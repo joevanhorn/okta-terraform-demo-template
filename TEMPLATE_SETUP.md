@@ -168,14 +168,32 @@ terraform output state_bucket_name
 
 ---
 
-## Step 3: Configure GitHub Environment
+## Step 3: Configure GitHub Repository
+
+### Option A: Automated Setup (Recommended)
+
+Run the setup script to configure repository settings automatically:
+
+```bash
+./scripts/setup-repository.sh
+```
+
+This script configures:
+- ✅ GitHub Actions workflow permissions (read/write + PR creation)
+- ✅ Repository labels (template-sync, maintenance)
+
+**Requirements:** [GitHub CLI](https://cli.github.com/) authenticated with admin access.
+
+### Option B: Manual Setup
+
+If you prefer manual configuration or don't have GitHub CLI:
+
+#### 3.1 Create GitHub Environment
 
 GitHub Environments provide:
 - Secret management per Okta tenant
 - Approval gates for production deployments
 - Environment-specific protection rules
-
-### 3.1 Create GitHub Environment
 
 1. Go to your repository on GitHub
 2. Navigate to **Settings → Environments**
@@ -185,7 +203,7 @@ GitHub Environments provide:
    - Case-insensitive but should be consistent (e.g., `MyCompany` → `environments/mycompany/`)
 5. Click **"Configure environment"**
 
-### 3.2 Add Environment Secrets
+#### 3.2 Add Environment Secrets
 
 Add these three secrets:
 
@@ -212,7 +230,7 @@ Add these three secrets:
   - `okta-emea.com` for EMEA orgs
 - Click **"Add secret"**
 
-### 3.3 Configure Protection Rules (Optional)
+#### 3.3 Configure Protection Rules (Optional)
 
 For **production** environments, configure these protection rules:
 
@@ -230,7 +248,7 @@ For **development/staging**, lighter protection is acceptable:
 - No wait timer
 - Self-approval allowed
 
-### 3.4 Create Repository Labels
+#### 3.4 Create Repository Labels
 
 The template sync workflow uses labels to mark automated PRs. Create these labels:
 
@@ -272,7 +290,7 @@ gh label create maintenance \
 - Makes it easy to identify automated template updates
 - Helps filter PRs in the Pull Requests tab
 
-### 3.5 Enable Workflow Permissions for PR Creation
+#### 3.5 Enable Workflow Permissions for PR Creation
 
 The sync-template workflow needs permission to create pull requests. Enable this setting:
 

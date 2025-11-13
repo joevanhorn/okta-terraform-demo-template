@@ -16,6 +16,22 @@ No prior knowledge needed - just follow the step-by-step guide to:
 3. Import your Okta org into code
 4. See the results!
 
+### 🤖 Automated Setup Script
+
+After using this template, run the setup script to configure repository settings automatically:
+
+```bash
+# One command to configure repository
+./scripts/setup-repository.sh
+```
+
+**What it configures:**
+- ✅ GitHub Actions permissions for PR creation
+- ✅ Repository labels (template-sync, maintenance)
+- ✅ Validates GitHub CLI authentication
+
+Requires: [GitHub CLI](https://cli.github.com/) with admin access to the repository.
+
 ### 📚 Detailed Setup
 
 For comprehensive setup with all options:
