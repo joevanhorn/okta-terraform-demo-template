@@ -4,6 +4,8 @@ Welcome! This guide will walk you through setting up this template for your orga
 
 **Estimated time:** 30-45 minutes for first environment
 
+> **💡 Secrets Reference:** See **[SECRETS_SETUP.md](./SECRETS_SETUP.md)** for a complete guide to all required GitHub secrets and how to configure them.
+
 ---
 
 ## Table of Contents

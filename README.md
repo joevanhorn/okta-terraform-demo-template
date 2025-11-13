@@ -35,11 +35,8 @@ Requires: [GitHub CLI](https://cli.github.com/) with admin access to the reposit
 ### 📚 Detailed Setup
 
 For comprehensive setup with all options:
-**[TEMPLATE_SETUP.md](./TEMPLATE_SETUP.md)** - Complete setup guide covering:
-- AWS backend configuration
-- Multiple environments
-- Advanced options
-- Testing and validation
+- **[TEMPLATE_SETUP.md](./TEMPLATE_SETUP.md)** - Complete setup guide covering AWS backend, multiple environments, and advanced options
+- **[SECRETS_SETUP.md](./SECRETS_SETUP.md)** - Complete guide to configuring GitHub secrets (Okta credentials, AWS access, infrastructure passwords)
 
 ## What's Included
 
