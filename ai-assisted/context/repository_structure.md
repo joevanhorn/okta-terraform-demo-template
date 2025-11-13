@@ -27,10 +27,20 @@ okta-terraform-complete-demo/
 │   │   │   └── terraform.tfvars.example  # Example variables
 │   │   ├── imports/            # Imported JSON data
 │   │   └── config/             # Configuration files
+│   │       ├── owner_mappings.json    # Resource owners (API-managed)
+│   │       ├── label_mappings.json    # Governance labels (API-managed)
+│   │       └── risk_rules.json        # Risk rules/SOD policies (API-managed)
 │   ├── production/             # Production environment (template)
 │   ├── staging/                # Staging environment (template)
 │   └── development/            # Development environment (template)
 ├── scripts/                    # Python automation scripts
+│   ├── import_oig_resources.py     # Import OIG resources from Okta
+│   ├── sync_owner_mappings.py      # Sync resource owners
+│   ├── apply_resource_owners.py    # Apply resource owners
+│   ├── sync_label_mappings.py      # Sync governance labels
+│   ├── apply_admin_labels.py       # Auto-label admin resources
+│   ├── import_risk_rules.py        # Import risk rules (SOD policies)
+│   └── apply_risk_rules.py         # Apply risk rules to Okta
 ├── docs/                       # Documentation
 ├── testing/                    # Testing and validation guides
 └── .github/workflows/          # GitHub Actions workflows
@@ -107,8 +117,9 @@ resource "okta_group_memberships" "example" {
 ### OIG Resources
 - Entitlement bundles: Manage bundle definitions only
 - Principal assignments: Manage via Okta Admin Console (not Terraform)
-- Resource owners: Manage via Python scripts (API-only)
-- Governance labels: Manage via Python scripts (API-only)
+- Resource owners: Manage via Python scripts (API-only, stored in `config/owner_mappings.json`)
+- Governance labels: Manage via Python scripts (API-only, stored in `config/label_mappings.json`)
+- Risk rules (SOD policies): Manage via Python scripts (API-only, stored in `config/risk_rules.json`)
 
 ## Environment-Specific Paths
 

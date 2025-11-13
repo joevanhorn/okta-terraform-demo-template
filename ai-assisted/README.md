@@ -682,6 +682,24 @@ ai-assisted/
 
 **Requirements:** Okta Identity Governance license
 
+### 6. Manage Risk Rules (SOD Policies)
+**File:** `prompts/manage_risk_rules.md`
+
+**Use for:**
+- Separation of Duties (SOD) policies
+- Risk rule configuration
+- Conflict detection setup
+- Compliance controls
+
+**Generates:**
+- risk_rules.json configuration file
+
+**Time to generate:** 3-5 minutes (Tier 1) or 1-2 minutes (Tier 2)
+
+**Requirements:** Okta Identity Governance license
+
+**Note:** Risk rules are managed via Python scripts, not Terraform
+
 ### 5. Deploy Infrastructure
 **File:** `prompts/deploy_infrastructure.md`
 
@@ -995,10 +1013,13 @@ Filename: complete_demo.tf
 
 ## Related Documentation
 
+- **📖 Documentation Index:** `../docs/00-INDEX.md` - **Start here! Master index to all 52+ documentation files**
 - **Demo Build Guide:** `../testing/DETAILED_DEMO_BUILD_GUIDE.md`
 - **Resource Reference:** `../docs/TERRAFORM_RESOURCES.md`
 - **Manual Validation:** `../testing/MANUAL_VALIDATION_PLAN.md`
 - **Main README:** `../README.md`
+- **API Management:** `../docs/API_MANAGEMENT.md` - Risk rules, owners, labels
+- **OIG Prerequisites:** `../OIG_PREREQUISITES.md`
 
 ---
 

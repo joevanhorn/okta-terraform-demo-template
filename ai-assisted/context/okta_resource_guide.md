@@ -155,10 +155,36 @@ These resources require Okta Identity Governance license:
 - `okta_resource_set`
 - Related OIG resources
 
+### Risk Rules (Separation of Duties Policies)
+
+**API-Only** - Not available in Terraform provider
+
+Risk rules detect and prevent conflicting access patterns (Separation of Duties violations).
+
+**Management:**
+- **Import:** `python3 scripts/import_risk_rules.py --output environments/myenv/config/risk_rules.json`
+- **Apply:** `python3 scripts/apply_risk_rules.py --config environments/myenv/config/risk_rules.json`
+- **Configuration:** JSON file at `environments/{env}/config/risk_rules.json`
+
+**Structure:**
+- **Type:** Always "SEPARATION_OF_DUTIES"
+- **Resources:** Array with max 1 resource (app, bundle, or collection ORN)
+- **Conflict Criteria:** AND conditions with CONTAINS_ONE or CONTAINS_ALL operations
+- **Entitlements:** Array of entitlement set ID + value ID pairs (max 10 per list)
+
+**Example Use Cases:**
+- Maker-Checker: Invoice creator ≠ invoice approver
+- Change Management: Change implementer ≠ change approver
+- Financial Controls: Payment creator ≠ payment authorizer
+- Data Access: Database admin ≠ production deployer
+
+**Docs:** See `docs/API_MANAGEMENT.md` (Risk Rules section) for complete guide
+
 ### API-Only Features
 Some OIG features are API-only (not in Terraform):
 - Resource owners (use Python scripts: `scripts/apply_resource_owners.py`)
-- Governance labels (use Python scripts: `scripts/apply_governance_labels.py`)
+- Governance labels (use Python scripts: `scripts/apply_admin_labels.py`, `scripts/sync_label_mappings.py`)
+- Risk rules / SOD policies (use Python scripts: `scripts/import_risk_rules.py`, `scripts/apply_risk_rules.py`)
 - Principal assignments to bundles (manage via Okta Admin Console)
 
 ## Infrastructure Resources (AWS)

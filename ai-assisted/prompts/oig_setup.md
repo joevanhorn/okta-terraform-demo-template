@@ -115,8 +115,33 @@ python3 scripts/sync_label_mappings.py \
 # Edit label_mappings.json to set desired labels
 
 # Apply labels
-python3 scripts/apply_governance_labels.py \
+python3 scripts/apply_admin_labels.py \
   --config environments/myorg/config/label_mappings.json
+
+# Or use workflow
+gh workflow run apply-labels-from-config.yml \
+  -f environment=myorg \
+  -f dry_run=false
+```
+
+### 6. Configure Risk Rules (Optional, API-Only)
+```bash
+# Import existing risk rules to see format
+python3 scripts/import_risk_rules.py \
+  --output environments/myorg/config/risk_rules.json
+
+# Edit risk_rules.json to add/modify SOD policies
+# See prompts/manage_risk_rules.md for examples
+
+# Apply risk rules
+python3 scripts/apply_risk_rules.py \
+  --config environments/myorg/config/risk_rules.json \
+  --dry-run  # Remove for actual apply
+
+# Or use workflow
+gh workflow run apply-risk-rules.yml \
+  -f environment=myorg \
+  -f dry_run=false
 ```
 
 ---
@@ -265,7 +290,10 @@ When demoing OIG features:
 
 ## Related Documentation
 
+- **📖 Documentation Index:** `../docs/00-INDEX.md` - Master guide to all documentation
 - **OIG Overview:** `testing/DETAILED_DEMO_BUILD_GUIDE.md` (Level 5)
 - **OIG Validation:** `testing/MANUAL_VALIDATION_PLAN.md` (Section 5)
 - **Resource Guide:** `docs/TERRAFORM_RESOURCES.md` (OIG section)
+- **API Management:** `docs/API_MANAGEMENT.md` - Owners, labels, risk rules
+- **Risk Rules Prompt:** `prompts/manage_risk_rules.md` - SOD policies setup
 - **Okta OIG Docs:** https://help.okta.com/oie/en-us/content/topics/identity-governance/iga-main.htm
