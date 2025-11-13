@@ -65,9 +65,62 @@ arn:aws:iam::123456789012:role/GitHubActions-OktaTerraform
 
 ---
 
+## ⚠️ CRITICAL: Environment Naming Requirements
+
+**GitHub Environment names and secret names are CASE-SENSITIVE and must match EXACTLY.**
+
+### ❌ Common Mistakes That Will Cause Failures:
+
+| What You Set | What Workflow Expects | Result |
+|--------------|----------------------|--------|
+| Environment: `myorg` | Workflow input: `MyOrg` | ❌ **FAILS** - Environment not found |
+| Environment: `Production` | Workflow input: `production` | ❌ **FAILS** - Environment not found |
+| Secret: `okta_api_token` | Expected: `OKTA_API_TOKEN` | ❌ **FAILS** - Secret not found |
+| Secret: `Okta_Org_Name` | Expected: `OKTA_ORG_NAME` | ❌ **FAILS** - Secret not found |
+
+### ✅ Correct Pattern:
+
+1. **Environment Name:** Can be any case (e.g., `MyOrg`, `Production`, `dev-env`)
+2. **Workflow Input:** Must match environment name EXACTLY
+3. **Secret Names:** Must be UPPERCASE with underscores (e.g., `OKTA_API_TOKEN`)
+
+**Example that works:**
+```
+Environment created: "MyOrg"
+Workflow dispatch input: "MyOrg" ← Must match exactly!
+Secrets in "MyOrg" environment:
+  - OKTA_API_TOKEN ← Must be uppercase
+  - OKTA_ORG_NAME ← Must be uppercase
+  - OKTA_BASE_URL ← Must be uppercase
+```
+
+### 🔍 How to Verify Before Running Workflows:
+
+1. **Check environment name:**
+   - Go to: Settings → Environments
+   - Note the EXACT name (including capitalization)
+
+2. **Check secret names in that environment:**
+   - Click on the environment
+   - Verify all secret names are UPPERCASE with underscores
+
+3. **When running workflow:**
+   - Copy-paste the environment name (don't type it manually)
+   - Ensures exact match
+
+### 💡 Recommended Naming Convention:
+
+**For consistency, we recommend:**
+- **Environment names:** PascalCase (e.g., `MyOrg`, `DevEnvironment`, `Production`)
+- **Secret names:** UPPERCASE_WITH_UNDERSCORES (always - not optional)
+
+---
+
 ## Environment-Level Secrets
 
 These secrets are configured per GitHub Environment (e.g., "MyOrg", "Production", etc.).
+
+> **📍 Remember:** The environment name you choose here must be used EXACTLY (case-sensitive) when running workflows!
 
 ### Core Okta Secrets (Required for All Environments)
 
@@ -380,27 +433,70 @@ Check the workflow logs for successful AWS authentication:
 
 ### Error: "Environment not found"
 
-**Symptom:** Workflow fails with "Environment not found: MyOrg"
+**Symptom:** Workflow fails with "Environment not found: MyOrg" or "❌ Environment not found: myorg"
 
-**Possible causes:**
-1. Environment name mismatch
-2. Environment not created in GitHub
+**Root Cause:** Environment names are CASE-SENSITIVE and must match EXACTLY.
+
+**Common Mistake Examples:**
+- Created environment: `myorg` but workflow input: `MyOrg` ❌
+- Created environment: `Production` but workflow input: `production` ❌
+- Created environment: `Dev-Env` but workflow input: `dev-env` ❌
 
 **Solution:**
-1. Verify environment exists: `Settings → Environments`
-2. Check environment name matches exactly (case-sensitive)
-3. Create environment if missing
+
+1. **Check what environment name actually exists:**
+   - Go to: `Settings → Environments`
+   - Note the EXACT name (including capitalization and hyphens)
+   - Example: You see `MyOrg` ← This is what you must use
+
+2. **When running workflow:**
+   - Copy-paste the environment name (don't type it manually)
+   - In workflow dispatch screen, paste EXACTLY: `MyOrg`
+
+3. **If environment doesn't exist:**
+   - Click "New environment"
+   - Choose a name and remember it exactly
+   - Recommendation: Use PascalCase like `MyOrg` or `DevEnvironment`
+
+**Quick Test:**
+```bash
+# List all environments
+gh api repos/:owner/:repo/environments --jq '.environments[].name'
+```
 
 ---
 
 ### Error: "Secret not found"
 
-**Symptom:** Workflow fails with "Secret OKTA_API_TOKEN not found"
+**Symptom:** Workflow fails with "Secret OKTA_API_TOKEN not found" or similar
 
-**Possible causes:**
-1. Secret not added to correct environment
-2. Secret name typo
-3. Workflow using wrong environment name
+**Root Cause:** Secret names must be UPPERCASE with underscores, and added to the correct environment.
+
+**Common Mistake Examples:**
+- Named secret: `okta_api_token` instead of `OKTA_API_TOKEN` ❌
+- Named secret: `Okta_Org_Name` instead of `OKTA_ORG_NAME` ❌
+- Added secret to Repository secrets instead of Environment secrets ❌
+- Added secret to wrong environment (e.g., `Production` instead of `MyOrg`) ❌
+
+**Solution:**
+
+1. **Verify secret names are correct:**
+   - Go to: `Settings → Environments → [Your Environment]`
+   - Check secret names are UPPERCASE_WITH_UNDERSCORES:
+     - ✅ `OKTA_API_TOKEN`
+     - ✅ `OKTA_ORG_NAME`
+     - ✅ `OKTA_BASE_URL`
+     - ❌ `okta_api_token`
+     - ❌ `Okta_Api_Token`
+
+2. **Verify secrets are in the correct environment:**
+   - Secrets must be in the SAME environment the workflow is using
+   - If workflow uses environment "MyOrg", secrets must be in "MyOrg"
+   - NOT in Repository secrets, NOT in different environment
+
+3. **Recreate secret with correct name if needed:**
+   - Delete the incorrectly named secret
+   - Add new secret with EXACT name from list above
 
 **Solution:**
 1. Verify secrets in environment: `Settings → Environments → MyOrg → Secrets`
