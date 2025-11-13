@@ -47,14 +47,31 @@ environments/
 
 ### `/terraform/`
 Contains ALL Terraform configuration files for the environment:
+
+**Auto-generated files (from import workflow):**
 - `oig_entitlements.tf` - Entitlement bundle definitions
 - `oig_reviews.tf` - Access review campaigns
+- `oig_approval_sequences.tf` - Approval workflows
+
+**User-created files (you create these):**
 - `app_oauth.tf` - OAuth applications
 - `user.tf` - User resources
 - `group.tf` - Group resources
-- `backend.tf`, `provider.tf`, `variables.tf`, etc.
+- `policies.tf` - Security policies
+- etc.
+
+**Required configuration:**
+- `provider.tf` - Okta provider and S3 backend configuration
+- `variables.tf` - Variable definitions
+
+**Template files (for new organizations):**
+- `QUICKSTART_DEMO.tf.example` - Ready-to-use demo (5 users, 3 groups, 1 app)
+- `RESOURCE_EXAMPLES.tf` - Comprehensive reference with ALL Okta resource examples
+- `README.md` - Guide explaining templates and best practices
 
 **Everything is in one place** - no need to choose between directories.
+
+**📝 New to Terraform?** See [terraform/README.md](./environments/myorg/terraform/README.md) for template usage guide.
 
 ### `/imports/`
 Raw JSON data from API imports for reference:

@@ -114,6 +114,59 @@ cp environments/myorg/config/* environments/mycompany/config/
 
 ---
 
+## 📝 Terraform Starter Templates
+
+**New to Terraform or starting with a brand new Okta org?** We provide ready-to-use templates!
+
+Each environment includes starter templates to help you quickly set up resources:
+
+### 🚀 **QUICKSTART_DEMO.tf.example** - Ready in 2 Minutes
+
+Perfect for: Testing, learning, quick demos
+
+**Contains:**
+- 5 demo users (employees, manager, contractor)
+- 3 groups with memberships
+- 1 OAuth application
+- Complete outputs for credentials
+
+**Deploy:**
+```bash
+cd environments/mycompany/terraform
+cp QUICKSTART_DEMO.tf.example demo.tf
+# Uncomment all code, change @example.com to your domain
+terraform init && terraform apply
+```
+
+### 📚 **RESOURCE_EXAMPLES.tf** - Comprehensive Reference
+
+Perfect for: Finding examples of any resource type
+
+**Contains:**
+- ALL Okta Terraform resources with examples
+- Users, Groups, Apps, Policies, OIG, Auth Servers, Hooks
+- Real-world configuration patterns
+- Detailed comments explaining each attribute
+
+**Usage:**
+```bash
+# Browse for examples
+less environments/mycompany/terraform/RESOURCE_EXAMPLES.tf
+# Copy examples to your own .tf files
+```
+
+### 📖 **README.md** - Template Guide
+
+Located in each `terraform/` directory with:
+- Explanation of all available templates
+- Quick start workflows for different scenarios
+- Best practices (file organization, naming, escaping)
+- Testing and troubleshooting guides
+
+**[→ See terraform/README.md](./environments/myorg/terraform/README.md)** for complete template guide.
+
+---
+
 ## 🖥️ Active Directory Infrastructure (Optional)
 
 Each environment can include AWS infrastructure for Active Directory integration with Okta.
