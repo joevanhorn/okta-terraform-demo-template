@@ -2,6 +2,55 @@
 
 This directory contains tools and templates for using AI assistants (Gemini, ChatGPT, Claude) to generate Terraform code for Okta infrastructure.
 
+## 🚀 Before You Use AI: Try the Ready-Made Templates!
+
+**Want something even faster?** We provide ready-to-use templates that don't require AI:
+
+### **QUICKSTART_DEMO.tf.example** - Deploy in 2 Minutes ⭐
+
+Perfect for testing or learning:
+```bash
+cd ../environments/myorg/terraform
+cp QUICKSTART_DEMO.tf.example demo.tf
+# Uncomment code, change @example.com → deploy!
+terraform init && terraform apply
+```
+
+**Creates:** 5 users, 3 groups, 1 OAuth app - no AI needed!
+
+### **RESOURCE_EXAMPLES.tf** - Comprehensive Reference
+
+Browse copy-paste examples for ANY Okta resource:
+```bash
+less ../environments/myorg/terraform/RESOURCE_EXAMPLES.tf
+```
+
+**Contains:** Users, Groups, Apps, Policies, OIG, Hooks - all resource types!
+
+**See:** [../environments/myorg/terraform/README.md](../environments/myorg/terraform/README.md) for complete template guide.
+
+---
+
+## When to Use AI vs Templates
+
+**Use Templates When:**
+- ✅ Testing this template for the first time
+- ✅ You want a quick working demo (2 minutes)
+- ✅ You need examples of specific resource types
+- ✅ You're learning Terraform basics
+
+**Use AI When:**
+- ✅ You need custom, specific scenarios
+- ✅ Templates don't have exactly what you need
+- ✅ You want to generate complex configurations quickly
+- ✅ You're comfortable with Terraform and want automation
+
+**Recommendation:** Start with templates, graduate to AI for custom needs!
+
+---
+
+## AI-Assisted Approaches
+
 **Three approaches available:**
 1. **Tier 1: Prompt Engineering** (Manual copy/paste with any AI)
 2. **Tier 2: CLI Tool** (Automated with API integration)

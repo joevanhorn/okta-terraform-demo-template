@@ -39,10 +39,18 @@ This template uses **Infrastructure as Code (IaC)** - managing Okta through code
 
 ## ⚡ Before You Start: Choose Your Path
 
+**Path 0: I just want to TEST this template (FASTEST!)** ⭐
+→ Use **Ready-Made Template** (QUICKSTART_DEMO.tf.example)
+→ Time: **2 minutes** to deploy working demo
+→ Creates: 5 users, 3 groups, 1 OAuth app automatically
+→ **Perfect for:** First-time testing, understanding how it works
+→ **Jump to:** [Super Quick Template Method](#super-quick-template-method-new)
+
 **Path 1: I want demos FAST and I'm okay learning some command line**
 → Use **AI-Assisted method** (recommended for most SEs)
 → Time: 30-45 min first time, 10 min after
 → You'll learn: Basic terminal commands, terraform basics
+→ **Jump to:** [Quick Demo Builder (AI-Assisted)](#quick-demo-builder-ai-assisted)
 
 **Path 2: I prefer clicking in Okta Admin Console**
 → Build demos manually in Okta (not using this tool)
@@ -53,8 +61,9 @@ This template uses **Infrastructure as Code (IaC)** - managing Okta through code
 → Start with **Manual Method**, then try AI-Assisted
 → Time: 3-4 hours learning, but you'll understand every detail
 → **Benefit:** Can answer deep technical questions from customers
+→ **Jump to:** [Manual Demo Building](#manual-demo-building)
 
-**This guide covers Paths 1 and 3.** Choose AI-Assisted for speed, Manual for learning.
+**This guide covers Paths 0, 1, and 3.** Choose Template for fastest testing, AI-Assisted for custom demos, Manual for deep learning.
 
 ---
 
@@ -125,12 +134,149 @@ This guide covers:
 
 ## Table of Contents
 
-1. [Quick Demo Builder (AI-Assisted)](#quick-demo-builder-ai-assisted)
-2. [Manual Demo Building](#manual-demo-building)
-3. [Common Demo Scenarios](#common-demo-scenarios)
-4. [Demo Presentation Tips](#demo-presentation-tips)
-5. [Troubleshooting Demos](#troubleshooting-demos)
-6. [Common First-Time Mistakes](#common-first-time-mistakes)
+1. [Super Quick Template Method (NEW!)](#super-quick-template-method-new) ⭐
+2. [Quick Demo Builder (AI-Assisted)](#quick-demo-builder-ai-assisted)
+3. [Manual Demo Building](#manual-demo-building)
+4. [Common Demo Scenarios](#common-demo-scenarios)
+5. [Demo Presentation Tips](#demo-presentation-tips)
+6. [Troubleshooting Demos](#troubleshooting-demos)
+7. [Common First-Time Mistakes](#common-first-time-mistakes)
+
+---
+
+## Super Quick Template Method (NEW!) ⭐
+
+**The absolute fastest way to get a working demo!** Deploy a complete demo environment in 2 minutes using our ready-made template.
+
+### What You Get
+
+This template creates a realistic demo environment with:
+- **5 demo users:**
+  - Alice Engineer (Engineering)
+  - Bob Developer (Engineering)
+  - Carol Marketing (Marketing)
+  - David Manager (Engineering Manager)
+  - Eva Contractor (Contract Developer)
+- **3 groups:**
+  - Engineering
+  - Marketing
+  - Administrators
+- **1 OAuth application** with group assignments
+- **Complete outputs** showing credentials
+
+**Perfect for:**
+- ✅ Testing this template for the first time
+- ✅ Understanding how Terraform works with Okta
+- ✅ Quick demo environment for testing workflows
+- ✅ Learning before creating custom demos
+
+### Quick Deploy (2 Minutes)
+
+**Step 1: Navigate to your environment's terraform directory**
+
+```bash
+# Replace 'mycompany' with your actual environment name
+cd environments/mycompany/terraform
+```
+
+**Step 2: Copy the template**
+
+```bash
+cp QUICKSTART_DEMO.tf.example demo.tf
+```
+
+**Step 3: Edit the file to uncomment ALL code**
+
+Open `demo.tf` in your text editor:
+
+```bash
+# Use your preferred editor
+code demo.tf        # VS Code
+vim demo.tf         # Vim
+nano demo.tf        # Nano
+open -a TextEdit demo.tf  # Mac TextEdit
+```
+
+**Find and replace:** Change `@example.com` to your actual email domain
+- **Example:** If your email is `yourname@company.com`, replace all `@example.com` with `@company.com`
+- **Why:** Users will be created with these email addresses
+
+**Uncomment:** Remove the `#` from the beginning of EVERY line
+- **Tip:** Most editors have "Select All" + "Find & Replace" to remove `# ` quickly
+- **VS Code:** Select all → Edit → Toggle Line Comment
+- **Or:** Manually delete `# ` from start of each line
+
+**Step 4: Deploy!**
+
+```bash
+# See what will be created (safe - read-only)
+terraform plan
+
+# Create the resources in Okta
+terraform apply
+# Type 'yes' when prompted
+```
+
+**Step 5: View Your Demo**
+
+```bash
+# See all created users
+terraform output demo_users
+
+# See created groups
+terraform output demo_groups
+
+# See OAuth app details
+terraform output demo_app
+
+# Get the client secret (sensitive)
+terraform output -json demo_app_client_secret | jq -r
+```
+
+### What Just Happened?
+
+1. **Terraform read** your `demo.tf` file
+2. **Terraform called** Okta APIs to create users, groups, and apps
+3. **Resources appeared** in your Okta Admin Console - just like you created them manually!
+
+### Verify in Okta Admin Console
+
+Open your Okta Admin Console and check:
+
+1. **Directory → People** - You should see 5 new users (Alice, Bob, Carol, David, Eva)
+2. **Directory → Groups** - You should see 3 new groups
+3. **Applications → Applications** - You should see "Demo Application"
+
+**🎉 Success!** You just deployed a complete demo environment using code.
+
+### Clean Up When Done Testing
+
+To remove all created resources:
+
+```bash
+terraform destroy
+# Type 'yes' when prompted
+```
+
+**This will delete:**
+- All 5 demo users
+- All 3 groups
+- The OAuth application
+
+### Next Steps
+
+Now that you've seen how easy this is:
+
+**Want to create custom demos?**
+- → Continue to [Quick Demo Builder (AI-Assisted)](#quick-demo-builder-ai-assisted)
+- → Or browse `RESOURCE_EXAMPLES.tf` for specific resource types
+
+**Want to understand how it works?**
+- → Jump to [Manual Demo Building](#manual-demo-building)
+
+**Need different resources?**
+- → See [terraform/README.md](./environments/myorg/terraform/README.md) for comprehensive examples
+- → Browse `RESOURCE_EXAMPLES.tf` for ALL Okta resource types
 
 ---
 
@@ -370,6 +516,23 @@ Apply complete! Resources: 8 added, 0 changed, 0 destroyed.
 - Customize beyond what AI generates
 - Answer detailed customer questions confidently
 - Troubleshoot issues more easily
+
+**💡 Pro Tip:** You can browse `RESOURCE_EXAMPLES.tf` in your terraform directory for copy-paste examples of ANY Okta resource type. It's like having a cookbook of proven recipes!
+
+```bash
+# Browse comprehensive examples
+less environments/mycompany/terraform/RESOURCE_EXAMPLES.tf
+
+# Or open in your editor
+code environments/mycompany/terraform/RESOURCE_EXAMPLES.tf
+```
+
+**See:** [terraform/README.md](./environments/myorg/terraform/README.md) for complete template guide with examples for:
+- Users, Groups, Schemas
+- OAuth, SAML, SWA apps
+- Policies, Rules, Networks
+- OIG resources (Entitlements, Reviews, Sequences)
+- Authorization Servers, Scopes, Hooks
 
 ### Understanding Terraform Files
 
