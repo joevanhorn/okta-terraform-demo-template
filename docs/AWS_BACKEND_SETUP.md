@@ -161,15 +161,15 @@ terraform plan
 
 ```bash
 # Production
-cd environments/production/terraform
+cd environments/myorg/terraform
 terraform init -migrate-state
 
 # Staging
-cd environments/staging/terraform
+cd environments/myorg/terraform
 terraform init -migrate-state
 
 # Development
-cd environments/development/terraform
+cd environments/myorg/terraform
 terraform init -migrate-state
 ```
 

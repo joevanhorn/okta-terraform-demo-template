@@ -242,9 +242,9 @@ Environment directory names should match:
 - Okta tenant name (for clarity)
 
 Examples:
-- `myorg` → MyOrg GitHub Environment
-- `production` → Production GitHub Environment
-- `mycompany-dev` → MyCompany-Dev GitHub Environment
+- `myorg` → MyOrg GitHub Environment (template example)
+- `acme-prod` → AcmeProd GitHub Environment
+- `customer-demo` → CustomerDemo GitHub Environment
 
 ### 5. Regular Imports
 Run import workflows regularly to detect configuration drift:

@@ -6,10 +6,7 @@
 
 | Folder | Okta Organization | Purpose |
 |--------|------------------|---------|
-| `myorg/` | myorg.oktapreview.com | Demo and testing tenant |
-| `production/` | your-org.okta.com | Your production Okta tenant |
-| `staging/` | your-org-staging.okta.com | Your staging Okta tenant |
-| `development/` | your-org-dev.okta.com | Your development Okta tenant |
+| `myorg/` | myorg.oktapreview.com | Example template environment (replace with your org) |
 
 **One Folder = One Complete Okta Tenant**
 
@@ -25,27 +22,20 @@ Each directory under `environments/` represents a **separate Okta organization**
 
 ```
 environments/
-├── myorg/          # MyOrg.oktapreview.com
-│   ├── terraform/          # Terraform configurations for THIS tenant
-│   │   ├── oig_entitlements.tf
-│   │   ├── provider.tf
-│   │   └── variables.tf
-│   ├── config/             # API-managed resources (owners, labels)
-│   │   ├── owner_mappings.json
-│   │   └── label_mappings.json
-│   ├── imports/            # Raw API import data (JSON snapshots)
-│   └── archived-files/     # Legacy configuration files
-│
-├── production/             # Production Okta org
-│   └── terraform/
-│       ├── provider.tf
-│       └── variables.tf
-│
-├── staging/                # Staging Okta org
-│   └── terraform/
-│
-└── development/            # Development Okta org
-    └── terraform/
+└── myorg/          # Example template environment
+    ├── terraform/          # Okta Terraform configurations
+    │   ├── oig_entitlements.tf
+    │   ├── provider.tf
+    │   └── variables.tf
+    ├── infrastructure/     # AWS infrastructure (optional)
+    │   ├── provider.tf
+    │   ├── vpc.tf
+    │   ├── security-groups.tf
+    │   └── ad-domain-controller.tf
+    ├── config/             # API-managed resources (owners, labels)
+    │   ├── owner_mappings.json
+    │   └── label_mappings.json
+    └── imports/            # Raw API import data (JSON snapshots)
 ```
 
 ## Critical Rules for Environment Isolation
@@ -53,10 +43,8 @@ environments/
 ### 1. One Directory = One Okta Org
 
 Each environment directory manages resources for **exactly one** Okta organization:
-- `myorg/` → myorg.oktapreview.com
-- `production/` → your production Okta tenant
-- `staging/` → your staging Okta tenant
-- `development/` → your development Okta tenant
+- `myorg/` → Example template (replace with your org name)
+- Add additional directories as needed for your organizations
 
 **❌ NEVER** mix resources from different Okta orgs in the same directory.
 
@@ -104,10 +92,11 @@ Each environment has its own S3 state file:
 
 ```
 s3://okta-terraform-demo/Okta-GitOps/
-├── myorg/terraform.tfstate
-├── production/terraform.tfstate
-├── staging/terraform.tfstate
-└── development/terraform.tfstate
+└── myorg/terraform.tfstate
+    # Add more as needed:
+    # demo/terraform.tfstate
+    # customer1/terraform.tfstate
+    # etc.
 ```
 
 **Never share state across environments!**
@@ -124,8 +113,8 @@ mkdir -p environments/demo/{terraform,config,imports}
 ### 2. Copy Base Configuration
 ```bash
 # Copy provider configuration
-cp environments/production/terraform/provider.tf environments/demo/terraform/
-cp environments/production/terraform/variables.tf environments/demo/terraform/
+cp environments/myorg/terraform/provider.tf environments/demo/terraform/
+cp environments/myorg/terraform/variables.tf environments/demo/terraform/
 
 # Update backend key in provider.tf
 sed -i 's|production|demo|g' environments/demo/terraform/provider.tf

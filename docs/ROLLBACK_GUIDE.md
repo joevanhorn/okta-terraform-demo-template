@@ -218,7 +218,7 @@ gh run view <run-id> --log
 **Step 3: Destroy wrong resources**
 ```bash
 # In the WRONG environment where staging was applied
-cd environments/production/terraform
+cd environments/myorg/terraform
 
 # List what doesn't belong
 terraform state list
@@ -244,12 +244,12 @@ gh secret list -e Staging
 **Step 5: Apply correct config to correct environment**
 ```bash
 # Apply production config to production
-cd environments/production/terraform
+cd environments/myorg/terraform
 terraform plan
 terraform apply
 
 # Apply staging config to staging
-cd environments/staging/terraform
+cd environments/myorg/terraform
 terraform plan
 terraform apply
 ```

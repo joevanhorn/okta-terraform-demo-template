@@ -1108,8 +1108,8 @@ terraform destroy
 **Fix:** Always work in YOUR environment directory:
 ```bash
 # ❌ Wrong:
-cd environments/production/terraform    # Template example
-cd environments/staging/terraform       # Template example
+cd environments/myorg/terraform    # Template example
+cd environments/myorg/terraform       # Template example
 
 # ✅ Right:
 cd environments/myfirstenvironment/terraform  # YOUR environment

@@ -621,9 +621,9 @@ gh workflow run apply-labels-from-config.yml \
 
 | Environment | Label Config Location |
 |-------------|-----------------------|
-| Production | `environments/production/config/label_mappings.json` |
-| Staging | `environments/staging/config/label_mappings.json` |
-| Development | `environments/development/config/label_mappings.json` |
+| Production | `environments/myorg/config/label_mappings.json` |
+| Staging | `environments/myorg/config/label_mappings.json` |
+| Development | `environments/myorg/config/label_mappings.json` |
 
 ---
 

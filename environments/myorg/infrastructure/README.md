@@ -58,7 +58,7 @@ cp terraform.tfvars.example terraform.tfvars
 
 ```bash
 # Navigate to infrastructure directory
-cd environments/production/infrastructure
+cd environments/myorg/infrastructure
 
 # Copy example variables file
 cp terraform.tfvars.example terraform.tfvars

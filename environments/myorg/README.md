@@ -49,7 +49,7 @@ The backend configuration is already set for production. No changes needed unles
 ### 3. Initialize Terraform
 
 ```bash
-cd environments/production/terraform
+cd environments/myorg/terraform
 terraform init
 ```
 
@@ -70,7 +70,7 @@ gh workflow run import-all-resources.yml \
 ### 5. Review and Apply
 
 ```bash
-cd environments/production/terraform
+cd environments/myorg/terraform
 terraform plan
 terraform apply
 ```
@@ -120,7 +120,7 @@ gh workflow run terraform-apply-with-approval.yml \
 ```bash
 # Sync from Okta
 python3 scripts/sync_owner_mappings.py \
-  --output environments/production/config/owner_mappings.json
+  --output environments/myorg/config/owner_mappings.json
 
 # Apply to Okta
 gh workflow run apply-owners.yml \
@@ -132,7 +132,7 @@ gh workflow run apply-owners.yml \
 ```bash
 # Sync from Okta
 python3 scripts/sync_label_mappings.py \
-  --output environments/production/config/label_mappings.json
+  --output environments/myorg/config/label_mappings.json
 
 # Apply to Okta
 gh workflow run apply-labels-from-config.yml \

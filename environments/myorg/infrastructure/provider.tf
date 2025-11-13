@@ -12,7 +12,7 @@ terraform {
   # State path: s3://okta-terraform-demo/Okta-GitOps/{environment}/infrastructure/terraform.tfstate
   backend "s3" {
     bucket         = "okta-terraform-demo"
-    key            = "Okta-GitOps/production/infrastructure/terraform.tfstate"
+    key            = "Okta-GitOps/myorg/infrastructure/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "okta-terraform-state-lock"

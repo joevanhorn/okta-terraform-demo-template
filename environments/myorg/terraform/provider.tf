@@ -13,7 +13,7 @@ terraform {
   # See aws-backend/README.md for setup instructions
   backend "s3" {
     bucket         = "okta-terraform-demo"
-    key            = "Okta-GitOps/staging/terraform.tfstate"
+    key            = "Okta-GitOps/myorg/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true
     dynamodb_table = "okta-terraform-state-lock"

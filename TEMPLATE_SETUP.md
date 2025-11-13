@@ -693,9 +693,9 @@ gh workflow run apply-admin-labels.yml \
 
 Repeat Steps 3-6 for each Okta organization:
 
-- `environments/production/` → GitHub Environment: `Production`
-- `environments/staging/` → GitHub Environment: `Staging`
-- `environments/development/` → GitHub Environment: `Development`
+- `environments/myorg/` → GitHub Environment: `Production`
+- `environments/myorg/` → GitHub Environment: `Staging`
+- `environments/myorg/` → GitHub Environment: `Development`
 
 Each environment is completely isolated with:
 - Separate GitHub Environment secrets

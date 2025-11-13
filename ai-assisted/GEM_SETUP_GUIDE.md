@@ -216,7 +216,7 @@ resource "okta_user" "engineer1" {
 **Specify environment and file:**
 ```
 Create 3 users for the production environment.
-Save to: environments/production/terraform/users.tf
+Save to: environments/myorg/terraform/users.tf
 ```
 
 **Request specific patterns:**

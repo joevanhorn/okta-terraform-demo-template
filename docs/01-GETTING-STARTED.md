@@ -293,16 +293,16 @@ As you grow, you'll want separate environments for dev/staging/prod.
 
 ```bash
 # Create new environment
-mkdir -p environments/production/{terraform,config,imports}
+mkdir -p environments/myorg/{terraform,config,imports}
 
 # Copy template files
-cp environments/production/terraform/provider.tf environments/production/terraform/
-cp environments/production/terraform/variables.tf environments/production/terraform/
+cp environments/myorg/terraform/provider.tf environments/myorg/terraform/
+cp environments/myorg/terraform/variables.tf environments/myorg/terraform/
 ```
 
 **Step 2: Update Backend Configuration**
 
-Edit `environments/production/terraform/provider.tf`:
+Edit `environments/myorg/terraform/provider.tf`:
 
 ```hcl
 terraform {

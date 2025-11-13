@@ -36,7 +36,7 @@ in the context above.
 
 ENVIRONMENT DETAILS:
 - Target environment: production
-- Files should go in: environments/production/infrastructure/
+- Files should go in: environments/myorg/infrastructure/
 
 INFRASTRUCTURE REQUIREMENTS:
 [Describe what you need]
@@ -136,7 +136,7 @@ After the AI generates the code:
 
 1. **Copy the generated files** to your infrastructure directory:
    ```bash
-   cd environments/production/infrastructure
+   cd environments/myorg/infrastructure
    # Create files with generated code
    ```
 
@@ -217,7 +217,7 @@ I need to deploy AWS infrastructure for Active Directory integration with Okta u
 
 ENVIRONMENT DETAILS:
 - Target environment: production
-- Files should go in: environments/production/infrastructure/
+- Files should go in: environments/myorg/infrastructure/
 
 INFRASTRUCTURE REQUIREMENTS:
 Windows Server 2022 as Active Directory Domain Controller with fully automated setup,
@@ -447,7 +447,7 @@ After successfully deploying infrastructure:
    - Run initial sync
 
 3. **Set up Okta resources**:
-   - Navigate to `environments/production/terraform/`
+   - Navigate to `environments/myorg/terraform/`
    - Create Okta users, groups, apps, entitlement bundles
    - Configure policies and access reviews
 

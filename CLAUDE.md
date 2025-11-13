@@ -718,8 +718,8 @@ cp testing/MANUAL_VALIDATION_PLAN.md testing/validation_run_$(date +%Y%m%d).md
    mkdir -p environments/mycompany/{terraform,imports,config}
 
    # Copy template files
-   cp environments/production/terraform/* environments/mycompany/terraform/
-   cp environments/production/config/* environments/mycompany/config/
+   cp environments/myorg/terraform/* environments/mycompany/terraform/
+   cp environments/myorg/config/* environments/mycompany/config/
    ```
 
 2. **Set up GitHub Environments**

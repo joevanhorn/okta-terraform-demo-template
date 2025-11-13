@@ -84,8 +84,8 @@ environments/
 mkdir -p environments/mycompany/{terraform,imports,config}
 
 # Copy template files
-cp environments/production/terraform/* environments/mycompany/terraform/
-cp environments/production/config/* environments/mycompany/config/
+cp environments/myorg/terraform/* environments/mycompany/terraform/
+cp environments/myorg/config/* environments/mycompany/config/
 
 # See TEMPLATE_SETUP.md for complete setup instructions
 ```
@@ -167,7 +167,7 @@ After `terraform apply`, the Domain Controller will automatically:
 
 ~$35-40/month for t3.medium instance with 50GB storage (stop when not in use to save costs)
 
-**[→ See Infrastructure README](./environments/production/infrastructure/README.md)** for complete guide including:
+**[→ See Infrastructure README](./environments/myorg/infrastructure/README.md)** for complete guide including:
 - Detailed architecture
 - Security best practices
 - Customization options
@@ -365,9 +365,9 @@ Go to **Settings → Environments** and create your first environment:
 mkdir -p environments/mycompany/{terraform,imports,config}
 
 # Copy template files
-cp environments/production/terraform/provider.tf environments/mycompany/terraform/
-cp environments/production/terraform/variables.tf environments/mycompany/terraform/
-cp environments/production/config/*.json environments/mycompany/config/
+cp environments/myorg/terraform/provider.tf environments/mycompany/terraform/
+cp environments/myorg/terraform/variables.tf environments/mycompany/terraform/
+cp environments/myorg/config/*.json environments/mycompany/config/
 
 # Update provider.tf with your backend key
 # Change: key = "Okta-GitOps/production/terraform.tfstate"
