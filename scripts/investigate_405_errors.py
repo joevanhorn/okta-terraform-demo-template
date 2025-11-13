@@ -13,9 +13,10 @@ Key findings from API documentation:
 - Request Conditions: /governance/api/v2/resources/{resourceId}/request-conditions (new)
 
 Usage:
-    export OKTA_API_TOKEN="your-token"
+    # Set environment variables (replace with your actual values)
     export OKTA_ORG_NAME="your-org"
     export OKTA_BASE_URL="okta.com"  # or oktapreview.com
+    export OKTA_API_TOKEN="<paste-your-token-here>"  # Example placeholder
 
     python3 scripts/investigate_405_errors.py
 """
