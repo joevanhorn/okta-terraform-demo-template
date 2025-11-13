@@ -1,0 +1,229 @@
+name: Sync Template Updates
+
+on:
+  # Run weekly on Sundays at 2 AM UTC
+  schedule:
+    - cron: '0 2 * * 0'
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      template_branch:
+        description: 'Template branch to sync from'
+        required: false
+        default: 'main'
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-template:
+    name: Sync from Template Repository
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add template remote
+        run: |
+          # Check if template remote exists
+          if git remote | grep -q '^template$'; then
+            echo "Template remote already exists, updating URL"
+            git remote set-url template https://github.com/joevanhorn/okta-terraform-demo-template.git
+          else
+            echo "Adding template remote"
+            git remote add template https://github.com/joevanhorn/okta-terraform-demo-template.git
+          fi
+
+          git remote -v
+
+      - name: Fetch template updates
+        run: |
+          TEMPLATE_BRANCH="${{ inputs.template_branch || 'main' }}"
+          echo "Fetching template updates from branch: $TEMPLATE_BRANCH"
+          git fetch template "$TEMPLATE_BRANCH"
+
+      - name: Check for updates
+        id: check_updates
+        run: |
+          TEMPLATE_BRANCH="${{ inputs.template_branch || 'main' }}"
+
+          # Get the merge-base (common ancestor)
+          MERGE_BASE=$(git merge-base HEAD template/$TEMPLATE_BRANCH 2>/dev/null || echo "")
+
+          if [ -z "$MERGE_BASE" ]; then
+            echo "No common ancestor found - this might be a fresh template usage"
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+            echo "update_count=unknown" >> $GITHUB_OUTPUT
+          else
+            # Count commits in template that we don't have
+            UPDATE_COUNT=$(git rev-list --count HEAD..template/$TEMPLATE_BRANCH)
+
+            if [ "$UPDATE_COUNT" -gt 0 ]; then
+              echo "Found $UPDATE_COUNT new commits in template"
+              echo "has_updates=true" >> $GITHUB_OUTPUT
+              echo "update_count=$UPDATE_COUNT" >> $GITHUB_OUTPUT
+            else
+              echo "No updates found - repository is up to date"
+              echo "has_updates=false" >> $GITHUB_OUTPUT
+              echo "update_count=0" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Create update branch
+        if: steps.check_updates.outputs.has_updates == 'true'
+        id: create_branch
+        run: |
+          BRANCH_NAME="sync-template-$(date +%Y%m%d-%H%M%S)"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+          git checkout -b "$BRANCH_NAME"
+          echo "Created branch: $BRANCH_NAME"
+
+      - name: Merge template updates
+        if: steps.check_updates.outputs.has_updates == 'true'
+        id: merge
+        continue-on-error: true
+        run: |
+          TEMPLATE_BRANCH="${{ inputs.template_branch || 'main' }}"
+
+          echo "Attempting to merge template/$TEMPLATE_BRANCH"
+
+          # Try merge with allow-unrelated-histories for repos created via "Use this template"
+          if git merge template/$TEMPLATE_BRANCH --allow-unrelated-histories -m "chore: Sync template updates from upstream"; then
+            echo "Merge successful"
+            echo "merge_status=success" >> $GITHUB_OUTPUT
+          else
+            echo "Merge has conflicts - will create PR for manual resolution"
+            echo "merge_status=conflicts" >> $GITHUB_OUTPUT
+
+            # Add all changes (including conflicts)
+            git add .
+            git commit -m "chore: Sync template updates (has conflicts - needs manual resolution)" || true
+          fi
+
+      - name: Push update branch
+        if: steps.check_updates.outputs.has_updates == 'true'
+        run: |
+          BRANCH_NAME="${{ steps.create_branch.outputs.branch_name }}"
+          git push origin "$BRANCH_NAME"
+
+      - name: Create Pull Request
+        if: steps.check_updates.outputs.has_updates == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH_NAME="${{ steps.create_branch.outputs.branch_name }}"
+          UPDATE_COUNT="${{ steps.check_updates.outputs.update_count }}"
+          MERGE_STATUS="${{ steps.merge.outputs.merge_status }}"
+
+          # Build PR body
+          if [ "$MERGE_STATUS" = "conflicts" ]; then
+            PR_BODY="## ⚠️ Template Updates (Merge Conflicts)
+
+This PR syncs updates from the template repository but has **merge conflicts** that need manual resolution.
+
+### What to do:
+1. Review the conflicts in the Files Changed tab
+2. Resolve conflicts locally or using GitHub's conflict editor
+3. Test the changes
+4. Merge when ready
+
+### Updates
+- Template commits: $UPDATE_COUNT new commits
+- Status: ⚠️ Has conflicts
+
+### Conflict Resolution Help
+\`\`\`bash
+# Check out this branch
+git fetch origin
+git checkout $BRANCH_NAME
+
+# Review conflicts
+git status
+
+# Resolve conflicts in your editor, then:
+git add .
+git commit -m \"Resolve merge conflicts\"
+git push origin $BRANCH_NAME
+\`\`\`
+
+---
+🤖 Generated automatically by [Sync Template Updates workflow](.github/workflows/sync-template.yml)"
+          else
+            PR_BODY="## ✨ Template Updates Available
+
+This PR syncs updates from the template repository.
+
+### What's included:
+- Template commits: $UPDATE_COUNT new commits
+- Status: ✅ Clean merge (no conflicts)
+
+### Review checklist:
+- [ ] Review changes in Files Changed tab
+- [ ] Check for any custom modifications that need preservation
+- [ ] Test in a non-production environment if significant changes
+- [ ] Merge when ready
+
+### Viewing changes:
+\`\`\`bash
+# Check out this branch locally to test
+git fetch origin
+git checkout $BRANCH_NAME
+
+# Run validation
+terraform fmt -check -recursive
+terraform validate
+\`\`\`
+
+---
+🤖 Generated automatically by [Sync Template Updates workflow](.github/workflows/sync-template.yml)"
+          fi
+
+          # Create PR
+          gh pr create \
+            --title "🔄 Sync template updates ($UPDATE_COUNT commits)" \
+            --body "$PR_BODY" \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --label "template-sync" \
+            --label "maintenance"
+
+          echo "✅ Pull request created successfully"
+
+      - name: No updates available
+        if: steps.check_updates.outputs.has_updates == 'false'
+        run: |
+          echo "✅ Repository is up to date with template"
+          echo "No pull request needed"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Sync Template Updates Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.check_updates.outputs.has_updates }}" = "true" ]; then
+            echo "✅ **Updates found and PR created**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- Updates: ${{ steps.check_updates.outputs.update_count }} commits" >> $GITHUB_STEP_SUMMARY
+            echo "- Branch: \`${{ steps.create_branch.outputs.branch_name }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- Status: ${{ steps.merge.outputs.merge_status }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Review the pull request in the Pull Requests tab." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **No updates needed**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Your repository is up to date with the template." >> $GITHUB_STEP_SUMMARY
+          fi

@@ -310,6 +310,77 @@ terraform apply
 
 For detailed setup instructions, see **[TEMPLATE_SETUP.md](./TEMPLATE_SETUP.md)**.
 
+---
+
+## 🔄 Keeping Your Repository Updated
+
+This template receives regular updates including new features, bug fixes, improved workflows, and enhanced documentation.
+
+### Automatic Updates (Recommended)
+
+**Use the built-in sync workflow:**
+
+1. **Enable the workflow:**
+   - Go to **Actions** tab in your repository
+   - Find "Sync Template Updates" workflow
+   - Click "Enable workflow" if needed
+
+2. **Run manually anytime:**
+   ```bash
+   gh workflow run sync-template.yml
+   ```
+   Or click "Run workflow" in the Actions tab
+
+3. **Review the PR:**
+   - Workflow creates a PR with template updates
+   - Review changes in the PR
+   - Merge when ready
+
+**The workflow runs automatically:**
+- 🕐 Weekly on Sundays at 2 AM UTC
+- 🔘 Manually via workflow dispatch
+- 📦 Creates PR with all template updates
+- 🔍 Shows exactly what changed
+
+### Manual Sync (Alternative)
+
+If you prefer manual control:
+
+```bash
+# One-time setup: Add template as remote
+git remote add template https://github.com/joevanhorn/okta-terraform-demo-template.git
+
+# Sync updates anytime:
+git fetch template
+git checkout -b sync-template-updates
+git merge template/main --allow-unrelated-histories
+git push origin sync-template-updates
+
+# Create PR via GitHub web UI or:
+gh pr create --title "Sync template updates" --body "Updates from template repository"
+```
+
+### Stay Notified
+
+**Watch this repository for updates:**
+1. Click "Watch" button (top right)
+2. Select "Custom"
+3. Enable "Releases"
+4. Click "Apply"
+
+You'll be notified when new features are released!
+
+### Recent Updates
+
+**v2.0.0 (2025-11-12):**
+- ✨ Added Gemini Gem support (Tier 3 AI-assisted generation)
+- 📝 GitHub web UI integration guide
+- 🔄 Automatic template sync workflow
+
+See [CHANGELOG.md](./CHANGELOG.md) for full history.
+
+---
+
 ## 📚 Documentation
 
 Comprehensive guides are available in the `docs/` directory:
