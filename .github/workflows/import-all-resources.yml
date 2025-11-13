@@ -1,17 +1,13 @@
-name: Existing Tenant - Import All Resources
+name: Import All Resources from Okta
 
 on:
   workflow_dispatch:
     inputs:
       tenant_environment:
-        description: 'Target tenant environment'
+        description: 'Environment name (must match directory in environments/)'
         required: true
-        type: choice
-        options:
-          - 'LowerDeckLabs'
-          - 'Production'
-          - 'Staging'
-          - 'Development'
+        type: string
+        default: 'myorg'
       update_terraform:
         description: 'Update production-ready Terraform files'
         required: false
@@ -39,6 +35,7 @@ jobs:
 
     permissions:
       contents: write
+      pull-requests: write  # Required for creating PR
       actions: read
       id-token: write  # Required for AWS OIDC authentication
 
@@ -61,6 +58,7 @@ jobs:
           echo "  5. OIG Request Settings → Terraform (okta_request_settings)"
           echo "  6. Resource Owners → config/owner_mappings.json"
           echo "  7. Governance Labels → config/label_mappings.json"
+          echo "  8. Risk Rules (SOD Policies) → config/risk_rules.json"
           echo ""
           echo "NOTE: Principal assignments (grants) are NOT imported and should"
           echo "be managed in Okta Admin UI or via direct API calls."
@@ -68,6 +66,16 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Validate Environment Exists
+        run: |
+          if [ ! -d "environments/${{ inputs.tenant_environment }}" ]; then
+            echo "❌ Environment not found: ${{ inputs.tenant_environment }}"
+            echo "Available environments:"
+            ls -1 environments/ | grep -v README.md
+            exit 1
+          fi
+          echo "✅ Environment found: ${{ inputs.tenant_environment }}"
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -229,15 +237,44 @@ jobs:
           fi
 
       # ============================================================================
-      # STEP 4: Update Terraform Files (if requested)
+      # STEP 4: Import Risk Rules (SOD Policies)
       # ============================================================================
 
-      - name: "Step 4: Update Terraform Files"
+      - name: "Step 4: Import Risk Rules"
+        id: import_risk_rules
+        run: |
+          echo ""
+          echo "=================================================================="
+          echo "STEP 4: Importing Risk Rules (SOD Policies) from Okta"
+          echo "=================================================================="
+          chmod +x scripts/import_risk_rules.py
+
+          python3 scripts/import_risk_rules.py \
+            --output "${{ env.IMPORT_DIR }}/config-exports/risk_rules.json" 2>&1 | tee import_risk_rules.log
+
+          IMPORT_STATUS=$?
+          echo "import_status=$IMPORT_STATUS" >> $GITHUB_OUTPUT
+
+          # Count risk rules
+          if [ -f "${{ env.IMPORT_DIR }}/config-exports/risk_rules.json" ]; then
+            RULES=$(jq '.rules | length' "${{ env.IMPORT_DIR }}/config-exports/risk_rules.json" 2>/dev/null || echo "0")
+            echo "rules_count=$RULES" >> $GITHUB_OUTPUT
+            echo "✅ Imported $RULES risk rules"
+          else
+            echo "rules_count=0" >> $GITHUB_OUTPUT
+            echo "⚠️  No risk rules found"
+          fi
+
+      # ============================================================================
+      # STEP 5: Update Terraform Files (if requested)
+      # ============================================================================
+
+      - name: "Step 5: Update Terraform Files"
         if: inputs.update_terraform == 'true'
         run: |
           echo ""
           echo "=================================================================="
-          echo "STEP 4: Updating Environment Terraform Files"
+          echo "STEP 5: Updating Environment Terraform Files"
           echo "=================================================================="
           echo "Target: ${{ env.ENV_DIR }}/terraform/"
 
@@ -283,10 +320,10 @@ jobs:
           echo "✅ Updated JSON reference files in ${{ env.ENV_DIR }}/imports/"
 
       # ============================================================================
-      # STEP 5: Import Resources into Terraform State
+      # STEP 6: Import Resources into Terraform State
       # ============================================================================
 
-      - name: "Step 5: Configure AWS Credentials for Terraform"
+      - name: "Step 6: Configure AWS Credentials for Terraform"
         if: inputs.update_terraform == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -294,13 +331,13 @@ jobs:
           role-session-name: GitHubActions-ImportResources-${{ inputs.tenant_environment }}
           aws-region: us-east-1
 
-      - name: "Step 5: Setup Terraform"
+      - name: "Step 6: Setup Terraform"
         if: inputs.update_terraform == 'true'
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.9.0
 
-      - name: "Step 5: Import Resources into Terraform State"
+      - name: "Step 6: Import Resources into Terraform State"
         if: inputs.update_terraform == 'true'
         working-directory: ${{ env.ENV_DIR }}/terraform
         env:
@@ -310,7 +347,7 @@ jobs:
         run: |
           echo ""
           echo "=================================================================="
-          echo "STEP 5: Importing Resources into Terraform State"
+          echo "STEP 6: Importing Resources into Terraform State"
           echo "=================================================================="
 
           # Check if import script exists
@@ -391,14 +428,14 @@ jobs:
           echo "✅ Terraform state now contains $RESOURCE_COUNT resources"
 
       # ============================================================================
-      # STEP 6: Update Config Files
+      # STEP 7: Update Config Files
       # ============================================================================
 
-      - name: "Step 6: Update Config Files"
+      - name: "Step 7: Update Config Files"
         run: |
           echo ""
           echo "=================================================================="
-          echo "STEP 6: Updating Environment Config Files"
+          echo "STEP 7: Updating Environment Config Files"
           echo "=================================================================="
           echo "Target: ${{ env.ENV_DIR }}/config/"
 
@@ -413,6 +450,11 @@ jobs:
             echo "📦 Backed up existing label_mappings.json"
           fi
 
+          if [ -f "${{ env.ENV_DIR }}/config/risk_rules.json" ]; then
+            cp "${{ env.ENV_DIR }}/config/risk_rules.json" "${{ env.ENV_DIR }}/config/risk_rules.json.backup-${{ env.TIMESTAMP }}"
+            echo "📦 Backed up existing risk_rules.json"
+          fi
+
           # Copy new config files to environment directory
           if [ -f "${{ env.IMPORT_DIR }}/config-exports/owner_mappings.json" ]; then
             cp "${{ env.IMPORT_DIR }}/config-exports/owner_mappings.json" "${{ env.ENV_DIR }}/config/owner_mappings.json"
@@ -424,11 +466,16 @@ jobs:
             echo "✅ Updated ${{ env.ENV_DIR }}/config/label_mappings.json"
           fi
 
+          if [ -f "${{ env.IMPORT_DIR }}/config-exports/risk_rules.json" ]; then
+            cp "${{ env.IMPORT_DIR }}/config-exports/risk_rules.json" "${{ env.ENV_DIR }}/config/risk_rules.json"
+            echo "✅ Updated ${{ env.ENV_DIR }}/config/risk_rules.json"
+          fi
+
       # ============================================================================
-      # STEP 7: Upload Artifacts
+      # STEP 8: Upload Artifacts
       # ============================================================================
 
-      - name: "Step 7: Upload Import Artifacts"
+      - name: "Step 8: Upload Import Artifacts"
         uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -439,15 +486,15 @@ jobs:
           retention-days: 180
 
       # ============================================================================
-      # STEP 8: Commit Changes (if requested)
+      # STEP 9: Create Pull Request with Changes (if requested)
       # ============================================================================
 
-      - name: "Step 8: Commit Changes to Repository"
+      - name: "Step 9: Create Pull Request with Changes"
         if: inputs.commit_changes == 'true' && success()
         run: |
           echo ""
           echo "=================================================================="
-          echo "STEP 8: Committing Changes to Repository"
+          echo "STEP 9: Creating Pull Request with Changes"
           echo "=================================================================="
 
           git config user.name "github-actions[bot]"
@@ -461,8 +508,13 @@ jobs:
           git add ${{ env.ENV_DIR }}/README.md 2>/dev/null || true
 
           if git diff --staged --quiet; then
-            echo "ℹ️  No changes to commit"
+            echo "ℹ️  No changes to commit - PR creation skipped"
           else
+            # Create branch for changes
+            BRANCH_NAME="import/all-resources-${{ inputs.tenant_environment }}-${{ env.TIMESTAMP }}"
+            git checkout -b "$BRANCH_NAME"
+
+            # Commit changes
             git commit -m "$(cat <<'EOF'
           feat(import): Complete import from ${{ inputs.tenant_environment }} tenant
 
@@ -472,11 +524,12 @@ jobs:
           - Approval workflows: ${{ steps.import_oig.outputs.sequences_count }}
           - Resource owners: ${{ steps.sync_owners.outputs.owners_count }}
           - Governance labels: ${{ steps.sync_labels.outputs.labels_count }}
+          - Risk rules: ${{ steps.import_risk_rules.outputs.rules_count }}
 
           Files updated:
           - ${{ env.ENV_DIR }}/terraform/ (Terraform configurations)
           - ${{ env.ENV_DIR }}/imports/ (Raw API import data)
-          - ${{ env.ENV_DIR }}/config/ (Resource owners and labels)
+          - ${{ env.ENV_DIR }}/config/ (Resource owners, labels, and risk rules)
 
           NOTE: Principal assignments (grants) are managed in Okta UI, not in code.
 
@@ -484,15 +537,67 @@ jobs:
 
           EOF
           )"
-            git push
-            echo "✅ Changes committed and pushed"
+
+            # Push branch
+            git push -u origin "$BRANCH_NAME"
+
+            # Create pull request
+            gh pr create \
+              --title "Import all resources from ${{ inputs.tenant_environment }}" \
+              --body "$(cat <<'EOF'
+          ## Import Summary
+
+          **Environment:** ${{ inputs.tenant_environment }}
+          **Timestamp:** ${{ env.TIMESTAMP }}
+          **Org:** ${OKTA_ORG_NAME}.${OKTA_BASE_URL}
+
+          ### Resources Imported
+
+          | Resource Type | Count |
+          |---------------|-------|
+          | Entitlement Bundles | ${{ steps.import_oig.outputs.bundles_count }} |
+          | Access Reviews | ${{ steps.import_oig.outputs.reviews_count }} |
+          | Approval Workflows | ${{ steps.import_oig.outputs.sequences_count }} |
+          | Resource Owners | ${{ steps.sync_owners.outputs.owners_count }} |
+          | Governance Labels | ${{ steps.sync_labels.outputs.labels_count }} |
+          | Risk Rules | ${{ steps.import_risk_rules.outputs.rules_count }} |
+
+          ### Files Updated
+
+          - `${{ env.ENV_DIR }}/terraform/*.tf` - Terraform configurations
+          - `${{ env.ENV_DIR }}/imports/*.json` - Raw API import data
+          - `${{ env.ENV_DIR }}/config/*.json` - Resource owners, labels, and risk rules
+
+          ### Next Steps
+
+          1. Review the imported Terraform configurations
+          2. Complete any TODO items in generated .tf files
+          3. Review config files for accuracy
+          4. After merge, run `terraform plan` to verify state
+
+          ### Important Notes
+
+          - 📝 **Entitlement bundle definitions** are now managed in Terraform
+          - ⚠️  **Principal assignments (grants)** should be managed in Okta Admin UI
+          - 🔧 **Resource owners** can be applied using the Apply Owners workflow
+          - 🏷️  **Governance labels** can be applied using the Apply Labels workflow
+          - 🛡️  **Risk rules** can be applied using the Apply Risk Rules workflow
+
+          🤖 Auto-generated by [Import All Resources workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF
+          )" \
+              --base main \
+              --head "$BRANCH_NAME"
+
+            echo "✅ Pull request created successfully"
+            echo "Branch: $BRANCH_NAME"
           fi
 
       # ============================================================================
-      # STEP 9: Generate Summary Report
+      # STEP 10: Generate Summary Report
       # ============================================================================
 
-      - name: "Step 9: Generate Summary Report"
+      - name: "Step 10: Generate Summary Report"
         if: always()
         run: |
           echo "# Complete Tenant Import Summary" >> $GITHUB_STEP_SUMMARY
@@ -511,18 +616,19 @@ jobs:
           echo "| Approval Workflows | ${{ steps.import_oig.outputs.sequences_count }} | ${{ env.ENV_DIR }}/terraform/oig_request_sequences.tf |" >> $GITHUB_STEP_SUMMARY
           echo "| Resource Owners | ${{ steps.sync_owners.outputs.owners_count }} | ${{ env.ENV_DIR }}/config/owner_mappings.json |" >> $GITHUB_STEP_SUMMARY
           echo "| Governance Labels | ${{ steps.sync_labels.outputs.labels_count }} | ${{ env.ENV_DIR }}/config/label_mappings.json |" >> $GITHUB_STEP_SUMMARY
+          echo "| Risk Rules | ${{ steps.import_risk_rules.outputs.rules_count }} | ${{ env.ENV_DIR }}/config/risk_rules.json |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           echo "## Actions Taken" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ "${{ inputs.update_terraform }}" == "true" ]; then
-            echo "- ✅ Terraform files updated in production-ready/" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Terraform files updated in ${{ env.ENV_DIR }}/terraform/" >> $GITHUB_STEP_SUMMARY
           else
             echo "- ℹ️  Terraform files NOT updated (update_terraform=false)" >> $GITHUB_STEP_SUMMARY
           fi
 
           if [ "${{ inputs.commit_changes }}" == "true" ]; then
-            echo "- ✅ Changes committed and pushed to repository" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Pull request created with imported resources" >> $GITHUB_STEP_SUMMARY
           else
             echo "- ℹ️  Changes NOT committed (commit_changes=false)" >> $GITHUB_STEP_SUMMARY
           fi
@@ -530,16 +636,23 @@ jobs:
 
           echo "## Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "1. **Review imported Terraform configurations** in ${{ env.ENV_DIR }}/terraform/" >> $GITHUB_STEP_SUMMARY
-          echo "2. **Complete TODO items** in generated .tf files" >> $GITHUB_STEP_SUMMARY
-          echo "3. **Review config files** in ${{ env.ENV_DIR }}/config/" >> $GITHUB_STEP_SUMMARY
-          echo "4. **Initialize and plan Terraform:**" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.commit_changes }}" == "true" ]; then
+            echo "1. **Review the pull request** created by this workflow" >> $GITHUB_STEP_SUMMARY
+            echo "2. **Review imported Terraform configurations** in the PR diff" >> $GITHUB_STEP_SUMMARY
+            echo "3. **Complete TODO items** in generated .tf files" >> $GITHUB_STEP_SUMMARY
+            echo "4. **Merge the pull request** after review and approval" >> $GITHUB_STEP_SUMMARY
+            echo "5. **Initialize and plan Terraform** after merge:" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "1. **Review imported Terraform configurations** in ${{ env.ENV_DIR }}/terraform/" >> $GITHUB_STEP_SUMMARY
+            echo "2. **Complete TODO items** in generated .tf files" >> $GITHUB_STEP_SUMMARY
+            echo "3. **Review config files** in ${{ env.ENV_DIR }}/config/" >> $GITHUB_STEP_SUMMARY
+            echo "4. **Initialize and plan Terraform:**" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "   \`\`\`bash" >> $GITHUB_STEP_SUMMARY
           echo "   cd ${{ env.ENV_DIR }}/terraform" >> $GITHUB_STEP_SUMMARY
           echo "   terraform init" >> $GITHUB_STEP_SUMMARY
           echo "   terraform plan" >> $GITHUB_STEP_SUMMARY
           echo "   \`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "5. **Apply Terraform changes** (after reviewing plan)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Important Notes" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -547,5 +660,6 @@ jobs:
           echo "- ⚠️  **Principal assignments (grants)** should be managed in Okta Admin UI" >> $GITHUB_STEP_SUMMARY
           echo "- 🔧 **Resource owners** can be applied using the Apply Owners workflow" >> $GITHUB_STEP_SUMMARY
           echo "- 🏷️  **Governance labels** can be applied using the Apply Labels workflow" >> $GITHUB_STEP_SUMMARY
+          echo "- 🛡️  **Risk rules** can be applied using the Apply Risk Rules workflow" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "📥 Download artifacts to review complete import data and logs" >> $GITHUB_STEP_SUMMARY
