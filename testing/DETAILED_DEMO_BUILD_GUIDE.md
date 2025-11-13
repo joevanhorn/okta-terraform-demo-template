@@ -7,9 +7,13 @@
 **📚 What You'll Learn:** Infrastructure as Code, Terraform basics, Git/GitHub, Command line essentials
 **🎯 Best For:** Solutions Engineers, learning deeply, technical discussions
 
-> **⚡ Want Quick Demos?** For a fast-track guide focused on AI-assisted demo building (30-45 min), see **[SIMPLE_SIMPLE_DEMO_BUILD_GUIDE.md](../SIMPLE_SIMPLE_DEMO_BUILD_GUIDE.md)** (assumes QUICKSTART.md completed).
+> **⚡ Super Quick (2 min)?** Just want to test this template fast? Copy `QUICKSTART_DEMO.tf.example` → uncomment → deploy! See [Super Quick Template Method](../SIMPLE_DEMO_BUILD_GUIDE.md#super-quick-template-method-new).
+
+> **⚡ Want Quick Demos?** For a fast-track guide focused on AI-assisted demo building (30-45 min), see **[SIMPLE_DEMO_BUILD_GUIDE.md](../SIMPLE_DEMO_BUILD_GUIDE.md)** (assumes QUICKSTART.md completed).
 
 > **📋 Secrets Reference:** This guide covers setting up Okta and AWS credentials. For a complete reference of all required GitHub secrets, see **[SECRETS_SETUP.md](../SECRETS_SETUP.md)**.
+
+> **📚 Need Examples?** Browse `RESOURCE_EXAMPLES.tf` in your terraform directory for copy-paste examples of ALL Okta resource types, or see [terraform/README.md](../environments/myorg/terraform/README.md) for the complete template guide.
 
 ---
 

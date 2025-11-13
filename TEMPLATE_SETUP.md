@@ -521,7 +521,72 @@ Successfully configured the backend "s3"!
 Terraform has been successfully initialized!
 ```
 
-### 6.2 Validate Configuration
+### 6.2 (Optional) Use Starter Templates for New Organizations
+
+**Skip this if you imported existing resources. This section is for brand new Okta orgs.**
+
+If you're starting with a brand new Okta organization, we provide ready-to-use templates:
+
+#### Option A: Quick Demo (Recommended for Testing)
+
+Deploy a working demo in 2 minutes with users, groups, and an OAuth app:
+
+```bash
+# Copy quickstart template
+cp QUICKSTART_DEMO.tf.example demo.tf
+
+# Edit file and uncomment ALL code
+vim demo.tf
+# Search and replace @example.com with your actual domain
+
+# Deploy
+terraform plan   # Review what will be created
+terraform apply  # Create resources
+
+# View outputs
+terraform output demo_users
+terraform output demo_app
+```
+
+**Creates:**
+- 5 demo users (employees, manager, contractor)
+- 3 groups (Engineering, Marketing, Admins)
+- 1 OAuth application with group assignments
+
+#### Option B: Browse Examples for Specific Resources
+
+Find examples for any resource type you need:
+
+```bash
+# Browse comprehensive reference
+less RESOURCE_EXAMPLES.tf
+
+# Examples include:
+# - Users, Groups, Schemas
+# - OAuth, SAML, SWA apps
+# - Policies, Rules, Networks
+# - OIG resources (Entitlements, Reviews, Sequences)
+# - Authorization Servers, Scopes
+# - Hooks (Inline & Event)
+
+# Copy examples to your own .tf files
+# All examples are commented out - uncomment what you need
+```
+
+#### Template Guide
+
+For complete template usage guide:
+```bash
+cat README.md  # Full guide in terraform directory
+```
+
+**📚 See:** [terraform/README.md](./environments/myorg/terraform/README.md) for:
+- Explanation of all available templates
+- Quick start workflows for different scenarios
+- Best practices (file organization, naming, template escaping)
+- Testing and troubleshooting guides
+
+### 6.3 Validate Configuration
 
 ```bash
 # Format Terraform files

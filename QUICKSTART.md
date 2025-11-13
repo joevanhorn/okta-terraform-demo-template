@@ -589,6 +589,11 @@ environments/yourenvname/imports/
 
 ### Common Next Actions
 
+**Want to create new resources from scratch?**
+→ [Terraform Starter Templates](environments/myorg/terraform/README.md) - Ready-to-use templates for users, groups, apps
+→ **Quick demo:** `cp QUICKSTART_DEMO.tf.example demo.tf` (deploy in 2 minutes!)
+→ **Find examples:** Browse `RESOURCE_EXAMPLES.tf` for any resource type
+
 **Want to make changes?**
 → [Making Your First Change](docs/01-GETTING-STARTED.md#making-your-first-change)
 

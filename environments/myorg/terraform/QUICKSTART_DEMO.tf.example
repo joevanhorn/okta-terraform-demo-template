@@ -1,0 +1,264 @@
+# ==============================================================================
+# QUICKSTART DEMO TEMPLATE
+# ==============================================================================
+#
+# This file provides a ready-to-use demo environment with:
+# - 5 demo users (3 employees, 1 manager, 1 contractor)
+# - 3 groups (Engineering, Marketing, Admins)
+# - 1 OAuth application
+# - 1 entitlement bundle (if OIG is enabled)
+#
+# Perfect for: Testing the template, learning GitOps, creating quick demos
+#
+# Usage:
+#   1. Copy this file: cp QUICKSTART_DEMO.tf.example demo.tf
+#   2. Uncomment ALL the code below
+#   3. Customize email domain (replace @example.com with your domain)
+#   4. Run: terraform init && terraform apply
+#
+# Time to deploy: ~2 minutes
+#
+# ==============================================================================
+
+# # ------------------------------------------------------------------------------
+# # STEP 1: Demo Users
+# # ------------------------------------------------------------------------------
+# # Create 5 users representing different roles in your organization
+#
+# resource "okta_user" "alice_engineer" {
+#   first_name = "Alice"
+#   last_name  = "Engineer"
+#   login      = "alice.engineer@example.com"  # ⚠️ Change to your domain
+#   email      = "alice.engineer@example.com"  # ⚠️ Change to your domain
+#   status     = "ACTIVE"
+#
+#   department      = "Engineering"
+#   title           = "Software Engineer"
+#   employee_number = "ENG001"
+# }
+#
+# resource "okta_user" "bob_engineer" {
+#   first_name = "Bob"
+#   last_name  = "Developer"
+#   login      = "bob.developer@example.com"   # ⚠️ Change to your domain
+#   email      = "bob.developer@example.com"   # ⚠️ Change to your domain
+#   status     = "ACTIVE"
+#
+#   department      = "Engineering"
+#   title           = "Senior Developer"
+#   employee_number = "ENG002"
+# }
+#
+# resource "okta_user" "carol_marketer" {
+#   first_name = "Carol"
+#   last_name  = "Marketing"
+#   login      = "carol.marketing@example.com" # ⚠️ Change to your domain
+#   email      = "carol.marketing@example.com" # ⚠️ Change to your domain
+#   status     = "ACTIVE"
+#
+#   department      = "Marketing"
+#   title           = "Marketing Specialist"
+#   employee_number = "MKT001"
+# }
+#
+# resource "okta_user" "david_manager" {
+#   first_name = "David"
+#   last_name  = "Manager"
+#   login      = "david.manager@example.com"   # ⚠️ Change to your domain
+#   email      = "david.manager@example.com"   # ⚠️ Change to your domain
+#   status     = "ACTIVE"
+#
+#   department      = "Engineering"
+#   title           = "Engineering Manager"
+#   employee_number = "MGR001"
+# }
+#
+# resource "okta_user" "eva_contractor" {
+#   first_name = "Eva"
+#   last_name  = "Contractor"
+#   login      = "eva.contractor@example.com"  # ⚠️ Change to your domain
+#   email      = "eva.contractor@example.com"  # ⚠️ Change to your domain
+#   status     = "ACTIVE"
+#
+#   department      = "Engineering"
+#   title           = "Contract Developer"
+#   employee_number = "CTR001"
+#   user_type       = "contractor"
+# }
+#
+# # ------------------------------------------------------------------------------
+# # STEP 2: Demo Groups
+# # ------------------------------------------------------------------------------
+# # Create groups and assign users to them
+#
+# resource "okta_group" "engineering" {
+#   name        = "Engineering"
+#   description = "Engineering department group"
+# }
+#
+# resource "okta_group" "marketing" {
+#   name        = "Marketing"
+#   description = "Marketing department group"
+# }
+#
+# resource "okta_group" "admins" {
+#   name        = "Administrators"
+#   description = "Administrative access group"
+# }
+#
+# # Assign users to groups
+# resource "okta_user_group_memberships" "alice_groups" {
+#   user_id = okta_user.alice_engineer.id
+#   groups  = [okta_group.engineering.id]
+# }
+#
+# resource "okta_user_group_memberships" "bob_groups" {
+#   user_id = okta_user.bob_engineer.id
+#   groups  = [okta_group.engineering.id]
+# }
+#
+# resource "okta_user_group_memberships" "carol_groups" {
+#   user_id = okta_user.carol_marketer.id
+#   groups  = [okta_group.marketing.id]
+# }
+#
+# resource "okta_user_group_memberships" "david_groups" {
+#   user_id = okta_user.david_manager.id
+#   groups  = [okta_group.engineering.id, okta_group.admins.id]
+# }
+#
+# resource "okta_user_group_memberships" "eva_groups" {
+#   user_id = okta_user.eva_contractor.id
+#   groups  = [okta_group.engineering.id]
+# }
+#
+# # ------------------------------------------------------------------------------
+# # STEP 3: Demo OAuth Application
+# # ------------------------------------------------------------------------------
+# # Create a sample OAuth application
+#
+# resource "okta_app_oauth" "demo_app" {
+#   label                      = "Demo Application"
+#   type                       = "web"
+#   grant_types                = ["authorization_code", "refresh_token"]
+#   redirect_uris              = ["https://demo.example.com/callback"]  # ⚠️ Change to your app URL
+#   response_types             = ["code"]
+#   token_endpoint_auth_method = "client_secret_post"
+#   consent_method             = "REQUIRED"
+#
+#   # Hide from mobile app stores (this is a web app)
+#   hide_ios = true
+#   hide_web = false
+#
+#   # Enable for end users
+#   login_mode = "SPEC"
+#   login_uri  = "https://demo.example.com/login"  # ⚠️ Change to your app URL
+# }
+#
+# # Assign groups to the application
+# resource "okta_app_group_assignment" "demo_app_engineering" {
+#   app_id   = okta_app_oauth.demo_app.id
+#   group_id = okta_group.engineering.id
+# }
+#
+# resource "okta_app_group_assignment" "demo_app_marketing" {
+#   app_id   = okta_app_oauth.demo_app.id
+#   group_id = okta_group.marketing.id
+# }
+#
+# # ------------------------------------------------------------------------------
+# # STEP 4: Demo Entitlement Bundle (Optional - requires OIG)
+# # ------------------------------------------------------------------------------
+# # Create a simple entitlement bundle for demonstration
+# # ⚠️ Only uncomment if Okta Identity Governance (OIG) is enabled
+#
+# # resource "okta_entitlement_bundle" "demo_bundle" {
+# #   name        = "Demo Standard Access Bundle"
+# #   description = "Standard access for demo employees"
+# #   status      = "ACTIVE"
+# #
+# #   entitlements = [
+# #     {
+# #       resource_orn = okta_app_oauth.demo_app.id
+# #       entitlement_type = "APP_RESOURCE"
+# #     }
+# #   ]
+# # }
+#
+# # ------------------------------------------------------------------------------
+# # STEP 5: Output Important Information
+# # ------------------------------------------------------------------------------
+# # Display useful information after terraform apply
+#
+# output "demo_users" {
+#   description = "Created demo users"
+#   value = {
+#     alice_engineer  = okta_user.alice_engineer.login
+#     bob_developer   = okta_user.bob_engineer.login
+#     carol_marketing = okta_user.carol_marketer.login
+#     david_manager   = okta_user.david_manager.login
+#     eva_contractor  = okta_user.eva_contractor.login
+#   }
+# }
+#
+# output "demo_groups" {
+#   description = "Created demo groups"
+#   value = {
+#     engineering = okta_group.engineering.id
+#     marketing   = okta_group.marketing.id
+#     admins      = okta_group.admins.id
+#   }
+# }
+#
+# output "demo_app" {
+#   description = "Demo OAuth application details"
+#   value = {
+#     name        = okta_app_oauth.demo_app.label
+#     client_id   = okta_app_oauth.demo_app.client_id
+#     # ⚠️ Client secret is sensitive - access via: terraform output -json demo_app | jq -r '.client_secret'
+#   }
+#   sensitive = false
+# }
+#
+# output "demo_app_client_secret" {
+#   description = "Demo app client secret (sensitive)"
+#   value       = okta_app_oauth.demo_app.client_secret
+#   sensitive   = true
+# }
+
+# ==============================================================================
+# WHAT'S NEXT?
+# ==============================================================================
+#
+# After deploying this demo:
+#
+# 1. ✅ View Your Resources in Okta Admin Console
+#    - Directory → People (see your 5 users)
+#    - Directory → Groups (see your 3 groups)
+#    - Applications → Applications (see Demo Application)
+#
+# 2. ✅ Test the OAuth Application
+#    - Get client credentials: terraform output demo_app
+#    - Get client secret: terraform output -json demo_app_client_secret | jq -r
+#    - Test OAuth flow with your application
+#
+# 3. ✅ Demonstrate GitOps Workflow
+#    - Make a change (e.g., add another user)
+#    - Create PR: git checkout -b add-user && git commit && gh pr create
+#    - Review terraform plan in PR
+#    - Merge and apply
+#
+# 4. ✅ Add More Resources
+#    - See RESOURCE_EXAMPLES.tf for all available resource types
+#    - Add SAML apps, policies, authorization servers, etc.
+#
+# 5. ✅ Enable OIG Features (Optional)
+#    - See: OIG_PREREQUISITES.md for setup
+#    - Create entitlement bundles
+#    - Set up access review campaigns
+#    - Implement approval workflows
+#
+# 6. ✅ Clean Up (When Done Testing)
+#    - terraform destroy  # Removes all created resources
+#
+# ==============================================================================

@@ -11,6 +11,9 @@ okta-terraform-complete-demo/
 │   │   ├── terraform/          # Terraform configurations (Okta resources)
 │   │   │   ├── provider.tf     # Okta provider configuration
 │   │   │   ├── variables.tf    # Variable definitions
+│   │   │   ├── QUICKSTART_DEMO.tf.example  # Ready-to-use demo template ⭐
+│   │   │   ├── RESOURCE_EXAMPLES.tf        # Comprehensive reference examples
+│   │   │   ├── README.md       # Template usage guide
 │   │   │   ├── users.tf        # User resources
 │   │   │   ├── groups.tf       # Group resources
 │   │   │   ├── apps.tf         # Application resources
@@ -60,6 +63,23 @@ okta-terraform-complete-demo/
   - `okta_org_name` - Okta organization name
   - `okta_base_url` - Base URL (okta.com, oktapreview.com, etc.)
   - `okta_api_token` - API token (from terraform.tfvars)
+
+### Template Files (NEW!)
+- **File:** `environments/{env}/terraform/QUICKSTART_DEMO.tf.example`
+- **Purpose:** Ready-to-use demo with 5 users, 3 groups, 1 OAuth app
+- **Usage:** Copy, uncomment, customize, deploy in 2 minutes
+- **Perfect for:** Testing, learning, quick demos
+
+- **File:** `environments/{env}/terraform/RESOURCE_EXAMPLES.tf`
+- **Purpose:** Comprehensive reference with examples of ALL Okta resources
+- **Contains:** Users, Groups, Apps, Policies, OIG, Auth Servers, Hooks
+- **Usage:** Browse for examples, copy what you need
+
+- **File:** `environments/{env}/terraform/README.md`
+- **Purpose:** Complete guide to using templates, best practices, workflows
+- **When to use:** Reference before AI generation, learn Terraform patterns
+
+**💡 Tip:** Before using AI, check if the templates already have what you need! They're faster and proven to work.
 
 ### Resource Files
 Each resource type has its own file:
