@@ -427,6 +427,394 @@ Create a shared document with:
 
 ---
 
+## GitHub Integration (No Git Required)
+
+This section is for users who want to commit Gem-generated code to GitHub but **don't have git installed locally** and prefer using only a web browser.
+
+### Prerequisites
+
+- GitHub account (free)
+- Access to your forked repository on github.com
+- Your Gemini Gem already set up
+
+### Workflow Overview
+
+```
+Gem generates code → Copy to clipboard →
+GitHub web UI → Create/edit file → Commit → Create PR (optional)
+```
+
+**Time:** 3-5 minutes per commit (after first time)
+
+---
+
+### Method 1: Direct File Creation (Fastest)
+
+**Best for:** Quick updates, simple changes, learning
+
+#### Step-by-Step
+
+**1. Generate code with your Gem:**
+
+Go to your Gem and enter prompt:
+```
+Create 3 marketing users for environments/demo/terraform/users.tf
+```
+
+Copy the generated Terraform code to clipboard.
+
+**2. Go to your GitHub repository:**
+- Open browser to: `https://github.com/YOUR-USERNAME/okta-terraform-demo-template`
+- Replace `YOUR-USERNAME` with your GitHub username
+
+**3. Navigate to the file location:**
+- Click on `environments/` folder
+- Click on your environment folder (e.g., `demo/`)
+- Click on `terraform/` folder
+
+**4a. If file exists (editing):**
+- Click on the file (e.g., `users.tf`)
+- Click the pencil icon (✏️) in top right: "Edit this file"
+- Paste your generated code (append or replace as needed)
+
+**4b. If file doesn't exist (creating new):**
+- Click "Add file" button (top right)
+- Select "Create new file"
+- Enter filename: `users.tf`
+- Paste your generated code
+
+**5. Commit the file:**
+
+Scroll down to "Commit changes" section:
+
+- **Commit message:**
+  ```
+  feat: Add marketing users for demo
+  ```
+
+- **Extended description (optional):**
+  ```
+  Generated with Gemini Gem
+  - 3 marketing team users
+  - Realistic test data
+  ```
+
+- **Choose commit option:**
+  - ✅ "Commit directly to the `main` branch" (for quick updates)
+  - OR "Create a new branch for this commit and start a pull request" (for review)
+
+- Click "Commit changes" button
+
+**6. Verify:**
+- GitHub automatically triggers workflows
+- Go to "Actions" tab to see terraform-plan running
+- Review plan output in workflow logs
+
+---
+
+### Method 2: Create Pull Request (Recommended for Production)
+
+**Best for:** Changes that need review, production environments, team collaboration
+
+#### Step-by-Step
+
+**1-4. Same as Method 1** (generate code, navigate to file, paste)
+
+**5. Create branch and PR:**
+
+When committing:
+- Select: ○ "Create a **new branch** for this commit and start a pull request"
+- Branch name: Auto-generated (e.g., `joevanhorn-patch-1`) or custom (e.g., `add-marketing-users`)
+- Click "Propose changes"
+
+**6. Fill out Pull Request:**
+
+GitHub opens PR creation page:
+
+- **Title:**
+  ```
+  Add marketing team users to demo environment
+  ```
+
+- **Description:**
+  ```
+  ## Summary
+  - Added 3 marketing users for demo purposes
+  - Users: sarah.johnson, mike.davis, emily.chen
+
+  ## Generated with
+  Gemini Gem using prompt: "Create 3 marketing users"
+
+  ## Testing
+  - [ ] Reviewed terraform plan in Actions
+  - [ ] Validated user details
+  - [ ] Ready to apply
+  ```
+
+- Click "Create pull request"
+
+**7. Review automated checks:**
+- GitHub Actions runs `terraform-plan.yml`
+- Review plan output in PR comments
+- Check for validation errors
+
+**8. Merge when ready:**
+- Click "Merge pull request"
+- Click "Confirm merge"
+- Delete branch (optional)
+
+**9. Apply changes (manual):**
+- Go to Actions tab
+- Click "Run workflow" on `terraform-apply-with-approval.yml`
+- Select your environment
+- Run workflow
+- Approve when prompted
+
+---
+
+### Method 3: GitHub Codespaces (Advanced, Cloud-Based)
+
+**Best for:** Users who want terminal access without local installation
+
+**Note:** Requires GitHub Pro, Team, or Enterprise (free for personal use with limits)
+
+#### Quick Setup
+
+**1. Open Codespace:**
+- Go to your repository on github.com
+- Click green "Code" button
+- Select "Codespaces" tab
+- Click "Create codespace on main"
+
+**2. Wait for environment:**
+- GitHub launches cloud-based VS Code
+- Takes 1-2 minutes first time
+- Has terminal, git, and all tools pre-installed
+
+**3. Use Gem and commit:**
+
+In Codespace terminal:
+```bash
+# Navigate to terraform directory
+cd environments/demo/terraform
+
+# Create file (paste Gem-generated code)
+cat > users.tf << 'EOF'
+[Paste your Gem-generated code here]
+EOF
+
+# Commit
+git add users.tf
+git commit -m "feat: Add marketing users"
+git push origin main
+```
+
+**Benefits:**
+- Full development environment
+- Terminal access without local installation
+- Git pre-configured
+- Can run terraform commands
+
+**Drawbacks:**
+- Requires GitHub paid plan (or limited free tier)
+- More complex than web UI
+- Overkill for simple file creation
+
+---
+
+### Workflow Decision Tree
+
+**Choose the right method:**
+
+```
+Do you need review/approval?
+├─ Yes → Method 2 (Pull Request)
+└─ No
+   ├─ Just need to commit one file?
+   │  └─ Yes → Method 1 (Direct Commit)
+   └─ Need terminal/complex operations?
+      └─ Yes → Method 3 (Codespaces)
+```
+
+---
+
+### Example: Complete Workflow for Marketing Demo
+
+**Scenario:** Create marketing users and Salesforce app
+
+**Step 1: Generate Users**
+
+Gem prompt:
+```
+Create 5 marketing users for environments/demo/terraform/users.tf
+```
+
+**Step 2: Commit Users**
+- GitHub → `environments/demo/terraform/`
+- Create new file: `users.tf`
+- Paste generated code
+- Commit message: `feat: Add marketing users`
+- Create branch: `add-marketing-demo`
+- Create PR
+
+**Step 3: Generate Salesforce App**
+
+Gem prompt:
+```
+Create Salesforce OAuth app for Marketing Team in environments/demo/terraform/apps.tf
+```
+
+**Step 4: Commit App**
+- In same PR branch: `add-marketing-demo`
+- GitHub → Navigate to `environments/demo/terraform/`
+- Create new file: `apps.tf`
+- Paste generated code
+- Commit to same branch: `add-marketing-demo`
+
+**Step 5: Generate Group**
+
+Gem prompt:
+```
+Create Marketing Team group with the 5 marketing users in environments/demo/terraform/groups.tf
+```
+
+**Step 6: Commit Group**
+- In same PR branch: `add-marketing-demo`
+- Create file: `groups.tf`
+- Paste generated code
+- Commit to branch
+
+**Step 7: Review and Merge**
+- Check terraform plan in PR
+- Merge PR when ready
+- Trigger apply workflow manually
+
+**Result:** Complete marketing demo in one PR, all done through web browser!
+
+---
+
+### Tips for GitHub Web Workflow
+
+**1. Use descriptive commit messages:**
+```
+# ✅ Good
+feat: Add 5 marketing users and Salesforce integration
+
+# ❌ Bad
+update files
+```
+
+**2. Create PRs for important changes:**
+- Production environments
+- Complex configurations
+- Multi-file changes
+
+**3. Review Actions output:**
+- Always check workflow runs
+- Read terraform plan carefully
+- Look for validation errors
+
+**4. Work in feature branches:**
+- Branch name format: `feature/marketing-demo`
+- Keeps main branch clean
+- Easier to review changes
+
+**5. Leverage PR descriptions:**
+- Explain what you generated
+- Include Gem prompts used
+- Add testing checklist
+
+**6. Commit related changes together:**
+- All files for one feature in one branch
+- Example: users + groups + apps for marketing team
+
+**7. Use GitHub's file editor features:**
+- Syntax highlighting works for .tf files
+- Preview tab shows rendered markdown
+- Can edit multiple files before committing
+
+---
+
+### Troubleshooting GitHub Web UI
+
+**Problem: Can't find "Add file" button**
+
+Solution: Make sure you're in a folder, not viewing a file. Navigate to the folder level where you want to add the file.
+
+**Problem: Commit button is grayed out**
+
+Solution:
+- Make sure you've made changes to the file
+- Check that filename is filled in (for new files)
+- Ensure commit message is not empty
+
+**Problem: Don't see terraform-plan workflow run**
+
+Solution:
+- Go to Actions tab
+- Check if workflows are enabled (Settings → Actions)
+- Verify `.github/workflows/` folder exists
+
+**Problem: Merge conflicts**
+
+Solution:
+- This means someone else changed the same file
+- Click "Resolve conflicts" button in PR
+- Manually merge the changes in GitHub's editor
+- Mark as resolved
+
+**Problem: Want to edit multiple files before committing**
+
+Solution: Use Method 2 (PR with branch):
+1. Create branch for first file
+2. After first commit, stay in that branch
+3. Navigate to other files and edit
+4. Commit to same branch
+5. All changes appear in same PR
+
+**Problem: Accidentally committed to main instead of branch**
+
+Solution:
+- No problem for non-critical changes
+- For critical changes, revert: Settings → Branches → View history → Revert
+- Best practice: Use PRs for important changes
+
+---
+
+### Security Best Practices
+
+**When using GitHub web UI:**
+
+1. ✅ **Review generated code before committing**
+   - Check for placeholder values
+   - Verify no hardcoded secrets
+   - Ensure realistic test data
+
+2. ✅ **Use example.com for email addresses**
+   ```hcl
+   # ✅ Good
+   email = "user@example.com"
+
+   # ❌ Bad - real email
+   email = "john@realcompany.com"
+   ```
+
+3. ✅ **Never commit real API tokens**
+   - Tokens go in GitHub Secrets, not code
+   - Use environment variables in workflows
+
+4. ✅ **Review terraform plan before applying**
+   - Always check what will be created
+   - Look for unexpected changes
+   - Verify resource counts
+
+5. ✅ **Use branch protection for production**
+   - Settings → Branches
+   - Add rule for `main` branch
+   - Require PR reviews
+
+---
+
 ## Cost Considerations
 
 ### Gemini API Pricing (as of 2025)
