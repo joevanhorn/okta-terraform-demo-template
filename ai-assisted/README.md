@@ -33,6 +33,7 @@ This directory contains tools and templates for using AI assistants (Gemini, Cha
    - `context/okta_resource_guide.md`
 3. **Choose a prompt template:**
    - `prompts/create_demo_environment.md` (complete demo)
+   - `prompts/deploy_infrastructure.md` (AWS Active Directory infrastructure)
    - `prompts/add_users.md` (add users only)
    - `prompts/create_app.md` (create applications)
    - `prompts/oig_setup.md` (OIG features)
@@ -122,6 +123,7 @@ Use pre-written prompts and context files with any AI assistant. No installation
 | Scenario | Prompt Template | Use Case |
 |----------|----------------|----------|
 | **Complete Demo Environment** | `prompts/create_demo_environment.md` | Building a full demo from scratch |
+| **Deploy Infrastructure** | `prompts/deploy_infrastructure.md` | AWS Active Directory infrastructure |
 | **Add Users** | `prompts/add_users.md` | Adding users to existing setup |
 | **Create Application** | `prompts/create_app.md` | OAuth/OIDC app configuration |
 | **OIG Setup** | `prompts/oig_setup.md` | Identity Governance features |
@@ -591,6 +593,7 @@ ai-assisted/
 │
 ├── prompts/                           # Prompt templates (Tier 1)
 │   ├── create_demo_environment.md     # Full demo environment
+│   ├── deploy_infrastructure.md       # AWS infrastructure for Active Directory
 │   ├── add_users.md                   # Add users to existing setup
 │   ├── create_app.md                  # Create OAuth applications
 │   └── oig_setup.md                   # OIG features (entitlements, reviews)
@@ -678,6 +681,45 @@ ai-assisted/
 **Time to generate:** 3-5 minutes (Tier 1) or 1-2 minutes (Tier 2)
 
 **Requirements:** Okta Identity Governance license
+
+### 5. Deploy Infrastructure
+**File:** `prompts/deploy_infrastructure.md`
+
+**Use for:**
+- AWS infrastructure for Active Directory integration
+- Windows Server Domain Controller setup
+- Okta AD Agent infrastructure preparation
+- VPC and networking for AD
+
+**Generates:**
+- provider.tf (AWS provider with S3 backend)
+- variables.tf (infrastructure variables)
+- vpc.tf (VPC, subnets, routing)
+- security-groups.tf (AD ports: DNS, LDAP, Kerberos, RDP, SMB)
+- ad-domain-controller.tf (EC2 instance with PowerShell automation)
+- outputs.tf (connection info, next steps)
+- scripts/userdata.ps1 (automated DC promotion and setup)
+- terraform.tfvars.example (configuration template)
+- README.md (deployment guide)
+
+**Infrastructure Features:**
+- Fully automated Domain Controller promotion
+- Automated OU structure creation (IT, HR, Finance, Sales, Marketing, Engineering)
+- Automated security group creation (department groups)
+- Sample user creation with default passwords
+- Okta AD Agent installer pre-downloaded
+- Comprehensive logging and troubleshooting
+
+**Deployment Time:**
+- Terraform apply: ~3-5 minutes
+- Automated setup: ~15-20 minutes
+- **Total:** ~20-25 minutes to ready-to-use Domain Controller
+
+**Cost:** ~$35-40/month (t3.medium EC2 + EBS + Elastic IP)
+
+**Time to generate:** 5-10 minutes (Tier 1) or 2-3 minutes (Tier 2)
+
+**Important:** Infrastructure goes in `environments/{env}/infrastructure/`, NOT `terraform/` directory
 
 ---
 
