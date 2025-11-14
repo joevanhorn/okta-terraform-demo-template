@@ -115,6 +115,118 @@ This SCIM server simulates a **cloud application with custom roles/entitlements*
 - SSH key pair in AWS (for direct server access)
 - CloudWatch enabled for log aggregation
 
+## Network Configuration
+
+The SCIM server supports flexible network deployment options:
+
+### Default Configuration (Simplest)
+
+By default, the server deploys to the **default VPC** with an **auto-created security group**:
+- ✅ No VPC/subnet configuration needed
+- ✅ Security group created automatically
+- ✅ HTTPS open to all (0.0.0.0/0)
+- ✅ SSH optional (controlled by `ssh_key_name`)
+
+**Perfect for:** Demos, testing, proof-of-concepts
+
+### Custom VPC/Subnet (Recommended for Production)
+
+Deploy into your existing VPC and subnet:
+
+```hcl
+# terraform.tfvars
+vpc_id    = "vpc-1234567890abcdef"
+subnet_id = "subnet-public-1a"  # Can be public or private (with NAT)
+```
+
+**Benefits:**
+- ✅ Network isolation
+- ✅ Private subnet support (requires NAT gateway)
+- ✅ Integration with existing infrastructure
+- ✅ VPC flow logs and monitoring
+
+### Use Existing Security Group (Maximum Control)
+
+Use your own security group with custom rules:
+
+```hcl
+# terraform.tfvars
+use_existing_security_group = true
+security_group_id          = "sg-1234567890abcdef"
+```
+
+**Your security group must allow:**
+- **Inbound 443 (HTTPS)** - From Okta IP ranges + your network
+- **Inbound 80 (HTTP)** - For Let's Encrypt validation (can be temporary)
+- **Outbound ALL** - For package downloads and Let's Encrypt
+
+**Perfect for:** Compliance requirements, pre-approved security groups, shared infrastructure
+
+### Restrict HTTPS Access (Security Best Practice)
+
+Limit HTTPS access to specific CIDR blocks (only when creating security group):
+
+```hcl
+# terraform.tfvars
+allowed_https_cidr = [
+  # Okta IP ranges (get latest from Okta docs)
+  "52.23.120.0/21",      # US East
+  "52.88.128.0/21",      # US West
+  "3.120.0.0/14",        # EMEA
+  # Your corporate network for dashboard access
+  "203.0.113.0/24"
+]
+```
+
+**Get Okta IP ranges:** https://help.okta.com/oie/en-us/content/topics/security/ip-address-allowlisting.htm
+
+### Network Configuration Examples
+
+#### Example 1: Default (Quick Start)
+
+```hcl
+# No network configuration needed - uses defaults
+domain_name     = "scim.demo-myorg.com"
+route53_zone_id = "Z1234567890ABC"
+scim_auth_token = "your-token"
+```
+
+#### Example 2: Custom VPC with Restricted HTTPS
+
+```hcl
+# Deploy in specific VPC with HTTPS restrictions
+vpc_id    = "vpc-1234567890abcdef"
+subnet_id = "subnet-public-1a"
+
+allowed_https_cidr = [
+  "52.23.120.0/21",    # Okta
+  "10.0.0.0/8"         # Your private network
+]
+```
+
+#### Example 3: Use Existing Security Group
+
+```hcl
+# Use pre-approved security group
+use_existing_security_group = true
+security_group_id          = "sg-approved-scim"
+vpc_id                     = "vpc-1234567890abcdef"
+subnet_id                  = "subnet-dmz-1a"
+```
+
+#### Example 4: Private Subnet with NAT
+
+```hcl
+# Deploy in private subnet (no public IP)
+vpc_id    = "vpc-1234567890abcdef"
+subnet_id = "subnet-private-1a"  # Must have NAT gateway route
+
+# Still need Elastic IP for Route53, but instance has no public IP
+# Instance routes outbound through NAT
+```
+
+**Note:** Elastic IP is still created for Route53 DNS, but the instance itself can be in a private subnet.
+
 ## Quick Start
 
 ### 1. Configure Variables
@@ -242,7 +354,11 @@ After deployment, Terraform provides these outputs:
 - `instance_id` - EC2 instance ID
 - `public_ip` - Server public IP address
 - `domain_name` - FQDN for SCIM server
-- `security_group_id` - Security group ID
+- `aws_region` - AWS region
+- `vpc_id` - VPC ID (or "default VPC")
+- `subnet_id` - Subnet ID (or "default subnet")
+- `security_group_id` - Security group ID (created or existing)
+- `security_group_created` - Whether a new security group was created
 
 ### URLs
 - `dashboard_url` - Web dashboard URL
@@ -289,6 +405,13 @@ terraform output okta_configuration
 | `github_repo` | string | | `joevanhorn/okta-terraform-demo-template` | Source code repository |
 | `scim_server_path` | string | | `main/environments/myorg/infrastructure/scim-server` | Path to SCIM server code |
 | `custom_entitlements` | string | | `""` | Custom roles (JSON) |
+| **Network Configuration** | | | | |
+| `vpc_id` | string | | `""` | VPC ID (empty = default VPC) |
+| `subnet_id` | string | | `""` | Subnet ID (empty = default subnet) |
+| `use_existing_security_group` | bool | | `false` | Use existing security group |
+| `security_group_id` | string | | `""` | Existing security group ID |
+| `allowed_https_cidr` | list(string) | | `["0.0.0.0/0"]` | Allowed HTTPS CIDRs |
+| **Additional** | | | | |
 | `tags` | map(string) | | `{}` | Additional resource tags |
 
 ## Custom Entitlements

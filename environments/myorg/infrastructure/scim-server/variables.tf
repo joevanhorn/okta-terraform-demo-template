@@ -120,6 +120,49 @@ variable "custom_entitlements" {
   default     = ""  # If empty, uses default 5 roles
 }
 
+# ===========================
+# Network Configuration
+# ===========================
+
+variable "vpc_id" {
+  description = "VPC ID to deploy into (leave empty for default VPC)"
+  type        = string
+  default     = ""
+}
+
+variable "subnet_id" {
+  description = "Subnet ID to deploy into (leave empty for default subnet in default VPC)"
+  type        = string
+  default     = ""
+}
+
+variable "use_existing_security_group" {
+  description = "Use an existing security group instead of creating one"
+  type        = bool
+  default     = false
+}
+
+variable "security_group_id" {
+  description = "Existing security group ID to use (only when use_existing_security_group = true)"
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.use_existing_security_group == false || (var.use_existing_security_group == true && var.security_group_id != "")
+    error_message = "security_group_id must be provided when use_existing_security_group is true"
+  }
+}
+
+variable "allowed_https_cidr" {
+  description = "CIDR blocks allowed to access HTTPS/SCIM API (only used when creating security group). Restrict to Okta IP ranges + your network for production."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+# ===========================
+# Additional Configuration
+# ===========================
+
 variable "tags" {
   description = "Additional tags to apply to all resources"
   type        = map(string)

@@ -24,9 +24,24 @@ output "aws_region" {
   value       = var.aws_region
 }
 
+output "vpc_id" {
+  description = "VPC ID where the server is deployed"
+  value       = var.vpc_id != "" ? var.vpc_id : "default VPC"
+}
+
+output "subnet_id" {
+  description = "Subnet ID where the server is deployed"
+  value       = var.subnet_id != "" ? var.subnet_id : "default subnet"
+}
+
 output "security_group_id" {
-  description = "Security group ID for the SCIM server"
-  value       = aws_security_group.scim_server.id
+  description = "Security group ID for the SCIM server (created or existing)"
+  value       = var.use_existing_security_group ? var.security_group_id : aws_security_group.scim_server[0].id
+}
+
+output "security_group_created" {
+  description = "Whether a new security group was created (false = using existing)"
+  value       = !var.use_existing_security_group
 }
 
 # ===========================

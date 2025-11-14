@@ -30,10 +30,13 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-# Security Group for SCIM Server
+# Security Group for SCIM Server (only created if not using existing)
 resource "aws_security_group" "scim_server" {
+  count = var.use_existing_security_group ? 0 : 1
+
   name_prefix = "scim-demo-"
   description = "Security group for SCIM entitlements demo server"
+  vpc_id      = var.vpc_id != "" ? var.vpc_id : null
 
   # SSH access (only if ssh_key_name is provided)
   dynamic "ingress" {
@@ -56,12 +59,12 @@ resource "aws_security_group" "scim_server" {
     description = "HTTP (redirects to HTTPS)"
   }
 
-  # HTTPS
+  # HTTPS - restricted by CIDR
   ingress {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_https_cidr
     description = "HTTPS for SCIM API and dashboard"
   }
 
@@ -154,7 +157,8 @@ resource "aws_instance" "scim_server" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
   key_name               = var.ssh_key_name != "" ? var.ssh_key_name : null
-  vpc_security_group_ids = [aws_security_group.scim_server.id]
+  subnet_id              = var.subnet_id != "" ? var.subnet_id : null
+  vpc_security_group_ids = var.use_existing_security_group ? [var.security_group_id] : [aws_security_group.scim_server[0].id]
   iam_instance_profile   = aws_iam_instance_profile.scim_server.name
 
   # User data script for server initialization
