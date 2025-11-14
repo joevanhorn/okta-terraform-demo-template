@@ -1,0 +1,177 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in the Okta Terraform GitOps Template
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out this form to help us investigate and fix the issue.
+
+  - type: checkboxes
+    id: existing-issue
+    attributes:
+      label: Is there an existing issue for this?
+      description: Please search to see if an issue already exists for the bug you encountered.
+      options:
+        - label: I have searched existing issues
+          required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which component is affected?
+      description: Select the component where you're experiencing the issue
+      options:
+        - Terraform Infrastructure (AWS)
+        - Terraform Okta Resources
+        - GitHub Actions Workflows
+        - Python Scripts (API Management)
+        - SCIM Server
+        - AI-Assisted Generation
+        - Documentation
+        - Other / Not Sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: Tell us what you see!
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: What should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: What actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the issue
+      placeholder: |
+        1. Navigate to '...'
+        2. Run command '...'
+        3. See error
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-output
+    attributes:
+      label: Error Output / Logs
+      description: If applicable, paste relevant error messages or log output
+      placeholder: Paste error messages here...
+      render: shell
+
+  - type: textarea
+    id: config-files
+    attributes:
+      label: Relevant Configuration Files
+      description: If applicable, paste relevant terraform.tfvars or configuration (REMOVE SENSITIVE VALUES!)
+      placeholder: |
+        # terraform.tfvars (with secrets removed)
+        domain_name = "example.com"
+        aws_region  = "us-east-1"
+      render: hcl
+
+  - type: dropdown
+    id: environment-type
+    attributes:
+      label: Environment Type
+      description: What type of environment are you using?
+      options:
+        - Production
+        - Staging
+        - Development
+        - Testing/Demo
+    validations:
+      required: true
+
+  - type: input
+    id: okta-org
+    attributes:
+      label: Okta Organization Type
+      description: What type of Okta org? (e.g., "Developer", "Preview", "Production")
+      placeholder: Developer
+    validations:
+      required: false
+
+  - type: textarea
+    id: versions
+    attributes:
+      label: Version Information
+      description: Please provide version information
+      placeholder: |
+        - Terraform Version: (run `terraform version`)
+        - Okta Provider Version: (check terraform.lock.hcl)
+        - AWS Provider Version: (check terraform.lock.hcl)
+        - Python Version: (run `python3 --version`)
+        - OS: (e.g., macOS 14.0, Ubuntu 22.04, Windows 11)
+      value: |
+        - Terraform Version:
+        - Okta Provider Version:
+        - AWS Provider Version:
+        - Python Version:
+        - OS:
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity / Impact
+      description: How severe is this issue?
+      options:
+        - Critical - Blocking production use
+        - High - Major feature broken
+        - Medium - Feature partially working
+        - Low - Minor issue / cosmetic
+    validations:
+      required: true
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround
+      description: Have you found any workaround for this issue?
+      placeholder: Describe any temporary workaround you've found...
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here (screenshots, links, etc.)
+      placeholder: Any additional information that might help...
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

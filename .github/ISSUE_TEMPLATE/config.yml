@@ -1,0 +1,21 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://github.com/joevanhorn/okta-terraform-demo-template/tree/main/docs
+    about: Read the comprehensive documentation and guides
+
+  - name: 💬 GitHub Discussions
+    url: https://github.com/joevanhorn/okta-terraform-demo-template/discussions
+    about: Ask questions, share ideas, and discuss with the community
+
+  - name: 🔍 Troubleshooting Guide
+    url: https://github.com/joevanhorn/okta-terraform-demo-template/blob/main/docs/05-TROUBLESHOOTING.md
+    about: Check common issues and solutions
+
+  - name: 🚀 Quick Start Guide
+    url: https://github.com/joevanhorn/okta-terraform-demo-template/blob/main/QUICKSTART.md
+    about: Get started in 10 minutes with the Quick Start guide
+
+  - name: 🎓 Working Example Repository
+    url: https://github.com/joevanhorn/okta-terraform-complete-demo
+    about: See a fully configured demo environment
