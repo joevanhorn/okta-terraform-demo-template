@@ -1,0 +1,12 @@
+# Python dependencies for SCIM Entitlements Demo Server
+# Repository: https://github.com/joevanhorn/okta-terraform-demo-template
+
+# Web framework
+Flask==3.0.0
+Werkzeug==3.0.1
+
+# Environment configuration
+python-dotenv==1.0.0
+
+# Optional: Enhanced logging and formatting (already in stdlib)
+# No additional dependencies required - uses standard library only
