@@ -122,7 +122,7 @@ To sync workflow files, you need a Personal Access Token (PAT). See **[docs/TEMP
 
 **Quick setup:**
 1. Create a [GitHub Personal Access Token](https://github.com/settings/tokens) with `repo` and `workflow` scopes
-2. Add it as a repository secret named `WORKFLOW_PAT`
+2. Add it as a repository secret named `PERSONAL_ACCESS_TOKEN`
 3. The sync workflow will run automatically every Sunday at 2 AM UTC
 
 **Skip this step if:**

@@ -41,9 +41,11 @@ refusing to allow a GitHub App to create or update workflow without `workflows` 
 2. Click **Settings** → **Secrets and variables** → **Actions**
 3. Click **"New repository secret"**
 4. Configure the secret:
-   - **Name:** `WORKFLOW_PAT` (must be exactly this name)
+   - **Name:** `PERSONAL_ACCESS_TOKEN` (must be exactly this name)
    - **Secret:** Paste the token you copied in Step 1
 5. Click **"Add secret"**
+
+**Note:** GitHub restricts secret names containing "GITHUB" in them, which is why we use `PERSONAL_ACCESS_TOKEN` instead of names like `GITHUB_PAT`.
 
 ### Step 3: Verify Setup
 
@@ -73,12 +75,12 @@ If the workflow completes successfully and creates a PR with workflow file chang
 
 ## Workflow Behavior
 
-### With WORKFLOW_PAT configured:
+### With PERSONAL_ACCESS_TOKEN configured:
 - ✅ Syncs all files including workflow files
 - ✅ Creates PRs with complete updates
 - ✅ Fully automated
 
-### Without WORKFLOW_PAT configured:
+### Without PERSONAL_ACCESS_TOKEN configured:
 - ✅ Syncs non-workflow files successfully
 - ❌ Fails when workflow files have changes
 - ⚠️ Partial automation
@@ -108,11 +110,11 @@ If you're concerned about token permissions, you can:
 ## Troubleshooting
 
 ### Error: "refusing to allow a GitHub App to create or update workflow"
-**Cause:** WORKFLOW_PAT is not configured or is invalid.
+**Cause:** PERSONAL_ACCESS_TOKEN is not configured or is invalid.
 
 **Solution:**
-1. Verify the secret exists: Repository Settings → Secrets → Actions → Check for `WORKFLOW_PAT`
-2. Verify the secret name is exactly `WORKFLOW_PAT` (case-sensitive)
+1. Verify the secret exists: Repository Settings → Secrets → Actions → Check for `PERSONAL_ACCESS_TOKEN`
+2. Verify the secret name is exactly `PERSONAL_ACCESS_TOKEN` (case-sensitive)
 3. Check token hasn't expired: GitHub Settings → Personal Access Tokens
 4. Regenerate token if needed and update the secret
 
