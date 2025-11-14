@@ -1,0 +1,116 @@
+name: Question / Help
+description: Ask a question or get help using the Okta Terraform GitOps Template
+title: "[Question]: "
+labels: ["question", "help wanted"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reaching out! Please fill out this form to ask your question.
+
+        **Note:** For general discussions, consider using [GitHub Discussions](https://github.com/joevanhorn/okta-terraform-demo-template/discussions) instead.
+
+  - type: checkboxes
+    id: documentation-check
+    attributes:
+      label: Have you checked the documentation?
+      description: Please check if your question is answered in the docs before creating an issue
+      options:
+        - label: I have checked the [documentation](https://github.com/joevanhorn/okta-terraform-demo-template/tree/main/docs)
+          required: true
+        - label: I have checked the [troubleshooting guide](https://github.com/joevanhorn/okta-terraform-demo-template/blob/main/docs/05-TROUBLESHOOTING.md)
+          required: true
+        - label: I have searched existing issues and discussions
+          required: true
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic Area
+      description: What is your question about?
+      options:
+        - Getting Started / Setup
+        - Terraform Configuration
+        - Okta Resources / OIG
+        - AWS Infrastructure
+        - GitHub Actions / Workflows
+        - Python Scripts / API
+        - SCIM Server
+        - AI-Assisted Generation
+        - Best Practices
+        - Architecture / Design
+        - Troubleshooting
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know?
+      placeholder: |
+        I'm trying to understand how to...
+        What's the recommended way to...
+        How do I configure...
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context / Background
+      description: Provide context about what you're trying to accomplish
+      placeholder: |
+        I'm working on...
+        My goal is to...
+        I've tried...
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-tried
+    attributes:
+      label: What Have You Tried?
+      description: Describe what you've already attempted
+      placeholder: |
+        1. I tried...
+        2. I also looked at...
+        3. This didn't work because...
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: What environment are you working with? (e.g., "Production Okta org", "AWS us-east-1")
+      placeholder: Development Okta org with AWS infrastructure
+
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: Urgency
+      description: How urgent is this?
+      options:
+        - "High - Blocking critical work"
+        - "Medium - Needed soon"
+        - "Low - Whenever convenient"
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-info
+    attributes:
+      label: Additional Information
+      description: Any other information that might be helpful
+      placeholder: Screenshots, error messages, configuration snippets (remove sensitive data!)
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

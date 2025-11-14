@@ -1,0 +1,200 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for the Okta Terraform GitOps Template
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please fill out this form to help us understand your request.
+
+  - type: checkboxes
+    id: existing-request
+    attributes:
+      label: Is there an existing feature request for this?
+      description: Please search to see if a similar feature has already been requested.
+      options:
+        - label: I have searched existing feature requests
+          required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Which component would this enhance?
+      description: Select the component this feature would affect
+      options:
+        - Terraform Infrastructure (AWS)
+        - Terraform Okta Resources
+        - GitHub Actions Workflows
+        - Python Scripts (API Management)
+        - SCIM Server
+        - AI-Assisted Generation
+        - Documentation
+        - New Component / Integration
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: feature-type
+    attributes:
+      label: Feature Type
+      description: What type of feature is this?
+      options:
+        - New Resource/Module
+        - Enhancement to Existing Feature
+        - New Workflow/Automation
+        - New Integration
+        - Performance Improvement
+        - Developer Experience
+        - Documentation Improvement
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Describe the problem or pain point this feature would solve
+      placeholder: |
+        I'm always frustrated when...
+        Currently it's difficult to...
+        Users need a better way to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution you'd like to see
+      placeholder: |
+        I would like to see...
+        The feature should work like...
+        This could be implemented by...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe alternative solutions or workarounds you've considered
+      placeholder: |
+        Alternative 1: ...
+        Alternative 2: ...
+        Current workaround: ...
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case / Scenario
+      description: Provide a specific use case or scenario where this feature would be valuable
+      placeholder: |
+        **Scenario:** As a Solutions Engineer deploying demos...
+        **When:** I need to create a new environment...
+        **I want:** To automatically configure...
+        **So that:** I can save time and reduce errors...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Target Audience
+      description: Who would primarily benefit from this feature?
+      multiple: true
+      options:
+        - Solutions Engineers
+        - Sales Teams
+        - Okta Administrators
+        - DevOps/SRE Teams
+        - Developers
+        - All Users
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority / Impact
+      description: How important is this feature?
+      options:
+        - Critical - Blocking a major use case
+        - High - Would significantly improve workflow
+        - Medium - Nice to have improvement
+        - Low - Minor convenience
+    validations:
+      required: true
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation Ideas (Optional)
+      description: If you have technical ideas for how this could be implemented, share them here
+      placeholder: |
+        This could be implemented using...
+        Similar to how [other project] does it...
+        Possible approach: ...
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Examples from Other Projects
+      description: Are there examples of this feature in other projects we can reference?
+      placeholder: |
+        - Project X has a similar feature: [link]
+        - This is how Y handles it: [description]
+
+  - type: dropdown
+    id: breaking-change
+    attributes:
+      label: Breaking Change?
+      description: Would this feature introduce breaking changes?
+      options:
+        - "No - Fully backwards compatible"
+        - "Maybe - Might require minor changes"
+        - "Yes - Would require migration"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: benefits
+    attributes:
+      label: Expected Benefits
+      description: What benefits would this feature provide?
+      placeholder: |
+        - Saves X hours per deployment
+        - Reduces errors by automating Y
+        - Enables new use case Z
+        - Improves user experience by...
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be interested in contributing this feature?
+      options:
+        - label: I'm willing to submit a PR for this feature
+        - label: I can help with testing
+        - label: I can help with documentation
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, mockups, or links about the feature request
+      placeholder: Any additional information that might help...
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
