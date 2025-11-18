@@ -1,0 +1,40 @@
+{
+  "entitlements": [
+    {
+      "id": "role_system_admin",
+      "name": "System Administrator",
+      "description": "Complete administrative access to all Salesforce settings and data",
+      "permissions": ["view_all_data", "modify_all_data", "manage_users", "customize_application", "manage_billing"]
+    },
+    {
+      "id": "role_sales_manager",
+      "name": "Sales Manager",
+      "description": "Manage sales team and view all opportunities",
+      "permissions": ["view_all_opportunities", "edit_opportunities", "manage_team", "run_reports", "view_forecasts"]
+    },
+    {
+      "id": "role_sales_rep",
+      "name": "Sales Representative",
+      "description": "Standard sales user with opportunity management",
+      "permissions": ["view_opportunities", "edit_my_opportunities", "create_opportunities", "view_accounts", "edit_my_accounts"]
+    },
+    {
+      "id": "role_marketing",
+      "name": "Marketing User",
+      "description": "Marketing campaign and lead management access",
+      "permissions": ["view_leads", "edit_leads", "manage_campaigns", "view_reports", "create_email_templates"]
+    },
+    {
+      "id": "role_support",
+      "name": "Service Agent",
+      "description": "Customer service and case management",
+      "permissions": ["view_cases", "edit_cases", "create_cases", "view_knowledge", "view_accounts"]
+    },
+    {
+      "id": "role_readonly",
+      "name": "Read Only User",
+      "description": "View-only access to records",
+      "permissions": ["view_data", "run_reports", "view_dashboards"]
+    }
+  ]
+}

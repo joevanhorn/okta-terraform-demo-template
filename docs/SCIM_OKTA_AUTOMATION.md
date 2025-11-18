@@ -95,10 +95,74 @@ This gives us:
 
 ### 1. SCIM Server Deployed
 
-The SCIM server infrastructure must be deployed first:
+The SCIM server infrastructure must be deployed first. You have two deployment options:
+
+#### Option A: GitHub Actions Workflow (Recommended)
+
+This is the recommended approach for production deployments, following GitOps best practices.
+
+**1. Add GitHub Environment Secrets:**
+
+Navigate to: **GitHub Repository → Settings → Environments → MyOrg**
+
+Add these secrets:
+
+| Secret Name | Description | How to Generate |
+|-------------|-------------|-----------------|
+| `SCIM_AUTH_TOKEN` | Bearer token for SCIM authentication | `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'` |
+| `AWS_REGION` | AWS region | `us-east-1` (or your preferred region) |
+| `AWS_ROLE_ARN` | AWS OIDC role ARN | Already configured (from AWS backend setup) |
+
+**2. Deploy via GitHub Actions:**
+
+```bash
+# Plan deployment
+gh workflow run deploy-scim-server.yml \
+  -f environment=myorg \
+  -f domain_name=scim.demo-myorg.example.com \
+  -f route53_zone_id=Z1234567890ABC \
+  -f instance_type=t3.micro \
+  -f action=plan
+
+# Review plan output in GitHub Actions → Workflow runs
+
+# Apply deployment
+gh workflow run deploy-scim-server.yml \
+  -f environment=myorg \
+  -f domain_name=scim.demo-myorg.example.com \
+  -f route53_zone_id=Z1234567890ABC \
+  -f instance_type=t3.micro \
+  -f action=apply
+```
+
+**3. Verify deployment:**
+
+Check the workflow summary in GitHub Actions for:
+- Infrastructure outputs (URLs, IDs)
+- Health check instructions
+- Next-step commands
+
+**Benefits:**
+- Secrets stored securely in GitHub (not in local files)
+- Audit trail of all deployments
+- Environment protection with approval gates
+- AWS OIDC authentication (no long-lived credentials)
+- Automated next-step instructions
+
+#### Option B: Manual Terraform Deployment (Alternative)
+
+Use this for local development or testing:
 
 ```bash
 cd environments/myorg/infrastructure/scim-server
+
+# Create terraform.tfvars from example
+cp terraform.tfvars.example terraform.tfvars
+
+# Edit with your values
+vim terraform.tfvars
+
+# Initialize and deploy
 terraform init
 terraform apply
 ```
@@ -137,9 +201,73 @@ Or use the repository requirements:
 pip install -r requirements.txt
 ```
 
+### 4. Custom Entitlements (Optional)
+
+The SCIM server supports custom entitlements/roles to demonstrate different application scenarios. By default, it uses 5 standard roles (Administrator, Standard User, Read Only, Support Agent, Billing Manager).
+
+**Using Pre-Built Templates:**
+
+The repository includes templates for common applications:
+- `entitlements.json` - Default 5 roles
+- `examples/entitlements-salesforce.json` - Salesforce-style roles
+- `examples/entitlements-aws.json` - AWS IAM-style permissions
+- `examples/entitlements-generic.json` - Generic application roles
+
+**Deploying with Custom Entitlements:**
+
+When deploying the SCIM server, specify the entitlements file:
+
+```bash
+# Via GitHub Actions
+gh workflow run deploy-scim-server.yml \
+  -f environment=myorg \
+  -f domain_name=scim.demo-myorg.example.com \
+  -f route53_zone_id=Z1234567890ABC \
+  -f entitlements_file=examples/entitlements-salesforce.json \
+  -f action=apply
+
+# Via Terraform
+cd environments/myorg/infrastructure/scim-server
+terraform apply -var="entitlements_file=examples/entitlements-aws.json"
+```
+
+**Creating Custom Entitlements:**
+
+Create a JSON file following this schema:
+
+```json
+{
+  "entitlements": [
+    {
+      "id": "role_analyst",
+      "name": "Data Analyst",
+      "description": "Analytics and reporting access",
+      "permissions": ["read", "analytics", "reports"]
+    }
+  ]
+}
+```
+
+See `environments/myorg/infrastructure/scim-server/README.md` for complete documentation.
+
 ---
 
 ## Step-by-Step Guide
+
+### Quick Reference
+
+**GitHub Actions Workflow (Recommended):**
+1. Add secrets to GitHub Environment (SCIM_AUTH_TOKEN, AWS_REGION, AWS_ROLE_ARN)
+2. Deploy SCIM server: `gh workflow run deploy-scim-server.yml`
+3. Create Okta app: `cd environments/myorg/terraform && terraform apply`
+4. Configure SCIM connection: `python3 scripts/configure_scim_app.py`
+
+**Manual Terraform (Alternative):**
+1. Deploy SCIM server: `cd infrastructure/scim-server && terraform apply`
+2. Create Okta app: `cd ../../terraform && terraform apply`
+3. Configure SCIM connection: `python3 scripts/configure_scim_app.py`
+
+---
 
 ### Phase 1: Terraform (App Creation)
 
@@ -681,6 +809,54 @@ This provides:
 ## Examples
 
 ### Complete End-to-End Example
+
+#### Using GitHub Actions Workflow (Recommended)
+
+```bash
+#!/bin/bash
+# complete-scim-setup-workflow.sh
+# Complete SCIM + Okta automation using GitHub Actions
+
+set -e
+
+echo "Step 1: Deploy SCIM Server via GitHub Actions"
+gh workflow run deploy-scim-server.yml \
+  -f environment=myorg \
+  -f domain_name=scim.demo-myorg.example.com \
+  -f route53_zone_id=Z1234567890ABC \
+  -f instance_type=t3.micro \
+  -f action=apply
+
+echo "⏳ Waiting for workflow to complete (check GitHub Actions tab)..."
+echo "Press Enter once deployment is complete..."
+read
+
+echo "Step 2: Create Okta App"
+cd environments/myorg/terraform
+terraform init
+terraform apply -auto-approve
+
+APP_ID=$(terraform output -raw scim_app_id)
+
+echo "Step 3: Get SCIM credentials from GitHub secrets"
+echo "SCIM_URL=https://scim.demo-myorg.example.com/scim/v2"
+echo "SCIM_TOKEN is stored in GitHub Environment secret: SCIM_AUTH_TOKEN"
+echo ""
+echo "Enter SCIM_AUTH_TOKEN from GitHub secrets:"
+read -s SCIM_TOKEN
+
+echo "Step 4: Configure SCIM Connection"
+python3 ../../scripts/configure_scim_app.py \
+  --app-id "$APP_ID" \
+  --scim-url "https://scim.demo-myorg.example.com/scim/v2" \
+  --scim-token "$SCIM_TOKEN" \
+  --test-connection
+
+echo "✅ Complete! SCIM app configured and ready."
+echo "📍 Next: Assign users to app in Okta Admin Console"
+```
+
+#### Using Manual Terraform (Alternative)
 
 ```bash
 #!/bin/bash
