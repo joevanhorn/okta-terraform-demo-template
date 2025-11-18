@@ -169,7 +169,8 @@ resource "aws_instance" "scim_server" {
     scim_basic_pass     = var.scim_basic_pass
     github_repo         = var.github_repo
     scim_server_path    = var.scim_server_path
-    custom_entitlements = var.custom_entitlements
+    custom_entitlements = var.custom_entitlements  # Deprecated, kept for backwards compatibility
+    entitlements_file   = var.entitlements_file
   })
 
   user_data_replace_on_change = true

@@ -1,0 +1,46 @@
+{
+  "entitlements": [
+    {
+      "id": "role_admin_access",
+      "name": "AdministratorAccess",
+      "description": "Full access to AWS services and resources",
+      "permissions": ["*:*"]
+    },
+    {
+      "id": "role_power_user",
+      "name": "PowerUserAccess",
+      "description": "Full access to AWS services except IAM and Organizations",
+      "permissions": ["ec2:*", "s3:*", "rds:*", "lambda:*", "cloudwatch:*", "logs:*"]
+    },
+    {
+      "id": "role_developer",
+      "name": "DeveloperAccess",
+      "description": "Access to development services",
+      "permissions": ["ec2:Describe*", "s3:GetObject", "s3:PutObject", "lambda:InvokeFunction", "dynamodb:*", "cloudwatch:GetMetricData"]
+    },
+    {
+      "id": "role_readonly",
+      "name": "ReadOnlyAccess",
+      "description": "Read-only access to AWS services",
+      "permissions": ["*:Describe*", "*:Get*", "*:List*", "s3:GetObject"]
+    },
+    {
+      "id": "role_billing",
+      "name": "BillingAccess",
+      "description": "Access to billing and cost management",
+      "permissions": ["aws-portal:ViewBilling", "aws-portal:ViewUsage", "ce:*", "cur:*"]
+    },
+    {
+      "id": "role_security_audit",
+      "name": "SecurityAudit",
+      "description": "Security auditing permissions",
+      "permissions": ["iam:Get*", "iam:List*", "cloudtrail:LookupEvents", "guardduty:Get*", "securityhub:Get*", "config:Get*"]
+    },
+    {
+      "id": "role_network_admin",
+      "name": "NetworkAdministrator",
+      "description": "Manage VPCs, subnets, and networking",
+      "permissions": ["ec2:*Vpc*", "ec2:*Subnet*", "ec2:*SecurityGroup*", "ec2:*RouteTable*", "ec2:*Gateway*", "route53:*"]
+    }
+  ]
+}

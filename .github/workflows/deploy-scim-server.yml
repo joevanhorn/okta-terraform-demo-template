@@ -1,0 +1,216 @@
+name: Deploy SCIM Server Infrastructure
+
+# This workflow deploys SCIM server infrastructure to AWS using environment secrets.
+# It follows the same GitOps pattern as other workflows in this repository.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy (must match environments/ directory and GitHub Environment)'
+        required: true
+        type: choice
+        options:
+          - myorg
+          - production
+          - staging
+          - development
+      domain_name:
+        description: 'SCIM server domain (e.g., scim.demo-myorg.example.com)'
+        required: true
+        type: string
+      route53_zone_id:
+        description: 'Route53 hosted zone ID (e.g., Z1234567890ABC)'
+        required: true
+        type: string
+      instance_type:
+        description: 'EC2 instance type'
+        required: false
+        default: 't3.micro'
+        type: choice
+        options:
+          - t3.micro
+          - t3.small
+          - t3.medium
+      entitlements_file:
+        description: 'Entitlements JSON file (relative to scim-server directory, e.g., "entitlements.json" or "examples/entitlements-salesforce.json")'
+        required: false
+        default: 'entitlements.json'
+        type: string
+      action:
+        description: 'Terraform action to perform'
+        required: true
+        type: choice
+        default: 'plan'
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  id-token: write   # Required for AWS OIDC
+  contents: read
+
+jobs:
+  deploy-scim-infrastructure:
+    name: Deploy SCIM Server to AWS
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment }}
+
+    defaults:
+      run:
+        working-directory: environments/${{ github.event.inputs.environment }}/infrastructure/scim-server
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-SCIM-Deploy
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9.0"
+
+      - name: Generate secure SCIM auth token
+        id: generate_token
+        if: github.event.inputs.action != 'destroy'
+        run: |
+          # Use existing token from secrets if available, otherwise generate new one
+          if [ -n "${{ secrets.SCIM_AUTH_TOKEN }}" ]; then
+            echo "Using existing SCIM_AUTH_TOKEN from environment secrets"
+            echo "token=${{ secrets.SCIM_AUTH_TOKEN }}" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️  WARNING: SCIM_AUTH_TOKEN not found in environment secrets"
+            echo "Generating temporary token for this deployment"
+            TOKEN=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
+            echo "token=$TOKEN" >> $GITHUB_OUTPUT
+            echo ""
+            echo "::warning::Please add SCIM_AUTH_TOKEN to your GitHub Environment secrets"
+            echo "::warning::Token generated: $TOKEN"
+          fi
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        if: github.event.inputs.action == 'plan' || github.event.inputs.action == 'apply'
+        env:
+          TF_VAR_domain_name: ${{ github.event.inputs.domain_name }}
+          TF_VAR_route53_zone_id: ${{ github.event.inputs.route53_zone_id }}
+          TF_VAR_scim_auth_token: ${{ steps.generate_token.outputs.token }}
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          TF_VAR_environment: ${{ github.event.inputs.environment }}
+          TF_VAR_instance_type: ${{ github.event.inputs.instance_type }}
+          TF_VAR_entitlements_file: ${{ github.event.inputs.entitlements_file }}
+        run: |
+          terraform plan -out=tfplan
+
+          echo "## 📋 Terraform Plan - SCIM Server Infrastructure" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Domain:** ${{ github.event.inputs.domain_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Route53 Zone:** ${{ github.event.inputs.route53_zone_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Instance Type:** ${{ github.event.inputs.instance_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Entitlements:** ${{ github.event.inputs.entitlements_file }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Review the plan output above before applying." >> $GITHUB_STEP_SUMMARY
+
+      - name: Terraform Apply
+        if: github.event.inputs.action == 'apply'
+        env:
+          TF_VAR_domain_name: ${{ github.event.inputs.domain_name }}
+          TF_VAR_route53_zone_id: ${{ github.event.inputs.route53_zone_id }}
+          TF_VAR_scim_auth_token: ${{ steps.generate_token.outputs.token }}
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          TF_VAR_environment: ${{ github.event.inputs.environment }}
+          TF_VAR_instance_type: ${{ github.event.inputs.instance_type }}
+          TF_VAR_entitlements_file: ${{ github.event.inputs.entitlements_file }}
+        run: |
+          terraform apply -auto-approve tfplan
+
+          echo "## ✅ SCIM Server Deployed Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Domain:** ${{ github.event.inputs.domain_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dashboard:** https://${{ github.event.inputs.domain_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**SCIM Endpoint:** https://${{ github.event.inputs.domain_name }}/scim/v2" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⏳ Next Steps (Wait 5-10 minutes)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The SCIM server is initializing. Wait 5-10 minutes for:" >> $GITHUB_STEP_SUMMARY
+          echo "- Let's Encrypt SSL certificate provisioning" >> $GITHUB_STEP_SUMMARY
+          echo "- Python dependencies installation" >> $GITHUB_STEP_SUMMARY
+          echo "- SCIM server startup" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🧪 Health Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "curl https://${{ github.event.inputs.domain_name }}/health" >> $GITHUB_STEP_SUMMARY
+          echo "# Expected: {\"status\":\"healthy\"}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Create Okta SCIM Application" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "cd environments/${{ github.event.inputs.environment }}/terraform" >> $GITHUB_STEP_SUMMARY
+          echo "terraform init" >> $GITHUB_STEP_SUMMARY
+          echo "terraform apply" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Terraform Destroy
+        if: github.event.inputs.action == 'destroy'
+        run: |
+          terraform destroy -auto-approve \
+            -var="domain_name=${{ github.event.inputs.domain_name }}" \
+            -var="route53_zone_id=${{ github.event.inputs.route53_zone_id }}" \
+            -var="scim_auth_token=dummy" \
+            -var="aws_region=${{ secrets.AWS_REGION || 'us-east-1' }}" \
+            -var="environment=${{ github.event.inputs.environment }}" \
+            -var="instance_type=${{ github.event.inputs.instance_type }}"
+
+          echo "## 🗑️  SCIM Server Destroyed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All infrastructure resources have been removed." >> $GITHUB_STEP_SUMMARY
+
+      - name: Output Terraform State
+        if: github.event.inputs.action == 'apply'
+        run: |
+          echo "## 📤 Terraform Outputs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          terraform output >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Save Configuration for Okta Integration
+        if: github.event.inputs.action == 'apply'
+        run: |
+          echo "## 🔗 Okta SCIM Integration Commands" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "After creating the Okta SCIM app, configure the connection:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "# Set Okta environment variables" >> $GITHUB_STEP_SUMMARY
+          echo "export OKTA_ORG_NAME=\"your-org\"" >> $GITHUB_STEP_SUMMARY
+          echo "export OKTA_BASE_URL=\"okta.com\"" >> $GITHUB_STEP_SUMMARY
+          echo "export OKTA_API_TOKEN=\"your-token\"" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Get app ID from Terraform output" >> $GITHUB_STEP_SUMMARY
+          echo "cd environments/${{ github.event.inputs.environment }}/terraform" >> $GITHUB_STEP_SUMMARY
+          echo "APP_ID=\$(terraform output -raw scim_app_id)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Configure SCIM connection" >> $GITHUB_STEP_SUMMARY
+          echo "python3 ../../scripts/configure_scim_app.py \\" >> $GITHUB_STEP_SUMMARY
+          echo "  --app-id \"\$APP_ID\" \\" >> $GITHUB_STEP_SUMMARY
+          echo "  --scim-url \"https://${{ github.event.inputs.domain_name }}/scim/v2\" \\" >> $GITHUB_STEP_SUMMARY
+          echo "  --scim-token \"${{ steps.generate_token.outputs.token }}\" \\" >> $GITHUB_STEP_SUMMARY
+          echo "  --test-connection" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

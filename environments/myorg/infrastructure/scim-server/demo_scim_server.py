@@ -69,7 +69,9 @@ def _require_auth_for_scim():
 
 # In-memory storage - simulates your cloud application's database
 users_db = {}
-entitlements_db = {
+
+# Default entitlements (fallback if entitlements.json not found)
+DEFAULT_ENTITLEMENTS = {
     "role_admin": {
         "id": "role_admin",
         "name": "Administrator",
@@ -101,6 +103,37 @@ entitlements_db = {
         "permissions": ["read", "billing", "invoices", "payments"]
     }
 }
+
+def load_entitlements():
+    """Load entitlements from JSON file or use defaults"""
+    entitlements_file = os.environ.get('ENTITLEMENTS_FILE', '/opt/scim-demo/entitlements.json')
+
+    try:
+        # Try to load from file
+        if os.path.exists(entitlements_file):
+            with open(entitlements_file, 'r') as f:
+                data = json.load(f)
+                entitlements_list = data.get('entitlements', [])
+
+                # Convert list to dictionary keyed by id
+                entitlements = {ent['id']: ent for ent in entitlements_list}
+
+                print(f"✅ Loaded {len(entitlements)} entitlements from {entitlements_file}")
+                for ent in entitlements.values():
+                    print(f"   • {ent['name']} ({ent['id']}) - {ent['description']}")
+
+                return entitlements
+        else:
+            print(f"⚠️  Entitlements file not found: {entitlements_file}")
+            print(f"   Using default entitlements")
+            return DEFAULT_ENTITLEMENTS
+    except Exception as e:
+        print(f"❌ Error loading entitlements from {entitlements_file}: {e}")
+        print(f"   Using default entitlements")
+        return DEFAULT_ENTITLEMENTS
+
+# Load entitlements at startup
+entitlements_db = load_entitlements()
 
 # Activity log for dashboard
 activity_log = []

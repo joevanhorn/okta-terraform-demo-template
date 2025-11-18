@@ -1,0 +1,34 @@
+{
+  "entitlements": [
+    {
+      "id": "role_admin",
+      "name": "Administrator",
+      "description": "Full system access",
+      "permissions": ["read", "write", "delete", "admin", "manage_users"]
+    },
+    {
+      "id": "role_user",
+      "name": "Standard User",
+      "description": "Basic access",
+      "permissions": ["read", "write"]
+    },
+    {
+      "id": "role_readonly",
+      "name": "Read Only",
+      "description": "View only access",
+      "permissions": ["read"]
+    },
+    {
+      "id": "role_support",
+      "name": "Support Agent",
+      "description": "Customer support access",
+      "permissions": ["read", "write", "support", "view_tickets"]
+    },
+    {
+      "id": "role_billing",
+      "name": "Billing Manager",
+      "description": "Billing and payment access",
+      "permissions": ["read", "billing", "invoices", "payments"]
+    }
+  ]
+}

@@ -63,6 +63,32 @@ python-dotenv==1.0.0
 EOF
 }
 
+# Download entitlements configuration
+echo "⬇️  Downloading entitlements configuration..."
+ENTITLEMENTS_SOURCE="${entitlements_file}"
+if [ -z "$ENTITLEMENTS_SOURCE" ]; then
+  ENTITLEMENTS_SOURCE="entitlements.json"
+fi
+
+echo "   Entitlements file: $ENTITLEMENTS_SOURCE"
+
+# Try to download the specified entitlements file
+curl -fSL -o entitlements.json "https://raw.githubusercontent.com/${github_repo}/${scim_server_path}/$ENTITLEMENTS_SOURCE" || {
+  echo "⚠️  Could not download entitlements from: $ENTITLEMENTS_SOURCE"
+  echo "   Server will use built-in default entitlements"
+  # Create empty file so the script doesn't fail
+  touch entitlements.json
+}
+
+if [ -f entitlements.json ] && [ -s entitlements.json ]; then
+  echo "✅ Entitlements configuration downloaded successfully"
+  # Display entitlements summary
+  ENTITLEMENTS_COUNT=$(python3 -c "import json; print(len(json.load(open('entitlements.json'))['entitlements']))" 2>/dev/null || echo "unknown")
+  echo "   Entitlements loaded: $ENTITLEMENTS_COUNT"
+else
+  echo "⚠️  Entitlements file is empty, server will use defaults"
+fi
+
 # Verify SCIM server downloaded successfully
 if [ ! -f demo_scim_server.py ] || [ ! -s demo_scim_server.py ]; then
   echo "❌ SCIM server file is missing or empty!"
