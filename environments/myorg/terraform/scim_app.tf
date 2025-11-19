@@ -54,21 +54,6 @@ resource "okta_app_auto_login" "scim_demo" {
 
   # Optional redirect URL
   sign_on_redirect_url = data.terraform_remote_state.scim_server.outputs.dashboard_url
-
-  # Skip users and groups settings
-  skip_users  = true
-  skip_groups = true
-
-  # Lifecycle
-  lifecycle {
-    ignore_changes = [
-      # Ignore changes made via API/Admin Console
-      features,
-      user_name_template,
-      user_name_template_type,
-      user_name_template_suffix
-    ]
-  }
 }
 
 # ==============================================================================
@@ -106,6 +91,7 @@ output "scim_app_label" {
 
 output "scim_app_admin_url" {
   description = "Direct link to app in Okta Admin Console"
+  sensitive   = true
   value       = "https://${var.okta_org_name}.${var.okta_base_url}/admin/app/${okta_app_auto_login.scim_demo.name}/instance/${okta_app_auto_login.scim_demo.id}/"
 }
 
@@ -131,6 +117,7 @@ output "scim_configuration_command" {
 
 output "scim_setup_instructions" {
   description = "Next steps after Terraform apply"
+  sensitive   = true
   value       = <<-EOT
     ╔════════════════════════════════════════════════════════════════════════════╗
     ║              SCIM App Created - Configuration Required                     ║

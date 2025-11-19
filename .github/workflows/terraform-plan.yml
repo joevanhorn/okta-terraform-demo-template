@@ -1,4 +1,4 @@
-name: Terraform Plan - LowerDeckLabs
+name: Terraform Plan - MyOrg
 
 on:
   workflow_dispatch:
@@ -6,10 +6,10 @@ on:
       environment:
         description: 'Environment to plan'
         required: true
-        default: 'lowerdecklabs'
+        default: 'myorg'
         type: choice
         options:
-          - lowerdecklabs
+          - myorg
           - production
           - staging
           - development
@@ -47,14 +47,16 @@ jobs:
             echo "environment=${{ inputs.environment }}" >> $GITHUB_OUTPUT
           else
             # Detect from changed files
-            if git diff --name-only HEAD~1 HEAD | grep -q "environments/production/terraform"; then
+            if git diff --name-only HEAD~1 HEAD | grep -q "environments/myorg/terraform"; then
+              echo "environment=myorg" >> $GITHUB_OUTPUT
+            elif git diff --name-only HEAD~1 HEAD | grep -q "environments/production/terraform"; then
               echo "environment=production" >> $GITHUB_OUTPUT
             elif git diff --name-only HEAD~1 HEAD | grep -q "environments/staging/terraform"; then
               echo "environment=staging" >> $GITHUB_OUTPUT
             elif git diff --name-only HEAD~1 HEAD | grep -q "environments/development/terraform"; then
               echo "environment=development" >> $GITHUB_OUTPUT
             else
-              echo "environment=lowerdecklabs" >> $GITHUB_OUTPUT
+              echo "environment=myorg" >> $GITHUB_OUTPUT
             fi
           fi
 
