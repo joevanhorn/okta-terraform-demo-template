@@ -133,6 +133,16 @@ jobs:
           BRANCH_NAME="${{ steps.create_branch.outputs.branch_name }}"
           git push origin "$BRANCH_NAME"
 
+      - name: Ensure Labels Exist
+        if: steps.check_updates.outputs.has_updates == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        run: |
+          # Create labels if they don't exist (ignore errors if they already exist)
+          gh label create template-sync --description "Automated template sync from upstream" --color "0366d6" --repo ${{ github.repository }} 2>/dev/null || true
+          gh label create maintenance --description "Maintenance and routine updates" --color "fbca04" --repo ${{ github.repository }} 2>/dev/null || true
+          echo "✅ Labels ready"
+
       - name: Create Pull Request
         if: steps.check_updates.outputs.has_updates == 'true'
         env:
