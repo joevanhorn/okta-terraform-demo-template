@@ -61,6 +61,20 @@ This index helps you find the right documentation for your needs.
 | [TROUBLESHOOTING_ENTITLEMENT_BUNDLES.md](TROUBLESHOOTING_ENTITLEMENT_BUNDLES.md) | Campaign association errors and fixes |
 | [OIG_MANUAL_IMPORT.md](OIG_MANUAL_IMPORT.md) | Manual OIG import procedures |
 
+### Okta Terraform Provider Analysis
+
+| Document | Purpose |
+|----------|---------|
+| [PROVIDER_ANALYSIS.md](PROVIDER_ANALYSIS.md) | **Complete provider analysis** - Resources, documentation, gaps (15K words) |
+| [PROVIDER_COVERAGE_MATRIX.md](PROVIDER_COVERAGE_MATRIX.md) | Resource coverage by category - What's available vs missing (8K words) |
+| [../PROVIDER_REVIEW_SUMMARY.md](../PROVIDER_REVIEW_SUMMARY.md) | **Executive summary** of provider review and recommendations |
+
+**Key Insights:**
+- 103 resources and 47 data sources analyzed
+- 3 CRITICAL missing OIG features (owners, labels, risk rules)
+- Validation workflow recommendations
+- Documentation enhancement opportunities
+
 ---
 
 ## 🤖 AI-Assisted Development
@@ -126,6 +140,8 @@ This index helps you find the right documentation for your needs.
 | **Troubleshoot issues** | [LESSONS_LEARNED.md](LESSONS_LEARNED.md) |
 | **Set up AWS backend** | [AWS_BACKEND_SETUP.md](AWS_BACKEND_SETUP.md) |
 | **Understand Terraformer** | [TERRAFORMER_OIG_FAQ.md](TERRAFORMER_OIG_FAQ.md) |
+| **Check provider resource coverage** | [PROVIDER_COVERAGE_MATRIX.md](PROVIDER_COVERAGE_MATRIX.md) |
+| **Understand provider limitations** | [PROVIDER_ANALYSIS.md](PROVIDER_ANALYSIS.md) |
 
 ---
 
