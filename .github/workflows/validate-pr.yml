@@ -129,7 +129,9 @@ jobs:
           echo "Scanning for potential secrets..."
 
           # Check for common secret patterns
-          if grep -r -i "PRIVATE[_-]KEY" --include="*.tf" --include="*.py" --include="*.yml" . 2>/dev/null; then
+          # Exclude generate-oauth-keys.yml which legitimately references key terms
+          if grep -r -i "PRIVATE[_-]KEY" --include="*.tf" --include="*.py" --include="*.yml" \
+             --exclude="generate-oauth-keys.yml" . 2>/dev/null; then
             echo "❌ Error: Found potential private key"
             exit 1
           fi
