@@ -1,0 +1,92 @@
+name: Deploy OAG Application
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: string
+      config_file:
+        description: 'Path to OAG config file'
+        required: true
+        default: 'config/oag_apps.json'
+      app_name:
+        description: 'Specific app to deploy (empty for all)'
+        required: false
+        type: string
+      dry_run:
+        description: 'Preview changes only'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy OAG Application
+    runs-on: ubuntu-latest
+
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyjwt cryptography
+
+      - name: Configure OAG credentials
+        run: |
+          # Create private key file from secret
+          mkdir -p ~/.oag
+          echo "${{ secrets.OAG_PRIVATE_KEY }}" > ~/.oag/private_key.pem
+          chmod 600 ~/.oag/private_key.pem
+
+      - name: Deploy OAG Application
+        env:
+          OAG_HOSTNAME: ${{ secrets.OAG_HOSTNAME }}
+          OAG_CLIENT_ID: ${{ secrets.OAG_CLIENT_ID }}
+          OAG_PRIVATE_KEY_PATH: ~/.oag/private_key.pem
+        run: |
+          CONFIG_PATH="environments/${{ inputs.environment }}/${{ inputs.config_file }}"
+
+          ARGS="--config $CONFIG_PATH --action deploy"
+
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          if [ -n "${{ inputs.app_name }}" ]; then
+            ARGS="$ARGS --app '${{ inputs.app_name }}'"
+          fi
+
+          echo "Running: python scripts/manage_oag_apps.py $ARGS"
+          python scripts/manage_oag_apps.py $ARGS
+
+      - name: List deployed applications
+        if: inputs.dry_run == false
+        env:
+          OAG_HOSTNAME: ${{ secrets.OAG_HOSTNAME }}
+          OAG_CLIENT_ID: ${{ secrets.OAG_CLIENT_ID }}
+          OAG_PRIVATE_KEY_PATH: ~/.oag/private_key.pem
+        run: |
+          CONFIG_PATH="environments/${{ inputs.environment }}/${{ inputs.config_file }}"
+          python scripts/manage_oag_apps.py --config $CONFIG_PATH --action list
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.oag/private_key.pem

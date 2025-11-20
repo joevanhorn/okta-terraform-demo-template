@@ -1,0 +1,91 @@
+{
+  "description": "Okta Access Gateway application configurations",
+  "last_updated": "2025-11-20T00:00:00Z",
+
+  "gateway": {
+    "hostname": "oag.example.com",
+    "client_id": "your_client_id_here",
+    "private_key_path": "~/.oag/private_key.pem",
+    "verify_ssl": true
+  },
+
+  "applications": [
+    {
+      "label": "Legacy HR Portal",
+      "public_domain": "hr.example.com",
+      "description": "Internal HR system with header-based authentication",
+      "protected_resources": [
+        {
+          "url": "https://internal-hr.corp.local:8443",
+          "weight": 100,
+          "health_check": {
+            "path": "/health",
+            "method": "GET",
+            "expected_status": 200,
+            "interval": 10,
+            "timeout": 1
+          }
+        }
+      ],
+      "attributes": [
+        {
+          "source": "IDP",
+          "field": "login",
+          "type": "Header",
+          "name": "X-Remote-User"
+        },
+        {
+          "source": "IDP",
+          "field": "email",
+          "type": "Header",
+          "name": "X-Remote-Email"
+        },
+        {
+          "source": "IDP",
+          "field": "firstName",
+          "type": "Header",
+          "name": "X-Remote-FirstName"
+        },
+        {
+          "source": "IDP",
+          "field": "lastName",
+          "type": "Header",
+          "name": "X-Remote-LastName"
+        }
+      ],
+      "group": "HR-Portal-Users",
+      "policy": "Protected"
+    },
+    {
+      "label": "Finance Dashboard",
+      "public_domain": "finance.example.com",
+      "description": "Financial reporting dashboard",
+      "protected_resources": [
+        {
+          "url": "https://finance-app-1.corp.local:443",
+          "weight": 50
+        },
+        {
+          "url": "https://finance-app-2.corp.local:443",
+          "weight": 50
+        }
+      ],
+      "attributes": [
+        {
+          "source": "IDP",
+          "field": "login",
+          "type": "Header",
+          "name": "REMOTE_USER"
+        },
+        {
+          "source": "IDP",
+          "field": "department",
+          "type": "Header",
+          "name": "X-User-Department"
+        }
+      ],
+      "group": "Finance-Users",
+      "policy": "Protected"
+    }
+  ]
+}

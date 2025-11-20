@@ -4,6 +4,10 @@
 # Core dependencies
 requests>=2.31.0,<3.0.0
 
+# OAG API Management (JWT authentication)
+pyjwt>=2.8.0         # JWT token generation
+cryptography>=41.0.0  # RSA key handling for OAG API
+
 # Optional: For enhanced features
 python-dotenv>=1.0.0  # Environment variable management
 pyyaml>=6.0          # YAML configuration support

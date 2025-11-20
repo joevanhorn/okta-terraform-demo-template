@@ -1,0 +1,61 @@
+{
+  "gateway": {
+    "hostname": "oag.example.com",
+    "client_id": "your_client_id",
+    "private_key_path": "~/.oag/private_key.pem"
+  },
+  "applications": [
+    {
+      "label": "OAG Demo App",
+      "public_domain": "demo.example.com",
+      "description": "Demo application for testing OAG header-based authentication",
+      "protected_resources": [
+        {
+          "url": "https://backend-server.internal:8080",
+          "weight": 100,
+          "health_check": {
+            "path": "/health",
+            "method": "GET",
+            "expected_status": 200,
+            "interval": 10,
+            "timeout": 3
+          }
+        }
+      ],
+      "attributes": [
+        {
+          "source": "IDP",
+          "field": "login",
+          "type": "Header",
+          "name": "X-Remote-User"
+        },
+        {
+          "source": "IDP",
+          "field": "email",
+          "type": "Header",
+          "name": "X-Remote-Email"
+        },
+        {
+          "source": "IDP",
+          "field": "firstName",
+          "type": "Header",
+          "name": "X-Remote-FirstName"
+        },
+        {
+          "source": "IDP",
+          "field": "lastName",
+          "type": "Header",
+          "name": "X-Remote-LastName"
+        },
+        {
+          "source": "IDP",
+          "field": "department",
+          "type": "Header",
+          "name": "X-User-Department"
+        }
+      ],
+      "group": "Demo-App-Users",
+      "policy": "Protected"
+    }
+  ]
+}
