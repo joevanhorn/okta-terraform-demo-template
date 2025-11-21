@@ -294,21 +294,42 @@ environments/
 
 ### Entitlements (Application-Level Access Rights)
 
+**CRITICAL:** Values MUST be in alphabetical order by `external_value`. Okta API returns values sorted alphabetically, and the provider compares by index position. Incorrect ordering causes "inconsistent result after apply" errors.
+
 ```hcl
 # Define entitlement with values on an application
+# Values MUST be in alphabetical order by external_value
 resource "okta_entitlement" "app_accounts" {
   app_id         = okta_app_oauth.my_app.id
   key            = "accounts"
   type           = "array<string>"
   display_name   = "Account Access"
 
+  # Alphabetical: 26DEMO26 < DEMO38
+  values {
+    value          = "CASH MANAGEMENT III"
+    external_value = "26DEMO26"
+  }
   values {
     value          = "ANCHOR CHECKING II"
     external_value = "DEMO38"
   }
+}
+
+# For yes/no entitlements: "no" < "yes" alphabetically
+resource "okta_entitlement" "app_approval" {
+  app_id         = okta_app_oauth.my_app.id
+  key            = "canApprove"
+  type           = "string"
+  display_name   = "Can Approve"
+
   values {
-    value          = "CASH MANAGEMENT III"
-    external_value = "26DEMO26"
+    value          = "No"
+    external_value = "no"
+  }
+  values {
+    value          = "Yes"
+    external_value = "yes"
   }
 }
 ```

@@ -161,6 +161,9 @@ resource "okta_app_group_assignment" "salesforce_marketing" {
 ## OIG Examples
 
 ### Entitlement (Application-Level Access Rights)
+
+**IMPORTANT:** Values MUST be in alphabetical order by `external_value`. Okta API returns values sorted alphabetically, and the provider compares by index position.
+
 ```hcl
 resource "okta_entitlement" "app_accounts" {
   app_id         = okta_app_oauth.money_movement.id
@@ -168,21 +171,39 @@ resource "okta_entitlement" "app_accounts" {
   type           = "array<string>"
   display_name   = "Account Access"
 
+  # Values in alphabetical order by external_value
   values {
-    value          = "ANCHOR CHECKING II"
-    external_value = "DEMO38"
+    value          = "CASH MANAGEMENT II"
+    external_value = "26DEMO14"
   }
   values {
     value          = "CASH MANAGEMENT III"
     external_value = "26DEMO26"
   }
   values {
-    value          = "CASH MANAGEMENT II"
-    external_value = "26DEMO14"
+    value          = "ANCHOR CHECKING II"
+    external_value = "DEMO38"
   }
   values {
     value          = "INTEREST CHECKING"
     external_value = "DEMO42"
+  }
+}
+
+# For yes/no entitlements, "no" comes before "yes" alphabetically
+resource "okta_entitlement" "app_permission" {
+  app_id         = okta_app_oauth.money_movement.id
+  key            = "canApprove"
+  type           = "string"
+  display_name   = "Can Approve"
+
+  values {
+    value          = "No"
+    external_value = "no"
+  }
+  values {
+    value          = "Yes"
+    external_value = "yes"
   }
 }
 ```

@@ -42,6 +42,7 @@ Manages application-level entitlements (access rights)
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/entitlement
 - **Use for:** Defining access rights on applications (e.g., "Account Access", "Role Permissions")
 - **Note:** Values get Okta-generated IDs that bundles reference
+- **Critical:** Values MUST be in alphabetical order by `external_value` (Okta API sorts them)
 
 ### okta_entitlement_bundle
 Manages entitlement bundles (packages of access)

@@ -588,6 +588,63 @@ resource "okta_entitlement_bundle" "standard_access" {
 - This creates proper resource dependencies so bundles can be created in the same apply as entitlements
 - Use locals to define reusable account groupings (standard, limited, full, etc.)
 
+### 11. Entitlement Values Must Be Alphabetically Ordered
+
+**Okta API returns entitlement values sorted alphabetically by `external_value`.**
+
+The Terraform provider compares values by index position, so if your configuration defines values in a different order than the API returns, you'll get "Provider produced inconsistent result after apply" errors.
+
+**Always define values in alphabetical order by `external_value`:**
+
+```hcl
+resource "okta_entitlement" "example" {
+  name           = "Access Level"
+  external_value = "accessLevel"
+  data_type      = "string"
+  multi_value    = false
+
+  parent {
+    external_id = okta_app_oauth.my_app.id
+    type        = "APPLICATION"
+  }
+
+  # Values MUST be in alphabetical order by external_value
+  values {
+    external_value = "no"    # "n" comes before "y"
+    name           = "No"
+    description    = "Access denied"
+  }
+
+  values {
+    external_value = "yes"   # "y" comes after "n"
+    name           = "Yes"
+    description    = "Access granted"
+  }
+}
+```
+
+**For array entitlements with many values:**
+```hcl
+# Sort alphabetically: 149259, 26DEMO14, 26DEMO26, DEMO1, DEMO10, DEMO11, DEMO2...
+values {
+  external_value = "149259"
+  name           = "149259"
+  description    = "Banking Account"
+}
+
+values {
+  external_value = "26DEMO14"
+  name           = "26DEMO14"
+  description    = "CASH MANAGEMENT II"
+}
+# ... continue in alphabetical order
+```
+
+**Key points:**
+- This is undocumented Okta API behavior
+- The provider should handle this (set comparison vs list), but currently doesn't
+- If you see "inconsistent result after apply" errors on entitlements, check value ordering first
+
 ---
 
 ## Repository Structure Highlights
