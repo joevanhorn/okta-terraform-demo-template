@@ -37,11 +37,18 @@ Assigns groups to applications
 
 ## OIG (Identity Governance) Resources
 
+### okta_entitlement
+Manages application-level entitlements (access rights)
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/entitlement
+- **Use for:** Defining access rights on applications (e.g., "Account Access", "Role Permissions")
+- **Note:** Values get Okta-generated IDs that bundles reference
+
 ### okta_entitlement_bundle
 Manages entitlement bundles (packages of access)
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/entitlement_bundle
 - **Use for:** Creating access bundles (e.g., "Marketing Tools", "Engineering Access")
 - **Note:** Manage bundle definitions only; assign principals via Okta UI
+- **Critical:** Use dynamic blocks to reference Okta-generated value IDs by external_value string
 
 ### okta_reviews
 Manages access review campaigns

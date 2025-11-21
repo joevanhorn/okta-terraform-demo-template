@@ -160,13 +160,85 @@ resource "okta_app_group_assignment" "salesforce_marketing" {
 
 ## OIG Examples
 
-### Entitlement Bundle
+### Entitlement (Application-Level Access Rights)
+```hcl
+resource "okta_entitlement" "app_accounts" {
+  app_id         = okta_app_oauth.money_movement.id
+  key            = "accounts"
+  type           = "array<string>"
+  display_name   = "Account Access"
+
+  values {
+    value          = "ANCHOR CHECKING II"
+    external_value = "DEMO38"
+  }
+  values {
+    value          = "CASH MANAGEMENT III"
+    external_value = "26DEMO26"
+  }
+  values {
+    value          = "CASH MANAGEMENT II"
+    external_value = "26DEMO14"
+  }
+  values {
+    value          = "INTEREST CHECKING"
+    external_value = "DEMO42"
+  }
+}
+```
+
+### Entitlement Bundle (Basic)
 ```hcl
 resource "okta_entitlement_bundle" "marketing_tools" {
   name        = "Marketing Tools Bundle"
   description = "Access to all marketing applications and resources"
+  status      = "ACTIVE"
 }
 ```
+
+### Entitlement Bundle with Dynamic Value Lookups (Recommended)
+
+**IMPORTANT:** Entitlement bundles require Okta-generated value IDs, not external_value strings.
+Use dynamic blocks with for expressions to look up value IDs:
+
+```hcl
+# Define account groupings in locals for reusability
+locals {
+  standard_accounts = ["DEMO38", "26DEMO26", "26DEMO14", "DEMO42"]
+  limited_accounts  = ["DEMO38", "DEMO42"]
+  all_accounts      = ["DEMO38", "26DEMO26", "26DEMO14", "DEMO2", "149259"]
+}
+
+# Bundle using dynamic lookup
+resource "okta_entitlement_bundle" "standard_access" {
+  name        = "Standard Access Bundle"
+  description = "Standard 4-account access for most users"
+  status      = "ACTIVE"
+
+  target {
+    external_id = okta_app_oauth.money_movement.id
+    type        = "APPLICATION"
+  }
+
+  entitlements {
+    id = okta_entitlement.app_accounts.id
+    dynamic "values" {
+      for_each = [
+        for v in okta_entitlement.app_accounts.values : v.id
+        if contains(local.standard_accounts, v.external_value)
+      ]
+      content {
+        id = values.value
+      }
+    }
+  }
+}
+```
+
+**Key points:**
+- `values` is a **block type**, not an argument - use `dynamic "values"` not `values = [...]`
+- The `for` expression filters values by `external_value` and returns the Okta-generated `id`
+- This creates proper resource dependencies so bundles can be created in the same apply as entitlements
 
 ### Access Review Campaign
 ```hcl

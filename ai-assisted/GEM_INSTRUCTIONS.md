@@ -292,20 +292,82 @@ environments/
 
 ## Okta Identity Governance (OIG) Patterns
 
-### Entitlement Bundles
+### Entitlements (Application-Level Access Rights)
 
 ```hcl
-# ✅ CORRECT - Bundle definition
+# Define entitlement with values on an application
+resource "okta_entitlement" "app_accounts" {
+  app_id         = okta_app_oauth.my_app.id
+  key            = "accounts"
+  type           = "array<string>"
+  display_name   = "Account Access"
+
+  values {
+    value          = "ANCHOR CHECKING II"
+    external_value = "DEMO38"
+  }
+  values {
+    value          = "CASH MANAGEMENT III"
+    external_value = "26DEMO26"
+  }
+}
+```
+
+### Entitlement Bundles
+
+**Basic bundle (without entitlement values):**
+```hcl
 resource "okta_entitlement_bundle" "marketing_access" {
   name        = "Marketing Access Bundle"
-  description = "Complete access package for marketing team members including CRM, analytics, and content management tools"
+  description = "Complete access package for marketing team members"
   status      = "ACTIVE"
 }
-
-# Note: This creates the bundle DEFINITION only
-# Assigning this bundle to users/groups is done in Okta Admin UI
-# NOT managed by Terraform!
 ```
+
+**Bundle with dynamic value lookups (RECOMMENDED):**
+
+When bundling entitlement values, use dynamic blocks to reference Okta-generated IDs:
+
+```hcl
+# Define account groupings in locals
+locals {
+  standard_accounts = ["DEMO38", "26DEMO26", "26DEMO14", "DEMO42"]
+}
+
+# Bundle using dynamic lookup
+resource "okta_entitlement_bundle" "standard_access" {
+  name        = "Standard Access Bundle"
+  description = "Standard 4-account access"
+  status      = "ACTIVE"
+
+  target {
+    external_id = okta_app_oauth.my_app.id
+    type        = "APPLICATION"
+  }
+
+  entitlements {
+    id = okta_entitlement.app_accounts.id
+    dynamic "values" {
+      for_each = [
+        for v in okta_entitlement.app_accounts.values : v.id
+        if contains(local.standard_accounts, v.external_value)
+      ]
+      content {
+        id = values.value
+      }
+    }
+  }
+}
+```
+
+**Key points:**
+- `values` is a **block type**, not an argument - use `dynamic "values"` not `values = [...]`
+- The `for` expression filters values by `external_value` and returns the Okta-generated `id`
+- This creates proper resource dependencies for same-apply creation
+
+# Note: Bundles manage DEFINITIONS only
+# Assigning bundles to users/groups is done in Okta Admin UI
+# NOT managed by Terraform!
 
 ### Access Review Campaigns
 
