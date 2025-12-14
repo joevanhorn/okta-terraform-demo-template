@@ -398,9 +398,112 @@ The workflow:
 
 ---
 
+## Active Directory Integration
+
+OPA can integrate with Active Directory for:
+- **Account Discovery**: Sync AD users to OPA
+- **Server Access**: RDP to Windows domain-joined servers
+- **Password Management**: Rotate AD service account passwords
+- **Session Recording**: Record privileged sessions for compliance
+
+### Prerequisites for AD Integration
+
+1. **OPA Gateway Installed**
+   - Deploy gateway on-premises or in cloud with network access to AD
+   - Use gateway setup token from Terraform
+
+2. **AD Service Account**
+   - Create a service account in AD with read access
+   - For password rotation, needs password reset permissions
+
+3. **Network Connectivity**
+   - Gateway → AD Domain Controller (LDAP 389/636, Kerberos 88)
+   - Gateway → OPA Cloud (HTTPS 443)
+
+### AD Integration Resources
+
+| Resource | Purpose |
+|----------|---------|
+| `oktapam_gateway_setup_token` | Token to install OPA Gateway |
+| `oktapam_ad_connection` | Connect to AD domain |
+| `oktapam_ad_user_sync_task_settings` | Sync AD users to OPA |
+| `oktapam_ad_task_settings` | Configure account discovery rules |
+| `oktapam_ad_certificate_object` | Manage AD certificates |
+
+### Example: AD Connection
+
+```hcl
+# Gateway for AD connectivity
+resource "oktapam_gateway_setup_token" "ad_gateway" {
+  description = "Gateway for Active Directory"
+  labels = {
+    environment = "production"
+    purpose     = "active-directory"
+  }
+}
+
+# AD Connection
+resource "oktapam_ad_connection" "corporate" {
+  name                     = "Corporate AD"
+  gateway_id               = "GATEWAY_UUID"  # From installed gateway
+  domain                   = "corp.example.com"
+  service_account_username = var.ad_service_account_username
+  service_account_password = var.ad_service_account_password
+  use_passwordless         = false
+  domain_controllers       = ["dc1.corp.example.com", "dc2.corp.example.com"]
+}
+
+# User Sync
+resource "oktapam_ad_user_sync_task_settings" "user_sync" {
+  connection_id     = oktapam_ad_connection.corporate.id
+  name              = "Corporate User Sync"
+  is_active         = true
+  frequency_seconds = 3600  # Every hour
+  base_dn           = "OU=Users,DC=corp,DC=example,DC=com"
+  ldap_query_filter = "(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
+  sid_field         = "objectSid"
+  upn_field         = "userPrincipalName"
+}
+```
+
+### Example File
+
+See `environments/myorg/terraform/opa_ad_integration.tf.example` for comprehensive AD integration patterns including:
+
+- Resource groups and projects for AD servers
+- Server enrollment tokens for domain controllers
+- AD connection and user sync configuration
+- Security policies for AD server access
+- Password rotation settings
+- Secret storage for AD credentials
+
+### AD Infrastructure
+
+This repository includes optional AWS infrastructure for deploying an AD domain controller for demos:
+
+```
+environments/myorg/infrastructure/
+├── ad-domain-controller.tf    # EC2 Windows Server
+├── networking.tf              # VPC, subnets, security groups
+├── scripts/userdata.ps1       # AD setup automation
+└── variables.tf               # Configuration variables
+```
+
+Deploy with:
+```bash
+cd environments/myorg/infrastructure
+terraform init
+terraform apply -var="admin_password=YourPassword123!" \
+                -var="ad_safe_mode_password=YourDSRMPassword123!" \
+                -var="okta_org_url=https://your-org.okta.com"
+```
+
+---
+
 ## References
 
 - [Okta PAM Provider - Terraform Registry](https://registry.terraform.io/providers/okta/oktapam/latest/docs)
 - [Provider GitHub Repository](https://github.com/okta/terraform-provider-oktapam)
 - [Okta Privileged Access Documentation](https://help.okta.com/en-us/content/topics/privileged-access/pam-overview.htm)
 - [Create OPA Service User](https://help.okta.com/en-us/content/topics/privileged-access/pam-service-users.htm)
+- [OPA AD Integration Guide](https://help.okta.com/en-us/content/topics/privileged-access/pam-ad-integration.htm)

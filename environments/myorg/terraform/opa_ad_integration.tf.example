@@ -1,0 +1,445 @@
+# =============================================================================
+# OKTA PRIVILEGED ACCESS (OPA) - ACTIVE DIRECTORY INTEGRATION
+# =============================================================================
+# This file contains OPA resources for integrating with Active Directory.
+# Copy and uncomment the resources after enabling the oktapam provider.
+#
+# Prerequisites:
+# 1. Enable oktapam provider in provider.tf
+# 2. Deploy AD infrastructure (environments/myorg/infrastructure/)
+# 3. Install OPA Gateway on-premises or in AWS
+# 4. Add OPA secrets to GitHub Environment
+#
+# Architecture:
+#   Okta (SaaS) <-> OPA Gateway <-> Active Directory Domain Controller
+#
+# Documentation:
+# - OPA Setup: docs/OPA_SETUP.md
+# - AD Infra: environments/myorg/infrastructure/README.md
+# =============================================================================
+
+# =============================================================================
+# DATA SOURCES - LOOK UP EXISTING OPA RESOURCES
+# =============================================================================
+# Reference existing gateways and teams before creating AD connections.
+
+# # Get list of available gateways
+# data "oktapam_gateways" "all" {}
+
+# # Get current team settings
+# data "oktapam_current_user" "me" {}
+
+# =============================================================================
+# GATEWAY SETUP TOKEN
+# =============================================================================
+# Generate a setup token for the OPA Gateway that will connect to AD.
+# This token is used during gateway installation.
+
+# resource "oktapam_gateway_setup_token" "ad_gateway" {
+#   description = "Gateway for Active Directory connectivity"
+#   labels = {
+#     environment = "production"
+#     purpose     = "active-directory"
+#     location    = "aws-us-east-1"
+#   }
+# }
+
+# =============================================================================
+# RESOURCE GROUP FOR AD
+# =============================================================================
+# Organize AD-related resources in a dedicated resource group.
+
+# resource "oktapam_resource_group" "active_directory" {
+#   name                            = "Active Directory"
+#   description                     = "Resources for AD domain integration and server access"
+#   delegated_resource_admin_groups = []
+# }
+
+# =============================================================================
+# PROJECT FOR AD SERVERS
+# =============================================================================
+# Create a project to manage Windows servers in the AD domain.
+
+# resource "oktapam_resource_group_project" "ad_servers" {
+#   name                  = "AD Domain Servers"
+#   resource_group        = oktapam_resource_group.active_directory.id
+#   ssh_certificate_type  = "CERT_TYPE_RSA_01"
+#   account_discovery     = true
+#   create_server_users   = false  # Use AD accounts
+#   forward_traffic       = true   # Forward through gateway
+#   rdp_session_recording = true   # Record RDP sessions for compliance
+#   ssh_session_recording = true   # Record SSH sessions
+#   gateway_selector      = "purpose=active-directory"
+# }
+
+# =============================================================================
+# SERVER ENROLLMENT TOKEN FOR AD DOMAIN CONTROLLERS
+# =============================================================================
+# Token used to enroll domain controllers into OPA.
+
+# resource "oktapam_resource_group_server_enrollment_token" "dc_enrollment" {
+#   resource_group = oktapam_resource_group.active_directory.id
+#   project        = oktapam_resource_group_project.ad_servers.id
+#   description    = "Enrollment token for AD Domain Controllers"
+# }
+
+# =============================================================================
+# ACTIVE DIRECTORY CONNECTION
+# =============================================================================
+# Connect OPA to your Active Directory domain for account discovery.
+#
+# IMPORTANT:
+# - Requires an installed and connected OPA Gateway
+# - Service account needs read access to AD for user/group sync
+# - Get gateway_id from: data.oktapam_gateways.all or OPA Console
+
+# resource "oktapam_ad_connection" "corporate" {
+#   name                     = "Corporate Active Directory"
+#   gateway_id               = "GATEWAY_UUID_HERE"  # From OPA Console or data source
+#   domain                   = var.ad_domain_name   # e.g., "demo.local"
+#   service_account_username = var.ad_service_account_username
+#   service_account_password = var.ad_service_account_password
+#   use_passwordless         = false
+#   certificate_id           = ""  # Optional: for certificate-based auth
+#
+#   # Domain controller endpoints
+#   domain_controllers = [
+#     "${var.ad_netbios_name}-DC01.${var.ad_domain_name}",
+#     # Add additional DCs for redundancy
+#   ]
+# }
+
+# =============================================================================
+# AD USER SYNC TASK
+# =============================================================================
+# Automatically sync AD users to OPA for account discovery.
+
+# resource "oktapam_ad_user_sync_task_settings" "user_sync" {
+#   connection_id     = oktapam_ad_connection.corporate.id
+#   name              = "Corporate User Sync"
+#   is_active         = true
+#   frequency_seconds = 3600  # Sync every hour
+#
+#   # LDAP query for user discovery
+#   base_dn           = "OU=Users,DC=${replace(var.ad_domain_name, ".", ",DC=")}"
+#   ldap_query_filter = "(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"  # Active users only
+#
+#   # Attribute mappings
+#   sid_field = "objectSid"
+#   upn_field = "userPrincipalName"
+# }
+
+# =============================================================================
+# AD TASK SETTINGS (Optional)
+# =============================================================================
+# Additional AD task configuration for account management.
+
+# resource "oktapam_ad_task_settings" "account_discovery" {
+#   connection_id = oktapam_ad_connection.corporate.id
+#
+#   # Account discovery settings
+#   rule_assignments {
+#     base_dn              = "OU=IT,OU=Users,DC=${replace(var.ad_domain_name, ".", ",DC=")}"
+#     ldap_query_filter    = "(objectClass=user)"
+#     project_id           = oktapam_resource_group_project.ad_servers.id
+#     priority             = 1
+#     server_account_type  = "standard"
+#     is_sudo_enabled      = false
+#   }
+# }
+
+# =============================================================================
+# GROUPS FOR AD ACCESS
+# =============================================================================
+# Create OPA groups that map to AD administrative functions.
+
+# resource "oktapam_group" "ad_admins" {
+#   name = "AD-Administrators"
+# }
+
+# resource "oktapam_group" "ad_helpdesk" {
+#   name = "AD-Helpdesk"
+# }
+
+# resource "oktapam_group" "ad_server_admins" {
+#   name = "AD-Server-Administrators"
+# }
+
+# =============================================================================
+# PROJECT GROUP ASSIGNMENTS
+# =============================================================================
+# Assign OPA groups to the AD server project with appropriate permissions.
+
+# # Full admin access for AD Administrators
+# resource "oktapam_project_group" "admins_ad_servers" {
+#   project_name        = oktapam_resource_group_project.ad_servers.name
+#   group_name          = oktapam_group.ad_admins.name
+#   server_admin        = true
+#   server_access       = true
+#   create_server_group = true
+# }
+
+# # Limited access for Helpdesk (view + password checkout)
+# resource "oktapam_project_group" "helpdesk_ad_servers" {
+#   project_name        = oktapam_resource_group_project.ad_servers.name
+#   group_name          = oktapam_group.ad_helpdesk.name
+#   server_admin        = false
+#   server_access       = true
+#   create_server_group = false
+#
+#   server_account_permissions {
+#     server_account    = "Administrator"
+#     password_checkout = true
+#   }
+# }
+
+# # Server admin access (non-domain admin)
+# resource "oktapam_project_group" "server_admins_ad" {
+#   project_name        = oktapam_resource_group_project.ad_servers.name
+#   group_name          = oktapam_group.ad_server_admins.name
+#   server_admin        = false
+#   server_access       = true
+#   create_server_group = true
+#
+#   server_account_permissions {
+#     server_account    = "localadmin"
+#     password_checkout = true
+#   }
+# }
+
+# =============================================================================
+# SECURITY POLICY FOR AD SERVERS
+# =============================================================================
+# Define access policies for AD server access with session recording.
+
+# resource "oktapam_security_policy_v2" "ad_server_access" {
+#   name        = "AD Server Access Policy"
+#   description = "Policy for accessing Active Directory domain servers"
+#   active      = true
+#
+#   principals {
+#     groups = [
+#       oktapam_group.ad_admins.id,
+#       oktapam_group.ad_helpdesk.id,
+#       oktapam_group.ad_server_admins.id
+#     ]
+#   }
+#
+#   rule {
+#     name = "domain-controller-access"
+#     type = "access"
+#
+#     resource_selector {
+#       server_selector {
+#         labels = {
+#           role = "Domain-Controller"
+#         }
+#       }
+#     }
+#
+#     privileges {
+#       server_accounts      = ["Administrator"]
+#       password_checkout    = true
+#       session_recording    = true
+#     }
+#   }
+#
+#   rule {
+#     name = "member-server-access"
+#     type = "access"
+#
+#     resource_selector {
+#       server_selector {
+#         labels = {
+#           environment = "production"
+#           domain      = var.ad_domain_name
+#         }
+#       }
+#     }
+#
+#     privileges {
+#       server_accounts      = ["localadmin", "svc_app"]
+#       password_checkout    = true
+#       session_recording    = true
+#     }
+#   }
+# }
+
+# =============================================================================
+# PASSWORD SETTINGS FOR AD SERVERS
+# =============================================================================
+# Configure password rotation for AD service accounts managed by OPA.
+
+# resource "oktapam_password_settings" "ad_passwords" {
+#   resource_group = oktapam_resource_group.active_directory.id
+#   project        = oktapam_resource_group_project.ad_servers.id
+#
+#   # Rotation settings
+#   enable_periodic_rotation        = true
+#   periodic_rotation_duration_days = 30
+#
+#   # Checkout settings
+#   min_checkout_duration_seconds = 300   # 5 minutes minimum
+#   max_checkout_duration_seconds = 14400 # 4 hours maximum
+#   checkout_required             = true
+# }
+
+# =============================================================================
+# SECRET FOLDER FOR AD CREDENTIALS
+# =============================================================================
+# Store AD-related secrets securely in OPA.
+
+# resource "oktapam_secret_folder" "ad_credentials" {
+#   name           = "AD Credentials"
+#   description    = "Active Directory service account credentials"
+#   resource_group = oktapam_resource_group.active_directory.id
+#   project        = oktapam_resource_group_project.ad_servers.id
+#   parent_folder  = ""
+# }
+
+# # Sub-folders for organization
+# resource "oktapam_secret_folder" "ad_service_accounts" {
+#   name           = "Service Accounts"
+#   description    = "AD service account passwords"
+#   resource_group = oktapam_resource_group.active_directory.id
+#   project        = oktapam_resource_group_project.ad_servers.id
+#   parent_folder  = oktapam_secret_folder.ad_credentials.id
+# }
+
+# resource "oktapam_secret_folder" "ad_admin_accounts" {
+#   name           = "Admin Accounts"
+#   description    = "Administrative account passwords"
+#   resource_group = oktapam_resource_group.active_directory.id
+#   project        = oktapam_resource_group_project.ad_servers.id
+#   parent_folder  = oktapam_secret_folder.ad_credentials.id
+# }
+
+# =============================================================================
+# SECRETS FOR AD
+# =============================================================================
+# Store sensitive AD credentials.
+
+# resource "oktapam_secret" "ad_service_account" {
+#   resource_group = oktapam_resource_group.active_directory.id
+#   project        = oktapam_resource_group_project.ad_servers.id
+#   parent_folder  = oktapam_secret_folder.ad_service_accounts.id
+#   name           = "svc_okta_ad"
+#   description    = "Okta AD Agent service account password"
+#
+#   secret {
+#     type  = "password"
+#     value = var.ad_okta_agent_password
+#   }
+# }
+
+# resource "oktapam_secret" "dsrm_password" {
+#   resource_group = oktapam_resource_group.active_directory.id
+#   project        = oktapam_resource_group_project.ad_servers.id
+#   parent_folder  = oktapam_secret_folder.ad_admin_accounts.id
+#   name           = "dc-dsrm-password"
+#   description    = "Domain Controller DSRM (Directory Services Restore Mode) password"
+#
+#   secret {
+#     type  = "password"
+#     value = var.ad_safe_mode_password
+#   }
+# }
+
+# =============================================================================
+# SUDO COMMAND BUNDLE FOR WINDOWS EQUIVALENT
+# =============================================================================
+# While sudo is Linux-specific, this shows the pattern for Unix servers.
+
+# resource "oktapam_sudo_command_bundle" "ad_management_ops" {
+#   name = "AD Management Operations"
+#
+#   # Active Directory management commands (for Linux SSSD integration)
+#   structured_commands {
+#     command      = "/usr/bin/realm"
+#     command_type = "executable"
+#     args_type    = "any"
+#     run_as       = "root"
+#   }
+#
+#   structured_commands {
+#     command      = "/usr/bin/adcli"
+#     command_type = "executable"
+#     args_type    = "any"
+#     run_as       = "root"
+#   }
+#
+#   # View AD-related logs
+#   structured_commands {
+#     command      = "/usr/bin/journalctl"
+#     command_type = "executable"
+#     args_type    = "custom"
+#     args         = "-u sssd -f"
+#     run_as       = "root"
+#   }
+# }
+
+# =============================================================================
+# VARIABLES FOR AD INTEGRATION
+# =============================================================================
+# Add these to variables.tf if not already present.
+
+# # Active Directory Configuration
+# variable "ad_domain_name" {
+#   description = "Active Directory domain name (e.g., demo.local)"
+#   type        = string
+# }
+
+# variable "ad_netbios_name" {
+#   description = "Active Directory NetBIOS name (e.g., DEMO)"
+#   type        = string
+# }
+
+# variable "ad_service_account_username" {
+#   description = "Service account for OPA AD connection"
+#   type        = string
+#   default     = "svc_okta"
+# }
+
+# variable "ad_service_account_password" {
+#   description = "Service account password for OPA AD connection"
+#   type        = string
+#   sensitive   = true
+# }
+
+# variable "ad_safe_mode_password" {
+#   description = "AD DSRM password"
+#   type        = string
+#   sensitive   = true
+# }
+
+# variable "ad_okta_agent_password" {
+#   description = "Okta AD Agent service account password"
+#   type        = string
+#   sensitive   = true
+# }
+
+# =============================================================================
+# OUTPUTS
+# =============================================================================
+
+# output "ad_gateway_setup_token" {
+#   description = "Token for setting up the AD gateway"
+#   value       = oktapam_gateway_setup_token.ad_gateway.token
+#   sensitive   = true
+# }
+
+# output "dc_enrollment_token" {
+#   description = "Token for enrolling domain controllers"
+#   value       = oktapam_resource_group_server_enrollment_token.dc_enrollment.token
+#   sensitive   = true
+# }
+
+# output "ad_resource_group_id" {
+#   description = "Active Directory resource group ID"
+#   value       = oktapam_resource_group.active_directory.id
+# }
+
+# output "ad_connection_id" {
+#   description = "AD connection ID for reference"
+#   value       = oktapam_ad_connection.corporate.id
+# }
