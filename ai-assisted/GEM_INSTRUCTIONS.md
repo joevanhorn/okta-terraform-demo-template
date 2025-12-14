@@ -1521,6 +1521,114 @@ resource "oktapam_security_policy_v2" "developer_server_access" {
 - `oktapam_current_user`
 - `oktapam_team_settings`
 
+### OPA Active Directory Integration Pattern
+
+Use this pattern when users request AD integration with OPA:
+
+```hcl
+# Gateway setup token for AD connectivity
+resource "oktapam_gateway_setup_token" "ad_gateway" {
+  description = "Gateway for Active Directory connectivity"
+  labels = {
+    environment = "production"
+    purpose     = "active-directory"
+  }
+}
+
+# Resource group for AD resources
+resource "oktapam_resource_group" "active_directory" {
+  name        = "Active Directory"
+  description = "Resources for AD domain integration"
+}
+
+# Project for AD domain servers
+resource "oktapam_resource_group_project" "ad_servers" {
+  name                  = "AD Domain Servers"
+  resource_group        = oktapam_resource_group.active_directory.id
+  ssh_certificate_type  = "CERT_TYPE_RSA_01"
+  account_discovery     = true
+  create_server_users   = false  # Use AD accounts
+  forward_traffic       = true   # Forward through gateway
+  rdp_session_recording = true   # Record RDP sessions
+  gateway_selector      = "purpose=active-directory"
+}
+
+# AD Connection - requires installed gateway
+resource "oktapam_ad_connection" "corporate" {
+  name                     = "Corporate AD"
+  gateway_id               = "GATEWAY_UUID"  # From installed gateway
+  domain                   = "corp.example.com"
+  service_account_username = var.ad_service_account_username
+  service_account_password = var.ad_service_account_password
+  use_passwordless         = false
+  domain_controllers       = ["dc1.corp.example.com"]
+}
+
+# AD User Sync Task
+resource "oktapam_ad_user_sync_task_settings" "user_sync" {
+  connection_id     = oktapam_ad_connection.corporate.id
+  name              = "Corporate User Sync"
+  is_active         = true
+  frequency_seconds = 3600  # Every hour
+  base_dn           = "OU=Users,DC=corp,DC=example,DC=com"
+  ldap_query_filter = "(&(objectClass=user)(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"
+  sid_field         = "objectSid"
+  upn_field         = "userPrincipalName"
+}
+
+# Security policy for AD server access
+resource "oktapam_security_policy_v2" "ad_server_access" {
+  name        = "AD Server Access Policy"
+  description = "Policy for accessing AD domain servers"
+  active      = true
+
+  principals {
+    groups = [oktapam_group.ad_admins.id]
+  }
+
+  rule {
+    name = "domain-controller-access"
+    type = "access"
+
+    resource_selector {
+      server_selector {
+        labels = {
+          role = "Domain-Controller"
+        }
+      }
+    }
+
+    privileges {
+      server_accounts   = ["Administrator"]
+      password_checkout = true
+      session_recording = true
+    }
+  }
+}
+
+# Password settings for AD accounts
+resource "oktapam_password_settings" "ad_passwords" {
+  resource_group = oktapam_resource_group.active_directory.id
+  project        = oktapam_resource_group_project.ad_servers.id
+
+  enable_periodic_rotation        = true
+  periodic_rotation_duration_days = 30
+  min_checkout_duration_seconds   = 300   # 5 minutes
+  max_checkout_duration_seconds   = 14400 # 4 hours
+  checkout_required               = true
+}
+```
+
+### When to Generate AD Integration
+
+**Generate AD integration when user requests:**
+- "Connect OPA to Active Directory"
+- "Set up AD sync"
+- "Windows server access"
+- "RDP to domain controllers"
+- "AD user discovery"
+- "Password rotation for AD accounts"
+
 ### OPA Important Notes
 
 1. **Separate Provider**: OPA uses `oktapam` provider, not `okta`
@@ -1528,6 +1636,7 @@ resource "oktapam_security_policy_v2" "developer_server_access" {
 3. **Optional**: OPA provider is optional - only enable when needed
 4. **Prerequisites**: Requires OPA license and team configuration
 5. **security_policy_v2**: Under active development, may have breaking changes
+6. **AD Integration**: Requires OPA Gateway installed with network access to AD
 
 ---
 

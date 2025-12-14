@@ -723,7 +723,23 @@ This repository supports optional OPA integration via the `oktapam` provider:
 
 **Setup:** See `docs/OPA_SETUP.md` for configuration instructions.
 
-**Example file:** `environments/myorg/terraform/opa_resources.tf.example`
+**Example files:**
+- `environments/myorg/terraform/opa_resources.tf.example` - Core OPA resources
+- `environments/myorg/terraform/opa_ad_integration.tf.example` - AD integration patterns
+
+**AD Integration:**
+OPA can integrate with Active Directory for:
+- Account discovery and user sync
+- RDP access to Windows domain-joined servers
+- Password rotation for service accounts
+- Session recording for compliance
+
+Prerequisites for AD integration:
+1. OPA Gateway installed with network access to AD
+2. AD service account with appropriate permissions
+3. Gateway connected to OPA cloud
+
+See `docs/OPA_SETUP.md#active-directory-integration` for details.
 
 ---
 
