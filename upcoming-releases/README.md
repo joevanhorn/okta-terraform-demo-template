@@ -27,6 +27,24 @@ A 4-phase release plan for integrating custom SCIM server infrastructure:
 
 ---
 
+## Recently Completed
+
+### Okta Privileged Access (OPA) Integration
+**Status:** ✅ Complete
+**Document:** [OPA_INTEGRATION_PLAN.md](OPA_INTEGRATION_PLAN.md)
+**PR:** [#26](https://github.com/joevanhorn/okta-terraform-demo-template/pull/26)
+
+Single-release integration of the `okta/oktapam` Terraform provider:
+- ✅ Provider configuration (commented, optional)
+- ✅ Comprehensive resource examples (~450 lines)
+- ✅ Setup documentation (~400 lines)
+- ✅ AI-assisted code generation patterns (~410 lines)
+- ✅ Documentation updates
+
+**Completed:** 2025-12-14
+
+---
+
 ## How to Use This Directory
 
 ### For Contributors
@@ -177,5 +195,5 @@ See **[SCIM_SERVER_INTEGRATION_PLAN.md](SCIM_SERVER_INTEGRATION_PLAN.md)** for a
 
 ---
 
-**Last Updated:** 2025-11-13
+**Last Updated:** 2025-12-14
 **Maintained By:** Template Maintainers
