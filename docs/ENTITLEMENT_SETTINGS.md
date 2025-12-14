@@ -145,6 +145,66 @@ gh workflow run manage-entitlement-settings.yml \
 
 *Required for `status`, `enable`, and `disable` actions
 
+## Auto-Enable Feature
+
+The repository includes an optional feature to **automatically enable entitlement management** on apps when Terraform files containing entitlement resources are merged to main.
+
+### How It Works
+
+1. When a PR is merged that adds/modifies files matching `*entitlement*.tf`
+2. The workflow scans those files for `okta_entitlement` and `okta_entitlement_bundle` resources
+3. It extracts the app references (either literal IDs or Terraform resource references)
+4. It enables entitlement management on those apps via the Entitlement Settings API
+
+### Enabling the Feature
+
+This feature is **disabled by default**. To enable it:
+
+1. Go to **Settings** → **Secrets and variables** → **Actions** → **Variables**
+2. Click **New repository variable**
+3. Name: `AUTO_ENABLE_ENTITLEMENTS`
+4. Value: `true`
+
+### Manual Trigger
+
+You can also run the workflow manually:
+
+```bash
+# Dry run (preview)
+gh workflow run auto-enable-entitlements.yml \
+  -f environment=myorg \
+  -f dry_run=true
+
+# Apply
+gh workflow run auto-enable-entitlements.yml \
+  -f environment=myorg \
+  -f dry_run=false
+```
+
+### Detection Script
+
+The detection script can be run standalone:
+
+```bash
+# Scan environment for entitlement resources
+python scripts/detect_entitlement_apps.py \
+  --environment myorg \
+  --resolve-labels \
+  --json
+```
+
+Output:
+```json
+{
+  "app_ids": [],
+  "terraform_references": ["okta_app_oauth.my_app"],
+  "resolved_labels": {
+    "okta_app_oauth.my_app": "My Application"
+  },
+  "files_scanned": 5
+}
+```
+
 ## Important Warnings
 
 ### Disabling Entitlement Management

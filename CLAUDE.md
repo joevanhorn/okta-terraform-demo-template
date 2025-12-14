@@ -161,6 +161,16 @@ gh workflow run apply-risk-rules.yml \
 gh workflow run apply-admin-labels.yml \
   -f environment=mycompany \
   -f dry_run=false
+
+# Manage entitlement settings on apps (requires environment secrets)
+gh workflow run manage-entitlement-settings.yml \
+  -f environment=mycompany \
+  -f action=list
+
+# Auto-enable entitlements (opt-in feature, requires AUTO_ENABLE_ENTITLEMENTS=true variable)
+gh workflow run auto-enable-entitlements.yml \
+  -f environment=mycompany \
+  -f dry_run=true
 ```
 
 ### Python Scripts (API Management)
