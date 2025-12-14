@@ -725,6 +725,107 @@ provider "aws" {
 }
 ```
 
+## Okta Privileged Access (OPA) Examples
+
+**Provider:** `okta/oktapam` (separate from `okta/okta`)
+**Setup:** See `docs/OPA_SETUP.md`
+
+### OPA Provider Configuration
+```hcl
+terraform {
+  required_providers {
+    oktapam = {
+      source  = "okta/oktapam"
+      version = ">= 0.6.0"
+    }
+  }
+}
+
+provider "oktapam" {
+  oktapam_key    = var.oktapam_key
+  oktapam_secret = var.oktapam_secret
+  oktapam_team   = var.oktapam_team
+}
+```
+
+### Resource Group and Project
+```hcl
+# Resource Group - top-level container
+resource "oktapam_resource_group" "production" {
+  name        = "Production"
+  description = "Production environment servers"
+}
+
+# Project within resource group
+resource "oktapam_resource_group_project" "web_servers" {
+  name                 = "Web Servers"
+  resource_group       = oktapam_resource_group.production.id
+  ssh_certificate_type = "CERT_TYPE_ED25519"
+  account_discovery    = true
+  create_server_users  = true
+}
+
+# Server enrollment token
+resource "oktapam_resource_group_server_enrollment_token" "web_token" {
+  resource_group = oktapam_resource_group.production.id
+  project        = oktapam_resource_group_project.web_servers.id
+  description    = "Web server enrollment token"
+}
+```
+
+### Secret Folder and Secret
+```hcl
+resource "oktapam_secret_folder" "api_keys" {
+  name           = "API Keys"
+  description    = "Application API keys"
+  resource_group = oktapam_resource_group.production.id
+  project        = oktapam_resource_group_project.web_servers.id
+}
+
+resource "oktapam_secret" "db_password" {
+  name           = "database-password"
+  description    = "Production database password"
+  resource_group = oktapam_resource_group.production.id
+  project        = oktapam_resource_group_project.web_servers.id
+  parent_folder  = oktapam_secret_folder.api_keys.id
+
+  secret {
+    type  = "password"
+    value = var.db_password
+  }
+}
+```
+
+### OPA Groups and Project Access
+```hcl
+resource "oktapam_group" "developers" {
+  name = "Developers"
+}
+
+resource "oktapam_project_group" "dev_access" {
+  project_name        = oktapam_resource_group_project.web_servers.name
+  group_name          = oktapam_group.developers.name
+  server_admin        = false
+  server_access       = true
+  create_server_group = true
+
+  server_account_permissions {
+    server_account    = "developer"
+    password_checkout = false
+  }
+}
+```
+
+### Gateway Setup Token
+```hcl
+resource "oktapam_gateway_setup_token" "datacenter" {
+  description = "Datacenter gateway"
+  labels = {
+    environment = "production"
+  }
+}
+```
+
 ## Best Practices
 
 ### 1. Always Use Status = "ACTIVE"

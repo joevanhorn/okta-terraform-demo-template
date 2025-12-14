@@ -43,3 +43,26 @@ variable "scim_app_group_id" {
   type        = string
   default     = ""
 }
+
+# ==============================================================================
+# OKTA PRIVILEGED ACCESS (OPA) VARIABLES - OPTIONAL
+# ==============================================================================
+# Uncomment these variables when enabling the oktapam provider
+# See docs/OPA_SETUP.md for configuration details
+
+# variable "oktapam_key" {
+#   description = "OPA service user key (ID) - from service user creation"
+#   type        = string
+#   sensitive   = true
+# }
+
+# variable "oktapam_secret" {
+#   description = "OPA service user secret - from service user creation"
+#   type        = string
+#   sensitive   = true
+# }
+
+# variable "oktapam_team" {
+#   description = "OPA team name (the team the service account belongs to)"
+#   type        = string
+# }

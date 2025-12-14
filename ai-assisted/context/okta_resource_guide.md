@@ -237,8 +237,51 @@ Elastic IP for stable public address
 5. Wait for automated setup (PowerShell user_data script)
 6. Install Okta AD Agent manually (installer is pre-downloaded)
 
+## Okta Privileged Access (OPA) Resources
+
+**Provider:** `okta/oktapam` (optional, separate from okta/okta)
+**Setup:** See `docs/OPA_SETUP.md`
+**Examples:** `environments/myorg/terraform/opa_resources.tf.example`
+
+### oktapam_resource_group
+Top-level organizational unit for OPA
+- **Docs:** https://registry.terraform.io/providers/okta/oktapam/latest/docs/resources/resource_group
+- **Use for:** Organizing servers, secrets, and policies by team or environment
+
+### oktapam_resource_group_project
+Project within a resource group
+- **Docs:** https://registry.terraform.io/providers/okta/oktapam/latest/docs/resources/resource_group_project
+- **Use for:** Grouping servers by function (web servers, databases, etc.)
+
+### oktapam_resource_group_server_enrollment_token
+Token for enrolling servers into OPA
+- **Docs:** https://registry.terraform.io/providers/okta/oktapam/latest/docs/resources/resource_group_server_enrollment_token
+- **Use for:** Automating server enrollment during provisioning
+
+### oktapam_gateway_setup_token
+Token for registering OPA gateways
+- **Docs:** https://registry.terraform.io/providers/okta/oktapam/latest/docs/resources/gateway_setup_token
+- **Use for:** Deploying gateways for network connectivity
+
+### oktapam_secret_folder / oktapam_secret
+Secret storage in OPA
+- **Docs:** https://registry.terraform.io/providers/okta/oktapam/latest/docs/resources/secret_folder
+- **Use for:** Storing credentials, API keys, and sensitive data
+
+### oktapam_security_policy_v2
+Access policies for servers and resources
+- **Docs:** https://registry.terraform.io/providers/okta/oktapam/latest/docs/resources/security_policy_v2
+- **Use for:** Defining who can access which servers with what privileges
+- **Note:** Under active development, breaking changes may occur
+
+### oktapam_group / oktapam_project_group
+OPA groups and project assignments
+- **Docs:** https://registry.terraform.io/providers/okta/oktapam/latest/docs/resources/group
+- **Use for:** Organizing users and assigning server access permissions
+
 ## Additional Resources
 
 - **Full Resource Catalog:** `docs/TERRAFORM_RESOURCES.md`
 - **Provider Documentation:** https://registry.terraform.io/providers/okta/okta/latest/docs
+- **OPA Provider Documentation:** https://registry.terraform.io/providers/okta/oktapam/latest/docs
 - **Okta Developer Docs:** https://developer.okta.com/

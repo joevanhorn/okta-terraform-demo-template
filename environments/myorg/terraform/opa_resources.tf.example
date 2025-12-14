@@ -1,0 +1,408 @@
+# =============================================================================
+# OKTA PRIVILEGED ACCESS (OPA) RESOURCES - EXAMPLE FILE
+# =============================================================================
+# This file contains example OPA resources. Copy and uncomment the resources
+# you need after enabling the oktapam provider in provider.tf.
+#
+# Prerequisites:
+# 1. Enable oktapam provider in provider.tf
+# 2. Uncomment OPA variables in variables.tf
+# 3. Add OPA secrets to GitHub Environment:
+#    - OKTAPAM_KEY
+#    - OKTAPAM_SECRET
+#    - OKTAPAM_TEAM
+#
+# Documentation:
+# - Provider: https://registry.terraform.io/providers/okta/oktapam/latest/docs
+# - GitHub: https://github.com/okta/terraform-provider-oktapam
+# =============================================================================
+
+# =============================================================================
+# RESOURCE GROUPS
+# =============================================================================
+# Resource groups are the top-level organizational unit in OPA.
+# They contain projects, secrets, and security policies.
+
+# resource "oktapam_resource_group" "engineering" {
+#   name               = "Engineering"
+#   description        = "Engineering team servers and secrets"
+#   delegated_resource_admin_groups = []  # Groups that can admin this resource group
+# }
+
+# resource "oktapam_resource_group" "production" {
+#   name               = "Production"
+#   description        = "Production environment servers"
+#   delegated_resource_admin_groups = []
+# }
+
+# =============================================================================
+# PROJECTS
+# =============================================================================
+# Projects organize servers within a resource group and define access settings.
+# Server enrollment tokens are created per-project.
+
+# resource "oktapam_project" "web_servers" {
+#   name                         = "Web Servers"
+#   resource_group               = oktapam_resource_group.engineering.id
+#   ssh_certificate_type         = "CERT_TYPE_ED25519"  # or "CERT_TYPE_RSA_01"
+#   account_discovery            = true
+#   create_server_users          = true
+#   forward_traffic              = false
+#   rdp_session_recording        = false
+#   ssh_session_recording        = false
+#   gateway_selector             = ""  # Gateway tag selector
+#
+#   # Optional: Server access behavior settings
+#   # user_on_demand_period        = 0
+#   # access_address               = ""
+# }
+
+# resource "oktapam_resource_group_project" "database_servers" {
+#   name                         = "Database Servers"
+#   resource_group               = oktapam_resource_group.production.id
+#   ssh_certificate_type         = "CERT_TYPE_ED25519"
+#   account_discovery            = true
+#   create_server_users          = true
+#   forward_traffic              = true
+#   gateway_selector             = "env=production"
+# }
+
+# =============================================================================
+# SERVER ENROLLMENT TOKENS
+# =============================================================================
+# Tokens used to enroll servers into OPA projects during provisioning.
+
+# resource "oktapam_server_enrollment_token" "web_servers_token" {
+#   project_name   = oktapam_project.web_servers.name
+#   description    = "Token for enrolling web servers"
+# }
+
+# # Resource group project enrollment token
+# resource "oktapam_resource_group_server_enrollment_token" "db_servers_token" {
+#   resource_group = oktapam_resource_group.production.id
+#   project        = oktapam_resource_group_project.database_servers.id
+#   description    = "Token for enrolling production database servers"
+# }
+
+# =============================================================================
+# GATEWAY SETUP TOKENS
+# =============================================================================
+# Tokens used to register ASA/OPA gateways for network connectivity.
+
+# resource "oktapam_gateway_setup_token" "datacenter_gateway" {
+#   description = "Gateway for datacenter connectivity"
+#   labels = {
+#     environment = "production"
+#     location    = "us-east-1"
+#   }
+# }
+
+# =============================================================================
+# GROUPS
+# =============================================================================
+# OPA groups for organizing users and assigning permissions.
+
+# resource "oktapam_group" "server_admins" {
+#   name = "Server Administrators"
+# }
+
+# resource "oktapam_group" "developers" {
+#   name = "Developers"
+# }
+
+# # Assign users to groups
+# resource "oktapam_user_group_attachment" "admin_attachment" {
+#   user_name  = "admin@example.com"
+#   group_name = oktapam_group.server_admins.name
+# }
+
+# =============================================================================
+# PROJECT GROUPS
+# =============================================================================
+# Assign groups to projects with specific permissions.
+
+# resource "oktapam_project_group" "developers_web" {
+#   project_name        = oktapam_project.web_servers.name
+#   group_name          = oktapam_group.developers.name
+#   server_admin        = false
+#   server_access       = true
+#   create_server_group = true
+#
+#   # Server account selector - which accounts can be accessed
+#   server_account_permissions {
+#     server_account     = "ubuntu"    # Server account name
+#     server_account_uid = ""          # Optional: specific UID
+#     password_checkout  = true
+#   }
+# }
+
+# resource "oktapam_project_group" "admins_web" {
+#   project_name        = oktapam_project.web_servers.name
+#   group_name          = oktapam_group.server_admins.name
+#   server_admin        = true
+#   server_access       = true
+#   create_server_group = true
+# }
+
+# =============================================================================
+# SECRET FOLDERS
+# =============================================================================
+# Organize secrets within resource group projects.
+
+# resource "oktapam_secret_folder" "api_keys" {
+#   name           = "API Keys"
+#   description    = "Application API keys and tokens"
+#   resource_group = oktapam_resource_group.engineering.id
+#   project        = oktapam_resource_group_project.database_servers.id
+#   parent_folder  = ""  # Root level folder
+# }
+
+# resource "oktapam_secret_folder" "database_creds" {
+#   name           = "Database Credentials"
+#   description    = "Database connection credentials"
+#   resource_group = oktapam_resource_group.production.id
+#   project        = oktapam_resource_group_project.database_servers.id
+#   parent_folder  = ""
+# }
+
+# # Nested folder
+# resource "oktapam_secret_folder" "mysql_creds" {
+#   name           = "MySQL"
+#   description    = "MySQL database credentials"
+#   resource_group = oktapam_resource_group.production.id
+#   project        = oktapam_resource_group_project.database_servers.id
+#   parent_folder  = oktapam_secret_folder.database_creds.id
+# }
+
+# =============================================================================
+# SECRETS
+# =============================================================================
+# Securely store credentials and sensitive data.
+
+# resource "oktapam_secret" "db_password" {
+#   resource_group = oktapam_resource_group.production.id
+#   project        = oktapam_resource_group_project.database_servers.id
+#   parent_folder  = oktapam_secret_folder.mysql_creds.id
+#   name           = "production-mysql-root"
+#   description    = "Production MySQL root password"
+#
+#   secret {
+#     type  = "password"
+#     value = var.mysql_root_password  # From sensitive variable
+#   }
+# }
+
+# =============================================================================
+# SECURITY POLICIES (V2)
+# =============================================================================
+# Define access policies for servers and resources.
+# Note: oktapam_security_policy_v2 is under active development.
+
+# resource "oktapam_security_policy_v2" "developer_access" {
+#   name        = "Developer Server Access"
+#   description = "Allow developers to access development servers"
+#   active      = true
+#
+#   principals {
+#     groups = [oktapam_group.developers.id]
+#   }
+#
+#   rule {
+#     name     = "dev-server-access"
+#     type     = "access"
+#
+#     # Resource selector
+#     resource_selector {
+#       server_selector {
+#         labels = {
+#           environment = "development"
+#         }
+#       }
+#     }
+#
+#     # Privileges
+#     privileges {
+#       server_accounts      = ["developer"]
+#       ssh_privilege        = "SSH_FULL"
+#       password_checkout    = false
+#       session_recording    = true
+#     }
+#   }
+# }
+
+# =============================================================================
+# SUDO COMMAND BUNDLES
+# =============================================================================
+# Define allowed sudo commands for fine-grained privilege management.
+
+# resource "oktapam_sudo_command_bundle" "basic_ops" {
+#   name = "Basic Operations"
+#
+#   structured_commands {
+#     command      = "/usr/bin/systemctl"
+#     command_type = "executable"
+#
+#     args_type  = "custom"
+#     args       = "restart nginx"
+#     run_as     = "root"
+#   }
+#
+#   structured_commands {
+#     command      = "/usr/bin/tail"
+#     command_type = "executable"
+#
+#     args_type  = "custom"
+#     args       = "-f /var/log/*"
+#     run_as     = "root"
+#   }
+# }
+
+# =============================================================================
+# PASSWORD SETTINGS
+# =============================================================================
+# Configure password rotation and checkout settings.
+
+# resource "oktapam_password_settings" "production_settings" {
+#   resource_group                   = oktapam_resource_group.production.id
+#   project                          = oktapam_resource_group_project.database_servers.id
+#
+#   enable_periodic_rotation         = true
+#   periodic_rotation_duration_days  = 30
+#
+#   min_checkout_duration_seconds    = 300   # 5 minutes
+#   max_checkout_duration_seconds    = 3600  # 1 hour
+#
+#   checkout_required                = true
+# }
+
+# =============================================================================
+# KUBERNETES CLUSTER MANAGEMENT
+# =============================================================================
+# Manage Kubernetes cluster access through OPA.
+
+# resource "oktapam_kubernetes_cluster" "production_k8s" {
+#   key             = "prod-k8s-cluster"
+#   auth_mechanism  = "OIDC"
+#
+#   labels = {
+#     environment = "production"
+#     team        = "platform"
+#   }
+# }
+
+# resource "oktapam_kubernetes_cluster_connection" "prod_connection" {
+#   cluster_id           = oktapam_kubernetes_cluster.production_k8s.id
+#   api_url              = "https://k8s-api.example.com:6443"
+#   public_certificate   = file("${path.module}/k8s-ca.crt")
+# }
+
+# resource "oktapam_kubernetes_cluster_group" "k8s_admins" {
+#   cluster_id   = oktapam_kubernetes_cluster.production_k8s.id
+#   group_name   = oktapam_group.server_admins.name
+#
+#   claims {
+#     groups = ["system:masters"]
+#   }
+# }
+
+# =============================================================================
+# ACTIVE DIRECTORY INTEGRATION
+# =============================================================================
+# Integrate with Active Directory for account discovery and sync.
+
+# resource "oktapam_ad_connection" "corporate_ad" {
+#   name                     = "Corporate Active Directory"
+#   gateway_id               = "gateway-uuid"
+#   domain                   = "corp.example.com"
+#   service_account_username = var.ad_service_account_username
+#   service_account_password = var.ad_service_account_password
+#   use_passwordless         = false
+#   certificate_id           = ""
+#   domain_controllers       = ["dc1.corp.example.com", "dc2.corp.example.com"]
+# }
+
+# resource "oktapam_ad_user_sync_task_settings" "corp_sync" {
+#   connection_id                    = oktapam_ad_connection.corporate_ad.id
+#   name                             = "Corporate User Sync"
+#   is_active                        = true
+#   frequency_seconds                = 3600  # 1 hour
+#   base_dn                          = "OU=Users,DC=corp,DC=example,DC=com"
+#   ldap_query_filter                = "(objectClass=user)"
+#   sid_field                        = "objectSid"
+#   upn_field                        = "userPrincipalName"
+# }
+
+# =============================================================================
+# TEAM SETTINGS
+# =============================================================================
+# Configure team-wide settings.
+
+# resource "oktapam_team_settings" "settings" {
+#   reactivate_users_via_idp             = true
+#   approve_device_without_interaction   = false
+#   include_user_sid                     = "ALWAYS"
+#   post_device_enrollment_url           = "https://example.com/enrolled"
+#   post_login_url                       = "https://example.com/login-success"
+#   web_session_timeout_minutes          = 60
+# }
+
+# =============================================================================
+# DATA SOURCES - READ EXISTING RESOURCES
+# =============================================================================
+# Use data sources to reference existing OPA resources.
+
+# # Look up existing resource groups
+# data "oktapam_resource_groups" "all" {}
+
+# data "oktapam_resource_group" "existing" {
+#   name = "Existing Resource Group"
+# }
+
+# # Look up existing projects
+# data "oktapam_projects" "engineering" {
+#   contains = "Engineering"
+# }
+
+# data "oktapam_project" "specific" {
+#   name = "Specific Project"
+# }
+
+# # Look up groups
+# data "oktapam_groups" "all" {}
+
+# data "oktapam_group" "admins" {
+#   name = "Server Administrators"
+# }
+
+# # Get current user info
+# data "oktapam_current_user" "me" {}
+
+# # Look up gateways
+# data "oktapam_gateways" "all" {}
+
+# # Look up security policies
+# data "oktapam_security_policies" "all" {}
+
+# =============================================================================
+# OUTPUTS
+# =============================================================================
+
+# output "web_server_enrollment_token" {
+#   description = "Token for enrolling web servers"
+#   value       = oktapam_server_enrollment_token.web_servers_token.token
+#   sensitive   = true
+# }
+
+# output "gateway_setup_token" {
+#   description = "Token for setting up datacenter gateway"
+#   value       = oktapam_gateway_setup_token.datacenter_gateway.token
+#   sensitive   = true
+# }
+
+# output "resource_group_ids" {
+#   description = "Resource group IDs"
+#   value = {
+#     engineering = oktapam_resource_group.engineering.id
+#     production  = oktapam_resource_group.production.id
+#   }
+# }

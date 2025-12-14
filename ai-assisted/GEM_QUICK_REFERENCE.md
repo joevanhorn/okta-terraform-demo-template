@@ -682,4 +682,70 @@ response_types = []  # Empty array
 
 ---
 
+## Okta Privileged Access (OPA) Quick Reference
+
+**Provider:** `okta/oktapam` (separate from `okta/okta`)
+
+### OPA Provider Setup
+```hcl
+provider "oktapam" {
+  oktapam_key    = var.oktapam_key    # Service user key
+  oktapam_secret = var.oktapam_secret # Service user secret
+  oktapam_team   = var.oktapam_team   # Team name
+}
+```
+
+### Resource Group & Project
+```hcl
+resource "oktapam_resource_group" "production" {
+  name = "Production"
+}
+
+resource "oktapam_resource_group_project" "servers" {
+  name                 = "Web Servers"
+  resource_group       = oktapam_resource_group.production.id
+  ssh_certificate_type = "CERT_TYPE_ED25519"
+}
+
+resource "oktapam_resource_group_server_enrollment_token" "token" {
+  resource_group = oktapam_resource_group.production.id
+  project        = oktapam_resource_group_project.servers.id
+  description    = "Server enrollment token"
+}
+```
+
+### Secret Management
+```hcl
+resource "oktapam_secret_folder" "creds" {
+  name           = "Credentials"
+  resource_group = oktapam_resource_group.production.id
+  project        = oktapam_resource_group_project.servers.id
+}
+
+resource "oktapam_secret" "password" {
+  name           = "db-password"
+  resource_group = oktapam_resource_group.production.id
+  project        = oktapam_resource_group_project.servers.id
+  parent_folder  = oktapam_secret_folder.creds.id
+  secret {
+    type  = "password"
+    value = var.db_password
+  }
+}
+```
+
+### Key OPA Resources
+- `oktapam_resource_group` - Top-level container
+- `oktapam_resource_group_project` - Project for servers
+- `oktapam_resource_group_server_enrollment_token` - Server enrollment
+- `oktapam_gateway_setup_token` - Gateway registration
+- `oktapam_secret_folder` / `oktapam_secret` - Secrets
+- `oktapam_group` - OPA groups
+- `oktapam_project_group` - Group access to projects
+- `oktapam_security_policy_v2` - Access policies
+
+**Note:** OPA provider is optional - only enable when Privileged Access features are needed.
+
+---
+
 This quick reference covers 95% of common Okta Terraform patterns. For edge cases, refer to full documentation or ask for clarification.

@@ -1291,6 +1291,246 @@ custom_entitlements = jsonencode([
 
 ---
 
+## Okta Privileged Access (OPA) Patterns
+
+### OPA Provider Overview
+
+The `oktapam` provider is **separate** from the main `okta` provider and manages Okta Privileged Access resources:
+
+- Server access projects and enrollment tokens
+- Secret folders and secrets
+- Security policies
+- Gateway setup tokens
+- Kubernetes cluster access
+- Active Directory integration
+
+**Provider:** `okta/oktapam` (version >= 0.6.0)
+**Documentation:** https://registry.terraform.io/providers/okta/oktapam/latest/docs
+
+### When to Generate OPA Resources
+
+**Generate OPA resources when user requests:**
+- "Set up server access"
+- "Create PAM project"
+- "Manage privileged access"
+- "Store secrets in OPA"
+- "Server enrollment tokens"
+- "Gateway setup"
+- "Kubernetes access management"
+
+### OPA Provider Configuration
+
+```hcl
+terraform {
+  required_providers {
+    okta = {
+      source  = "okta/okta"
+      version = ">= 6.4.0, < 7.0.0"
+    }
+    oktapam = {
+      source  = "okta/oktapam"
+      version = ">= 0.6.0"
+    }
+  }
+}
+
+provider "oktapam" {
+  oktapam_key    = var.oktapam_key    # Service user key
+  oktapam_secret = var.oktapam_secret # Service user secret
+  oktapam_team   = var.oktapam_team   # OPA team name
+}
+```
+
+### OPA Resource Group and Project Pattern
+
+```hcl
+# Resource Group - top-level organizational unit
+resource "oktapam_resource_group" "production" {
+  name        = "Production"
+  description = "Production environment servers"
+}
+
+# Project within resource group
+resource "oktapam_resource_group_project" "web_servers" {
+  name                 = "Web Servers"
+  resource_group       = oktapam_resource_group.production.id
+  ssh_certificate_type = "CERT_TYPE_ED25519"
+  account_discovery    = true
+  create_server_users  = true
+  forward_traffic      = false
+}
+
+# Server enrollment token
+resource "oktapam_resource_group_server_enrollment_token" "web_token" {
+  resource_group = oktapam_resource_group.production.id
+  project        = oktapam_resource_group_project.web_servers.id
+  description    = "Token for enrolling production web servers"
+}
+```
+
+### OPA Secret Management Pattern
+
+```hcl
+# Secret folder
+resource "oktapam_secret_folder" "api_keys" {
+  name           = "API Keys"
+  description    = "Application API keys and tokens"
+  resource_group = oktapam_resource_group.production.id
+  project        = oktapam_resource_group_project.web_servers.id
+}
+
+# Secret
+resource "oktapam_secret" "external_api_key" {
+  name           = "external-api-key"
+  description    = "External API key for third-party integration"
+  resource_group = oktapam_resource_group.production.id
+  project        = oktapam_resource_group_project.web_servers.id
+  parent_folder  = oktapam_secret_folder.api_keys.id
+
+  secret {
+    type  = "password"
+    value = var.external_api_key  # From sensitive variable
+  }
+}
+```
+
+### OPA Group and Access Pattern
+
+```hcl
+# OPA Group
+resource "oktapam_group" "developers" {
+  name = "Developers"
+}
+
+resource "oktapam_group" "server_admins" {
+  name = "Server Administrators"
+}
+
+# Assign group to project with permissions
+resource "oktapam_project_group" "developers_web_access" {
+  project_name        = oktapam_resource_group_project.web_servers.name
+  group_name          = oktapam_group.developers.name
+  server_admin        = false
+  server_access       = true
+  create_server_group = true
+
+  server_account_permissions {
+    server_account    = "developer"
+    password_checkout = false
+  }
+}
+
+resource "oktapam_project_group" "admins_web_access" {
+  project_name        = oktapam_resource_group_project.web_servers.name
+  group_name          = oktapam_group.server_admins.name
+  server_admin        = true
+  server_access       = true
+  create_server_group = true
+}
+```
+
+### OPA Gateway Setup Pattern
+
+```hcl
+# Gateway setup token for network connectivity
+resource "oktapam_gateway_setup_token" "datacenter_gateway" {
+  description = "Gateway for datacenter connectivity"
+  labels = {
+    environment = "production"
+    location    = "us-east-1"
+  }
+}
+
+output "gateway_token" {
+  description = "Token for gateway registration"
+  value       = oktapam_gateway_setup_token.datacenter_gateway.token
+  sensitive   = true
+}
+```
+
+### OPA Security Policy Pattern (V2)
+
+**Note:** `oktapam_security_policy_v2` is under active development.
+
+```hcl
+resource "oktapam_security_policy_v2" "developer_server_access" {
+  name        = "Developer Server Access"
+  description = "Allow developers to access development servers"
+  active      = true
+
+  principals {
+    groups = [oktapam_group.developers.id]
+  }
+
+  rule {
+    name = "dev-server-access"
+    type = "access"
+
+    resource_selector {
+      server_selector {
+        labels = {
+          environment = "development"
+        }
+      }
+    }
+
+    privileges {
+      server_accounts   = ["developer"]
+      ssh_privilege     = "SSH_FULL"
+      password_checkout = false
+      session_recording = true
+    }
+  }
+}
+```
+
+### OPA Resources Reference
+
+**Resources (can create/update/delete):**
+- `oktapam_resource_group` - Top-level organizational unit
+- `oktapam_resource_group_project` - Project within resource group
+- `oktapam_project` - Standalone project
+- `oktapam_server_enrollment_token` - Server enrollment token
+- `oktapam_resource_group_server_enrollment_token` - RG server token
+- `oktapam_gateway_setup_token` - Gateway registration token
+- `oktapam_group` - OPA group
+- `oktapam_user_group_attachment` - User to group assignment
+- `oktapam_project_group` - Group to project assignment
+- `oktapam_secret_folder` - Secret folder
+- `oktapam_secret` - Secret storage
+- `oktapam_security_policy` - Security policy (v1, legacy)
+- `oktapam_security_policy_v2` - Security policy (v2, active development)
+- `oktapam_password_settings` - Password rotation settings
+- `oktapam_sudo_command_bundle` - Allowed sudo commands
+- `oktapam_kubernetes_cluster` - K8s cluster
+- `oktapam_kubernetes_cluster_connection` - K8s connection
+- `oktapam_kubernetes_cluster_group` - K8s group assignment
+- `oktapam_ad_connection` - Active Directory connection
+- `oktapam_ad_user_sync_task_settings` - AD user sync
+- `oktapam_team_settings` - Team-wide settings
+
+**Data Sources (read-only):**
+- `oktapam_resource_groups` / `oktapam_resource_group`
+- `oktapam_projects` / `oktapam_project`
+- `oktapam_groups` / `oktapam_group`
+- `oktapam_gateways`
+- `oktapam_gateway_setup_tokens` / `oktapam_gateway_setup_token`
+- `oktapam_server_enrollment_tokens` / `oktapam_server_enrollment_token`
+- `oktapam_secret_folders` / `oktapam_secrets` / `oktapam_secret`
+- `oktapam_security_policies` / `oktapam_security_policy`
+- `oktapam_current_user`
+- `oktapam_team_settings`
+
+### OPA Important Notes
+
+1. **Separate Provider**: OPA uses `oktapam` provider, not `okta`
+2. **Separate Authentication**: Requires OPA service user credentials
+3. **Optional**: OPA provider is optional - only enable when needed
+4. **Prerequisites**: Requires OPA license and team configuration
+5. **security_policy_v2**: Under active development, may have breaking changes
+
+---
+
 ## Common Pitfalls to Avoid
 
 ### ❌ Don't Generate These (Not in Terraform Provider)

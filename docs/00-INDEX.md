@@ -108,6 +108,7 @@ This folder contains advanced reference documentation for specific topics.
 | **Set up AWS backend** | [AWS_BACKEND_SETUP.md](AWS_BACKEND_SETUP.md) |
 | **Manage governance labels** | [LABEL_WORKFLOW_GUIDE.md](LABEL_WORKFLOW_GUIDE.md) |
 | **Manage resource owners** | [API_MANAGEMENT.md](API_MANAGEMENT.md) |
+| **Set up Okta Privileged Access** | [OPA_SETUP.md](OPA_SETUP.md) |
 | **Import from Okta** | [03-WORKFLOWS-GUIDE.md](03-WORKFLOWS-GUIDE.md) |
 | **Troubleshoot issues** | [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) |
 | **Use AI to generate code** | [ai-assisted/README.md](../ai-assisted/README.md) |
