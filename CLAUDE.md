@@ -684,21 +684,46 @@ values {
 - `docs/LESSONS_LEARNED.md` - Critical troubleshooting insights
 - `docs/TERRAFORMER_OIG_FAQ.md` - Terraformer + OIG limitations
 
-### Terraform Provider Version
+### Terraform Provider Versions
 
 ```hcl
 terraform {
   required_version = ">= 1.9.0"
   required_providers {
+    # Core Okta Provider - Users, Groups, Apps, OIG
     okta = {
       source  = "okta/okta"
       version = ">= 6.4.0, < 7.0.0"  # OIG support requires 6.4.0+
     }
+
+    # Okta Privileged Access Provider (Optional)
+    # Uncomment to enable OPA resource management
+    # oktapam = {
+    #   source  = "okta/oktapam"
+    #   version = ">= 0.6.0"  # Latest with security_policy_v2
+    # }
   }
 }
 ```
 
 **Critical:** OIG resources require Okta Terraform Provider v6.4.0 or higher.
+
+### Okta Privileged Access (OPA) Integration
+
+This repository supports optional OPA integration via the `oktapam` provider:
+
+**OPA Resources:**
+- Server access projects and enrollment tokens
+- Secret folders and secrets
+- Security policies
+- Gateway setup tokens
+- Resource groups
+- Kubernetes cluster access
+- Active Directory integration
+
+**Setup:** See `docs/OPA_SETUP.md` for configuration instructions.
+
+**Example file:** `environments/myorg/terraform/opa_resources.tf.example`
 
 ---
 
@@ -976,11 +1001,13 @@ When working in this repository:
 11. **Label workflows use two-phase validation** - PR syntax check (no secrets) + deployment (with secrets)
 12. **Always create PRs for label changes** - automatic validation catches errors early
 13. **Review dry-run before apply** - automatic on merge, manual apply required
+14. **OPA is optional** - enable oktapam provider only when OPA features are needed
 
 This repository is designed for **managing Okta with GitOps**, so focus on:
 - Clear, understandable configurations
 - GitOps best practices
 - OIG feature management (including label management workflow)
+- OPA integration for privileged access (optional)
 - AWS backend for production-ready state management
 - Easy-to-customize structure
 - Two-phase validation for governance changes
