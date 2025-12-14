@@ -60,6 +60,7 @@ This folder contains advanced reference documentation for specific topics.
 | Document | Purpose |
 |----------|---------|
 | [../OIG_PREREQUISITES.md](../OIG_PREREQUISITES.md) | OIG setup requirements |
+| [ENTITLEMENT_SETTINGS.md](ENTITLEMENT_SETTINGS.md) | Enable/disable entitlement management via API (Beta) |
 | [LABEL_MANAGEMENT.md](LABEL_MANAGEMENT.md) | Governance labels technical guide |
 | [LABEL_WORKFLOW_GUIDE.md](LABEL_WORKFLOW_GUIDE.md) | Label management GitOps workflow |
 | [TROUBLESHOOTING_ENTITLEMENT_BUNDLES.md](TROUBLESHOOTING_ENTITLEMENT_BUNDLES.md) | Bundle-specific troubleshooting |
@@ -108,6 +109,7 @@ This folder contains advanced reference documentation for specific topics.
 | **Set up AWS backend** | [AWS_BACKEND_SETUP.md](AWS_BACKEND_SETUP.md) |
 | **Manage governance labels** | [LABEL_WORKFLOW_GUIDE.md](LABEL_WORKFLOW_GUIDE.md) |
 | **Manage resource owners** | [API_MANAGEMENT.md](API_MANAGEMENT.md) |
+| **Enable entitlement management on apps** | [ENTITLEMENT_SETTINGS.md](ENTITLEMENT_SETTINGS.md) |
 | **Set up Okta Privileged Access** | [OPA_SETUP.md](OPA_SETUP.md) |
 | **Import from Okta** | [03-WORKFLOWS-GUIDE.md](03-WORKFLOWS-GUIDE.md) |
 | **Troubleshoot issues** | [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) |
@@ -132,4 +134,4 @@ Older documentation that has been superseded is available in [archive/](archive/
 
 ---
 
-**Last Updated:** 2025-11-20
+**Last Updated:** 2025-12-14
