@@ -204,12 +204,18 @@ Since OPA integration was straightforward and self-contained, it was delivered a
 
 ## Future Enhancements
 
-Potential additions for future releases:
+### ✅ Completed (Phase 2)
 
-- [ ] GitHub Actions workflow for OPA-specific operations
-- [ ] Import script for existing OPA resources
+- [x] GitHub Actions workflow for OPA-specific operations (`opa-plan.yml`)
+- [x] Import script for existing OPA resources (`import_opa_resources.py`)
+- [x] OPA variables tfvars.example file
+
+### Potential Future Additions
+
 - [ ] OPA resource examples in demo scenarios
 - [ ] Integration with Okta Workflows for OPA automation
+- [ ] Secret rotation workflow
+- [ ] Gateway deployment automation
 
 ---
 

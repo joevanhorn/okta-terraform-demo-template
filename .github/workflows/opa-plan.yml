@@ -1,0 +1,263 @@
+name: OPA Terraform Plan
+
+# This workflow runs Terraform plan specifically for OPA (Okta Privileged Access) resources
+# It uses separate authentication (OKTAPAM_*) from the main Okta provider
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to plan'
+        required: true
+        default: 'myorg'
+        type: choice
+        options:
+          - myorg
+          - production
+          - staging
+          - development
+  push:
+    branches:
+      - main
+    paths:
+      - 'environments/*/terraform/opa_*.tf'
+      - '.github/workflows/opa-plan.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'environments/*/terraform/opa_*.tf'
+      - '.github/workflows/opa-plan.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write  # Required for AWS OIDC
+
+jobs:
+  detect-environment:
+    name: Detect Environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.detect-env.outputs.environment }}
+      has_opa_changes: ${{ steps.check-opa.outputs.has_opa_changes }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect Environment
+        id: detect-env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "environment=${{ inputs.environment }}" >> $GITHUB_OUTPUT
+          else
+            # Get changed files
+            if [ "${{ github.event_name }}" == "pull_request" ]; then
+              CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+            else
+              CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+            fi
+
+            # Extract environment from OPA file changes
+            ENV_NAME=$(echo "$CHANGED_FILES" | grep "^environments/.*/terraform/opa_" | head -1 | sed 's|environments/\([^/]*\)/terraform/.*|\1|')
+
+            if [ -n "$ENV_NAME" ]; then
+              echo "Detected environment: $ENV_NAME"
+              echo "environment=$ENV_NAME" >> $GITHUB_OUTPUT
+            else
+              echo "No environment detected, using default"
+              echo "environment=myorg" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Check for OPA Changes
+        id: check-opa
+        run: |
+          ENV="${{ steps.detect-env.outputs.environment }}"
+          if [ -f "environments/$ENV/terraform/opa_resources.tf" ]; then
+            echo "has_opa_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_opa_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+  opa-plan:
+    name: OPA Terraform Plan
+    needs: detect-environment
+    if: needs.detect-environment.outputs.has_opa_changes == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.detect-environment.outputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check OPA Provider Enabled
+        id: check-provider
+        working-directory: environments/${{ needs.detect-environment.outputs.environment }}/terraform
+        run: |
+          # Check if oktapam provider is uncommented in provider.tf
+          if grep -q '^\s*oktapam\s*=' provider.tf 2>/dev/null || grep -q '^provider "oktapam"' provider.tf 2>/dev/null; then
+            echo "OPA provider is enabled"
+            echo "opa_enabled=true" >> $GITHUB_OUTPUT
+          else
+            echo "::warning::OPA provider is not enabled in provider.tf"
+            echo "To enable OPA, uncomment the oktapam provider block in provider.tf"
+            echo "opa_enabled=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check OPA Secrets Available
+        id: check-secrets
+        if: steps.check-provider.outputs.opa_enabled == 'true'
+        run: |
+          MISSING_SECRETS=""
+          if [ -z "${{ secrets.OKTAPAM_KEY }}" ]; then
+            MISSING_SECRETS="OKTAPAM_KEY"
+          fi
+          if [ -z "${{ secrets.OKTAPAM_SECRET }}" ]; then
+            MISSING_SECRETS="$MISSING_SECRETS OKTAPAM_SECRET"
+          fi
+          if [ -z "${{ secrets.OKTAPAM_TEAM }}" ]; then
+            MISSING_SECRETS="$MISSING_SECRETS OKTAPAM_TEAM"
+          fi
+
+          if [ -n "$MISSING_SECRETS" ]; then
+            echo "::warning::Missing OPA secrets: $MISSING_SECRETS"
+            echo "secrets_available=false" >> $GITHUB_OUTPUT
+          else
+            echo "All OPA secrets are configured"
+            echo "secrets_available=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS Credentials via OIDC
+        if: steps.check-provider.outputs.opa_enabled == 'true' && steps.check-secrets.outputs.secrets_available == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-OPAPlan-${{ needs.detect-environment.outputs.environment }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        if: steps.check-provider.outputs.opa_enabled == 'true' && steps.check-secrets.outputs.secrets_available == 'true'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Configure Terraform variables
+        if: steps.check-provider.outputs.opa_enabled == 'true' && steps.check-secrets.outputs.secrets_available == 'true'
+        working-directory: environments/${{ needs.detect-environment.outputs.environment }}/terraform
+        run: |
+          cat > terraform.tfvars << EOF
+          # Okta Provider
+          okta_org_name  = "${{ secrets.OKTA_ORG_NAME }}"
+          okta_base_url  = "${{ secrets.OKTA_BASE_URL }}"
+          okta_api_token = "${{ secrets.OKTA_API_TOKEN }}"
+
+          # OPA Provider
+          oktapam_key    = "${{ secrets.OKTAPAM_KEY }}"
+          oktapam_secret = "${{ secrets.OKTAPAM_SECRET }}"
+          oktapam_team   = "${{ secrets.OKTAPAM_TEAM }}"
+          EOF
+
+      - name: Terraform Init
+        if: steps.check-provider.outputs.opa_enabled == 'true' && steps.check-secrets.outputs.secrets_available == 'true'
+        working-directory: environments/${{ needs.detect-environment.outputs.environment }}/terraform
+        run: terraform init -upgrade
+
+      - name: Terraform Validate
+        if: steps.check-provider.outputs.opa_enabled == 'true' && steps.check-secrets.outputs.secrets_available == 'true'
+        working-directory: environments/${{ needs.detect-environment.outputs.environment }}/terraform
+        run: terraform validate
+
+      - name: Terraform Plan (OPA Resources Only)
+        id: plan
+        if: steps.check-provider.outputs.opa_enabled == 'true' && steps.check-secrets.outputs.secrets_available == 'true'
+        working-directory: environments/${{ needs.detect-environment.outputs.environment }}/terraform
+        run: |
+          # Plan only OPA resources using -target
+          # Get all oktapam resources from the terraform files
+          OPA_TARGETS=""
+          for resource in $(grep -h "^resource \"oktapam_" opa_*.tf 2>/dev/null | sed 's/resource "\([^"]*\)" "\([^"]*\)".*/\1.\2/'); do
+            OPA_TARGETS="$OPA_TARGETS -target=$resource"
+          done
+
+          if [ -n "$OPA_TARGETS" ]; then
+            echo "Planning OPA resources: $OPA_TARGETS"
+            terraform plan -no-color $OPA_TARGETS -out=opa_tfplan
+            terraform show -no-color opa_tfplan > opa_plan_output.txt
+          else
+            echo "No OPA resources found to plan"
+            echo "No OPA resources defined in opa_*.tf files" > opa_plan_output.txt
+          fi
+        continue-on-error: true
+
+      - name: Display OPA Plan Summary
+        if: steps.check-provider.outputs.opa_enabled == 'true' && steps.check-secrets.outputs.secrets_available == 'true'
+        working-directory: environments/${{ needs.detect-environment.outputs.environment }}/terraform
+        run: |
+          echo "## OPA Terraform Plan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ needs.detect-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f opa_plan_output.txt ]; then
+            echo "### Changes" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            grep -A 20 "Terraform will perform" opa_plan_output.txt >> $GITHUB_STEP_SUMMARY || echo "No changes detected" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Resource Counts" >> $GITHUB_STEP_SUMMARY
+            grep "Plan:" opa_plan_output.txt >> $GITHUB_STEP_SUMMARY || grep "No changes" opa_plan_output.txt >> $GITHUB_STEP_SUMMARY || echo "See full output" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.check-provider.outputs.opa_enabled == 'true' && steps.check-secrets.outputs.secrets_available == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const planOutput = fs.existsSync('environments/${{ needs.detect-environment.outputs.environment }}/terraform/opa_plan_output.txt')
+              ? fs.readFileSync('environments/${{ needs.detect-environment.outputs.environment }}/terraform/opa_plan_output.txt', 'utf8')
+              : 'No plan output available';
+
+            const output = `## OPA Terraform Plan Results
+
+            **Environment:** \`${{ needs.detect-environment.outputs.environment }}\`
+            **Status:** ${{ steps.plan.outcome == 'success' && '✅ Success' || '❌ Failed' }}
+
+            <details>
+            <summary>Show Plan Output</summary>
+
+            \`\`\`
+            ${planOutput.substring(0, 60000)}
+            \`\`\`
+
+            </details>
+
+            *Triggered by: @${{ github.actor }}*
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+      - name: OPA Not Enabled Notice
+        if: steps.check-provider.outputs.opa_enabled != 'true'
+        run: |
+          echo "## OPA Provider Not Enabled" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The OPA (oktapam) provider is not enabled in this environment." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### To Enable OPA:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Uncomment the \`oktapam\` provider in \`provider.tf\`" >> $GITHUB_STEP_SUMMARY
+          echo "2. Uncomment the OPA variables in \`variables.tf\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Add GitHub secrets: \`OKTAPAM_KEY\`, \`OKTAPAM_SECRET\`, \`OKTAPAM_TEAM\`" >> $GITHUB_STEP_SUMMARY
+          echo "4. Copy \`opa_resources.tf.example\` to \`opa_resources.tf\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See \`docs/OPA_SETUP.md\` for complete setup instructions." >> $GITHUB_STEP_SUMMARY

@@ -342,6 +342,62 @@ Both providers can be used together in the same configuration.
 
 ---
 
+## Import Existing OPA Resources
+
+If you have existing OPA resources, use the import script to generate Terraform code:
+
+```bash
+# Set credentials
+export OKTAPAM_KEY="your-key"
+export OKTAPAM_SECRET="your-secret"
+export OKTAPAM_TEAM="your-team"
+
+# Preview what will be imported (dry run)
+python3 scripts/import_opa_resources.py --dry-run
+
+# Import and generate Terraform files
+python3 scripts/import_opa_resources.py --output-dir environments/myorg/terraform
+
+# Review generated files
+cat environments/myorg/terraform/opa_resources_imported.tf
+
+# Run import commands
+cd environments/myorg/terraform
+terraform init
+bash opa_import_commands.sh
+
+# Verify state
+terraform plan
+```
+
+### Generated Files
+
+| File | Description |
+|------|-------------|
+| `opa_resources_imported.tf` | Terraform configuration for discovered resources |
+| `opa_import_commands.sh` | Shell script with terraform import commands |
+| `opa_resources_export.json` | JSON export of discovered resources for reference |
+
+---
+
+## GitHub Actions Workflow
+
+A dedicated workflow for OPA resources is available:
+
+```bash
+# Manually trigger OPA plan
+gh workflow run opa-plan.yml -f environment=myorg
+```
+
+The workflow:
+- Only runs when `opa_*.tf` files change
+- Checks if OPA provider is enabled
+- Validates OPA secrets are configured
+- Plans only OPA resources (using -target)
+- Comments results on PRs
+
+---
+
 ## References
 
 - [Okta PAM Provider - Terraform Registry](https://registry.terraform.io/providers/okta/oktapam/latest/docs)

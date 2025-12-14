@@ -1,0 +1,47 @@
+# =============================================================================
+# OPA (Okta Privileged Access) Variables
+# =============================================================================
+# Copy this file to opa.auto.tfvars and fill in your values.
+# Alternatively, set these via environment variables:
+#   export TF_VAR_oktapam_key="your-key"
+#   export TF_VAR_oktapam_secret="your-secret"
+#   export TF_VAR_oktapam_team="your-team"
+#
+# For GitHub Actions, add these as secrets to your GitHub Environment:
+#   OKTAPAM_KEY
+#   OKTAPAM_SECRET
+#   OKTAPAM_TEAM
+# =============================================================================
+
+# OPA Team Name
+# The team name that the service account belongs to
+# Find this in OPA Console under Settings
+oktapam_team = "your-team-name"
+
+# OPA Service User Key (ID)
+# Created when you set up a service user in OPA Console
+# Settings → Service Users → Create Service User
+# IMPORTANT: This is sensitive - prefer environment variables in production
+# oktapam_key = "svcuser-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# OPA Service User Secret
+# Shown only once when creating the service user
+# IMPORTANT: This is sensitive - prefer environment variables in production
+# oktapam_secret = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+# =============================================================================
+# Recommended: Use Environment Variables for Sensitive Values
+# =============================================================================
+#
+# Option 1: Export before running terraform
+#   export TF_VAR_oktapam_key="your-key"
+#   export TF_VAR_oktapam_secret="your-secret"
+#   terraform plan
+#
+# Option 2: Use a .env file (add to .gitignore!)
+#   source .env && terraform plan
+#
+# Option 3: Use GitHub Actions secrets (recommended for CI/CD)
+#   Secrets are automatically injected by the workflow
+#
+# =============================================================================
