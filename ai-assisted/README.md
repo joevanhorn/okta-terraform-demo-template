@@ -205,6 +205,8 @@ Use pre-written prompts and context files with any AI assistant. No installation
 | **Add Users** | `prompts/add_users.md` | Adding users to existing setup |
 | **Create Application** | `prompts/create_app.md` | OAuth/OIDC app configuration |
 | **OIG Setup** | `prompts/oig_setup.md` | Identity Governance features |
+| **Backup & Restore** | `prompts/backup_restore.md` | Backup and restore operations |
+| **Cross-Org Migration** | `prompts/cross_org_migration.md` | Copy resources between orgs |
 
 #### 2. Prepare Context
 
@@ -672,9 +674,13 @@ ai-assisted/
 ├── prompts/                           # Prompt templates (Tier 1)
 │   ├── create_demo_environment.md     # Full demo environment
 │   ├── deploy_infrastructure.md       # AWS infrastructure for Active Directory
+│   ├── deploy_scim_server.md          # SCIM 2.0 server infrastructure
 │   ├── add_users.md                   # Add users to existing setup
 │   ├── create_app.md                  # Create OAuth applications
-│   └── oig_setup.md                   # OIG features (entitlements, reviews)
+│   ├── oig_setup.md                   # OIG features (entitlements, reviews)
+│   ├── manage_risk_rules.md           # SOD policies and risk rules
+│   ├── backup_restore.md              # Backup and restore operations
+│   └── cross_org_migration.md         # Cross-org resource migration
 │
 ├── context/                           # Context files for AI
 │   ├── repository_structure.md        # How the repo is organized
@@ -778,7 +784,38 @@ ai-assisted/
 
 **Note:** Risk rules are managed via Python scripts, not Terraform
 
-### 5. Deploy Infrastructure
+### 7. Backup & Restore Operations
+**File:** `prompts/backup_restore.md`
+
+**Use for:**
+- Creating backups of Okta tenants
+- Restoring from backups
+- Setting up scheduled backups
+- Disaster recovery planning
+
+**Two approaches:**
+- **Resource-based:** Full export to CSV/JSON (portable, selective restore)
+- **State-based:** S3 state versioning (fast rollback, preserves IDs)
+
+**Time to generate:** 2-3 minutes (Tier 1) or 1 minute (Tier 2)
+
+### 8. Cross-Org Migration
+**File:** `prompts/cross_org_migration.md`
+
+**Use for:**
+- Copying groups between Okta orgs
+- Migrating group memberships
+- Copying entitlement bundle grants
+- Cloning demo environments
+
+**Generates:**
+- Workflow commands for migration
+- CLI commands for export/import
+- Verification steps
+
+**Time to generate:** 2-3 minutes (Tier 1) or 1 minute (Tier 2)
+
+### 9. Deploy Infrastructure
 **File:** `prompts/deploy_infrastructure.md`
 
 **Use for:**
@@ -1116,6 +1153,6 @@ Filename: complete_demo.tf
 
 ---
 
-**Last Updated:** 2025-11-12
+**Last Updated:** 2025-12-22
 
 **Happy Generating! 🚀**

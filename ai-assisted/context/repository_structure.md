@@ -47,6 +47,23 @@ okta-terraform-complete-demo/
 │   ├── production/             # Production environment (template)
 │   ├── staging/                # Staging environment (template)
 │   └── development/            # Development environment (template)
+├── backup-restore/             # Backup and restore solutions ⭐ NEW!
+│   ├── README.md               # Choose your approach guide
+│   ├── resource-based/         # Full resource export/import approach
+│   │   ├── README.md           # Resource-based documentation
+│   │   ├── backup-tenant.yml   # Backup workflow
+│   │   ├── restore-tenant.yml  # Restore workflow
+│   │   └── scripts/            # Export scripts
+│   │       ├── export_users_to_csv.py      # Users → CSV
+│   │       ├── export_app_assignments.py   # App assignments → JSON
+│   │       └── create_backup_manifest.py   # Manifest generation
+│   └── state-based/            # S3 state versioning approach
+│       ├── README.md           # State-based documentation
+│       ├── backup-tenant.yml   # Capture S3 version
+│       ├── restore-tenant.yml  # Rollback S3 version
+│       └── scripts/            # State scripts
+│           ├── backup_state.py    # Capture S3 version ID
+│           └── restore_state.py   # Restore S3 version
 ├── scripts/                    # Python automation scripts
 │   ├── import_oig_resources.py     # Import OIG resources from Okta
 │   ├── sync_owner_mappings.py      # Sync resource owners
@@ -55,7 +72,12 @@ okta-terraform-complete-demo/
 │   ├── apply_admin_labels.py       # Auto-label admin resources
 │   ├── import_risk_rules.py        # Import risk rules (SOD policies)
 │   ├── apply_risk_rules.py         # Apply risk rules to Okta
-│   └── configure_scim_app.py       # Configure SCIM connection (API-only) ⭐ NEW!
+│   ├── configure_scim_app.py       # Configure SCIM connection (API-only)
+│   ├── manage_entitlement_settings.py  # Enable/disable entitlement mgmt ⭐ NEW!
+│   ├── export_groups_to_terraform.py   # Groups → Terraform (cross-org)
+│   ├── copy_group_memberships.py       # Export/import memberships (cross-org)
+│   ├── copy_grants_between_orgs.py     # Export/import grants (cross-org)
+│   └── import_opa_resources.py         # Import OPA resources
 ├── docs/                       # Documentation
 ├── testing/                    # Testing and validation guides
 └── .github/workflows/          # GitHub Actions workflows
@@ -288,3 +310,179 @@ These settings must be configured via Okta Admin API (Python script handles this
 - SCIM Server README: `environments/myorg/infrastructure/scim-server/README.md`
 - Automation Guide: `docs/SCIM_OKTA_AUTOMATION.md`
 - Secrets Migration: `environments/myorg/infrastructure/scim-server/GITHUB_SECRETS_MIGRATION.md`
+
+## Backup and Restore
+
+Two backup approaches are available in `backup-restore/`:
+
+### Resource-Based Backup (`backup-restore/resource-based/`)
+Exports Okta resources to portable files (CSV, JSON, Terraform):
+
+**What it backs up:**
+- Users → CSV (compatible with `users_from_csv.tf` pattern)
+- Groups and memberships → JSON
+- App assignments → JSON
+- OIG resources → Terraform files
+- Config: owners, labels, risk rules → JSON
+
+**Workflows:**
+```bash
+# Create backup (exports all resources)
+gh workflow run backup-tenant.yml \
+  -f environment=myorg \
+  -f commit_changes=true
+
+# Restore from backup
+gh workflow run restore-tenant.yml \
+  -f environment=myorg \
+  -f snapshot_id=latest \
+  -f resources=all \
+  -f dry_run=true
+```
+
+**Scripts:**
+- `scripts/export_users_to_csv.py` - Export users to CSV
+- `scripts/export_app_assignments.py` - Export app assignments
+- `scripts/create_backup_manifest.py` - Generate manifest
+
+### State-Based Backup (`backup-restore/state-based/`)
+Captures S3 state version ID for instant rollback:
+
+**What it backs up:**
+- S3 state version ID and metadata
+- Optional: Downloaded state file copy
+- Manifest with restore instructions
+
+**Workflows:**
+```bash
+# Create backup (captures S3 state version)
+gh workflow run backup-tenant-state.yml \
+  -f environment=myorg \
+  -f commit_changes=true
+
+# Restore state only
+gh workflow run restore-tenant-state.yml \
+  -f environment=myorg \
+  -f snapshot_id=latest \
+  -f restore_mode=state-only \
+  -f dry_run=true
+
+# Full restore (state + terraform apply)
+gh workflow run restore-tenant-state.yml \
+  -f environment=myorg \
+  -f snapshot_id=latest \
+  -f restore_mode=full-restore \
+  -f dry_run=false
+```
+
+**Scripts:**
+- `scripts/backup_state.py` - Capture S3 state version
+- `scripts/restore_state.py` - Restore S3 state version
+
+### Choosing an Approach
+
+| Feature | Resource-Based | State-Based |
+|---------|----------------|-------------|
+| Backup Size | 100KB - 10MB+ | ~1KB (metadata) |
+| Restore Speed | 5-30 min | 1-5 min |
+| Portable | Yes | No (S3-tied) |
+| Selective | Yes | No |
+| Preserves IDs | No | Yes |
+
+**Recommended Strategy:**
+- Daily: State-based for quick rollbacks
+- Weekly: Resource-based for full DR
+
+**Documentation:** `backup-restore/README.md`
+
+## Cross-Org Migration
+
+Scripts and workflows for copying resources between Okta organizations:
+
+### Migrate Groups
+```bash
+# Export groups from source org to Terraform
+python scripts/export_groups_to_terraform.py \
+  --output environments/target/terraform/groups_imported.tf \
+  --exclude-system
+
+# Via workflow
+gh workflow run migrate-cross-org.yml \
+  -f resource_type=groups \
+  -f source_environment=SourceEnv \
+  -f target_environment=TargetEnv \
+  -f dry_run=true
+```
+
+### Migrate Group Memberships
+```bash
+# Export memberships
+python scripts/copy_group_memberships.py export \
+  --output memberships.json
+
+# Import to target org
+python scripts/copy_group_memberships.py import \
+  --input memberships.json \
+  --dry-run
+```
+
+### Migrate Entitlement Bundle Grants
+```bash
+# Export grants from source org
+python scripts/copy_grants_between_orgs.py export \
+  --output grants_export.json
+
+# Import to target org
+python scripts/copy_grants_between_orgs.py import \
+  --input grants_export.json \
+  --exclude-apps "System App Name" \
+  --dry-run
+```
+
+**Consolidated Workflow:**
+```bash
+gh workflow run migrate-cross-org.yml \
+  -f resource_type=groups|memberships|grants \
+  -f source_environment=SourceEnv \
+  -f target_environment=TargetEnv \
+  -f dry_run=true
+```
+
+**Documentation:** `docs/CROSS_ORG_MIGRATION.md`
+
+## Entitlement Settings API (Beta - December 2025)
+
+Enables/disables entitlement management on applications via API:
+
+```bash
+# List all apps and their entitlement management status
+python scripts/manage_entitlement_settings.py --action list
+
+# Enable entitlement management on an app
+python scripts/manage_entitlement_settings.py \
+  --action enable \
+  --app-id 0oaXXXXXXXX \
+  --dry-run
+
+# Disable (WARNING: Deletes all entitlement data!)
+python scripts/manage_entitlement_settings.py \
+  --action disable \
+  --app-id 0oaXXXXXXXX
+```
+
+**Workflow:**
+```bash
+# Manual mode: list, enable, disable specific apps
+gh workflow run oig-manage-entitlements.yml \
+  -f mode=manual \
+  -f environment=myorg \
+  -f action=list
+
+# Auto mode: detect and enable on apps with entitlement resources
+gh workflow run oig-manage-entitlements.yml \
+  -f mode=auto \
+  -f environment=myorg \
+  -f dry_run=true
+```
+
+**Documentation:** `docs/ENTITLEMENT_SETTINGS.md`

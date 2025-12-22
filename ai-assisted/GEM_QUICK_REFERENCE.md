@@ -748,4 +748,90 @@ resource "oktapam_secret" "password" {
 
 ---
 
+## Backup and Restore Quick Reference
+
+**Two approaches in `backup-restore/`:**
+
+| Approach | Best For | Restore Speed |
+|----------|----------|---------------|
+| Resource-Based | Full DR, audit, cross-bucket | 5-30 min |
+| State-Based | Quick rollback | 1-5 min |
+
+**Resource-Based Commands:**
+```bash
+# Backup
+gh workflow run backup-tenant.yml -f environment=myorg
+
+# Restore (always dry-run first!)
+gh workflow run restore-tenant.yml \
+  -f environment=myorg \
+  -f snapshot_id=latest \
+  -f dry_run=true
+```
+
+**State-Based Commands:**
+```bash
+# Backup
+gh workflow run backup-tenant-state.yml -f environment=myorg
+
+# Restore
+gh workflow run restore-tenant-state.yml \
+  -f environment=myorg \
+  -f restore_mode=state-only \
+  -f dry_run=true
+```
+
+---
+
+## Cross-Org Migration Quick Reference
+
+**Workflow for all resource types:**
+```bash
+gh workflow run migrate-cross-org.yml \
+  -f resource_type=groups|memberships|grants \
+  -f source_environment=SourceEnv \
+  -f target_environment=TargetEnv \
+  -f dry_run=true
+```
+
+**Migration Order:**
+1. Groups → creates group definitions
+2. Memberships → assigns users to groups
+3. Grants → assigns bundles to principals
+
+---
+
+## CSV Bulk User Management
+
+**For 1000+ users, use CSV import:**
+
+```hcl
+locals {
+  csv_users = csvdecode(file("${path.module}/users.csv"))
+  users_map = { for user in local.csv_users : user.email => user }
+}
+
+resource "okta_user" "csv_users" {
+  for_each   = local.users_map
+  email      = each.value.email
+  first_name = each.value.first_name
+  last_name  = each.value.last_name
+  login      = each.value.login
+  status     = "ACTIVE"
+}
+```
+
+**CSV Format:**
+```csv
+email,first_name,last_name,login,status,department,manager_email,groups
+john@example.com,John,Doe,john@example.com,ACTIVE,Engineering,alice@example.com,"Engineering,Developers"
+```
+
+**Key points:**
+- Manager via `manager_email` column → resolved via `okta_link_value`
+- Groups as comma-separated values
+- Use `terraform apply -parallelism=10` for faster execution
+
+---
+
 This quick reference covers 95% of common Okta Terraform patterns. For edge cases, refer to full documentation or ask for clarification.
