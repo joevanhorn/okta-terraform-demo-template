@@ -1,0 +1,62 @@
+email,first_name,last_name,login,status,department,title,manager_email,groups,custom_profile_attributes
+# ==============================================================================
+# OKTA USER IMPORT CSV TEMPLATE
+# ==============================================================================
+#
+# This CSV template demonstrates bulk user creation for Okta via Terraform.
+# Copy this file to users.csv and customize with your user data.
+#
+# COLUMNS:
+#   email                     - (Required) User's primary email address
+#   first_name                - (Required) User's first name
+#   last_name                 - (Required) User's last name
+#   login                     - (Required) Okta login (usually same as email)
+#   status                    - (Optional) ACTIVE, STAGED, or DEPROVISIONED (default: ACTIVE)
+#   department                - (Optional) Department name
+#   title                     - (Optional) Job title
+#   manager_email             - (Optional) Manager's email for relationship lookup
+#   groups                    - (Optional) Comma-separated group names (no spaces after commas)
+#   custom_profile_attributes - (Optional) JSON string of custom attributes
+#
+# NOTES:
+#   - Manager relationships are resolved by email after all users are created
+#   - Groups are created automatically if they don't exist
+#   - Custom attributes must be valid JSON with escaped quotes
+#   - For large imports (1000+), use: terraform apply -parallelism=10
+#
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# EXECUTIVE LEADERSHIP (Top Level - No Managers)
+# ------------------------------------------------------------------------------
+alice.chen@example.com,Alice,Chen,alice.chen@example.com,ACTIVE,Executive,Chief Executive Officer,,"Executive,Leadership","{""employeeNumber"":""E0001"",""costCenter"":""CC-EXEC""}"
+marcus.johnson@example.com,Marcus,Johnson,marcus.johnson@example.com,ACTIVE,Executive,Chief Technology Officer,alice.chen@example.com,"Executive,Leadership,Technology","{""employeeNumber"":""E0002"",""costCenter"":""CC-EXEC""}"
+sarah.williams@example.com,Sarah,Williams,sarah.williams@example.com,ACTIVE,Executive,Chief Financial Officer,alice.chen@example.com,"Executive,Leadership,Finance","{""employeeNumber"":""E0003"",""costCenter"":""CC-EXEC""}"
+
+# ------------------------------------------------------------------------------
+# ENGINEERING DEPARTMENT (Reports to CTO)
+# ------------------------------------------------------------------------------
+david.kim@example.com,David,Kim,david.kim@example.com,ACTIVE,Engineering,VP of Engineering,marcus.johnson@example.com,"Engineering,Leadership","{""employeeNumber"":""E0010"",""costCenter"":""CC-ENG""}"
+emily.rodriguez@example.com,Emily,Rodriguez,emily.rodriguez@example.com,ACTIVE,Engineering,Engineering Manager,david.kim@example.com,"Engineering,Managers","{""employeeNumber"":""E0011"",""costCenter"":""CC-ENG""}"
+james.wilson@example.com,James,Wilson,james.wilson@example.com,ACTIVE,Engineering,Senior Software Engineer,emily.rodriguez@example.com,"Engineering,Developers","{""employeeNumber"":""E0012"",""costCenter"":""CC-ENG"",""skills"":[""Python"",""Terraform"",""AWS""]}"
+lisa.martinez@example.com,Lisa,Martinez,lisa.martinez@example.com,ACTIVE,Engineering,Software Engineer,emily.rodriguez@example.com,"Engineering,Developers","{""employeeNumber"":""E0013"",""costCenter"":""CC-ENG""}"
+michael.brown@example.com,Michael,Brown,michael.brown@example.com,ACTIVE,Engineering,Junior Developer,emily.rodriguez@example.com,"Engineering,Developers","{""employeeNumber"":""E0014"",""costCenter"":""CC-ENG""}"
+rachel.taylor@example.com,Rachel,Taylor,rachel.taylor@example.com,ACTIVE,Engineering,DevOps Engineer,david.kim@example.com,"Engineering,DevOps,Infrastructure","{""employeeNumber"":""E0015"",""costCenter"":""CC-ENG""}"
+
+# ------------------------------------------------------------------------------
+# FINANCE DEPARTMENT (Reports to CFO)
+# ------------------------------------------------------------------------------
+kevin.anderson@example.com,Kevin,Anderson,kevin.anderson@example.com,ACTIVE,Finance,Finance Manager,sarah.williams@example.com,"Finance,Managers","{""employeeNumber"":""F0001"",""costCenter"":""CC-FIN""}"
+jennifer.thomas@example.com,Jennifer,Thomas,jennifer.thomas@example.com,ACTIVE,Finance,Senior Accountant,kevin.anderson@example.com,Finance,"{""employeeNumber"":""F0002"",""costCenter"":""CC-FIN""}"
+robert.garcia@example.com,Robert,Garcia,robert.garcia@example.com,ACTIVE,Finance,Financial Analyst,kevin.anderson@example.com,Finance,"{""employeeNumber"":""F0003"",""costCenter"":""CC-FIN""}"
+
+# ------------------------------------------------------------------------------
+# CONTRACTORS (No Department, Limited Groups)
+# ------------------------------------------------------------------------------
+contractor.one@example.com,Alex,Contractor,contractor.one@example.com,ACTIVE,,,emily.rodriguez@example.com,Contractors,"{""employeeNumber"":""C0001"",""userType"":""contractor"",""contractEndDate"":""2025-12-31""}"
+contractor.two@example.com,Jordan,Freelance,contractor.two@example.com,ACTIVE,,,david.kim@example.com,Contractors,"{""employeeNumber"":""C0002"",""userType"":""contractor""}"
+
+# ------------------------------------------------------------------------------
+# STAGED USER (Not Yet Activated)
+# ------------------------------------------------------------------------------
+pending.hire@example.com,New,Employee,pending.hire@example.com,STAGED,Engineering,Software Engineer,emily.rodriguez@example.com,"Engineering,Developers","{""employeeNumber"":""E0099"",""startDate"":""2025-02-01""}"

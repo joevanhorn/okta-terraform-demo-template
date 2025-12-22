@@ -721,6 +721,55 @@ values {
 - The provider should handle this (set comparison vs list), but currently doesn't
 - If you see "inconsistent result after apply" errors on entitlements, check value ordering first
 
+### 12. CSV-Based User Management for Bulk Imports
+
+**For managing 1000+ users, use CSV-based import with for_each.**
+
+```hcl
+# Load users from CSV
+locals {
+  csv_users = csvdecode(file("${path.module}/users.csv"))
+  users_map = { for user in local.csv_users : user.email => user }
+}
+
+# Create users with for_each
+resource "okta_user" "csv_users" {
+  for_each   = local.users_map
+  email      = each.value.email
+  first_name = each.value.first_name
+  last_name  = each.value.last_name
+  login      = each.value.login
+  status     = coalesce(each.value.status, "ACTIVE")
+  department = try(each.value.department, null)
+  title      = try(each.value.title, null)
+  custom_profile_attributes = try(each.value.custom_profile_attributes, null)
+
+  lifecycle { ignore_changes = [manager_id] }
+}
+
+# Manager relationships via okta_link_value (after users exist)
+resource "okta_link_value" "managers" {
+  for_each        = local.users_by_manager
+  primary_user_id = local.user_email_to_id[each.key]
+  primary_name    = "manager"
+  associated_user_ids = [for email in each.value : local.user_email_to_id[email]]
+  depends_on      = [okta_user.csv_users]
+}
+```
+
+**CSV Format:**
+```csv
+email,first_name,last_name,login,status,department,title,manager_email,groups,custom_profile_attributes
+john@example.com,John,Doe,john@example.com,ACTIVE,Engineering,Developer,alice@example.com,"Engineering,Developers","{""employeeId"":""E001""}"
+```
+
+**Key points:**
+- Manager relationships use `manager_email` column, resolved to IDs via `okta_link_value`
+- Group memberships via comma-separated `groups` column (parsed with `split()`)
+- Custom attributes as JSON string with escaped quotes
+- Use `terraform apply -parallelism=10` for faster execution with 1000+ users
+- See `environments/myorg/terraform/users_from_csv.tf.example` for complete implementation
+
 ---
 
 ## Repository Structure Highlights

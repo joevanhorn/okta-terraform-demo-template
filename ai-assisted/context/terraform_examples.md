@@ -47,6 +47,85 @@ resource "okta_user" "bob_jones" {
 }
 ```
 
+### Bulk User Management with CSV (1000+ Users)
+
+For large-scale user management, use CSV-based import with for_each:
+
+**CSV Format (`users.csv`):**
+```csv
+email,first_name,last_name,login,status,department,title,manager_email,groups,custom_profile_attributes
+alice@example.com,Alice,Chen,alice@example.com,ACTIVE,Executive,CEO,,"Executive,Leadership","{""employeeNumber"":""E0001""}"
+bob@example.com,Bob,Smith,bob@example.com,ACTIVE,Engineering,Developer,alice@example.com,"Engineering,Developers","{""employeeNumber"":""E0010""}"
+```
+
+**Terraform Implementation:**
+```hcl
+# Load and transform CSV data
+locals {
+  csv_users_raw = csvdecode(file("${path.module}/users.csv"))
+  csv_users_filtered = [
+    for user in local.csv_users_raw : user
+    if !startswith(user.email, "#")  # Skip comment rows
+  ]
+  csv_users = {
+    for user in local.csv_users_filtered : user.email => {
+      email         = user.email
+      first_name    = user.first_name
+      last_name     = user.last_name
+      login         = user.login
+      status        = coalesce(trimspace(user.status), "ACTIVE")
+      department    = trimspace(try(user.department, ""))
+      title         = trimspace(try(user.title, ""))
+      manager_email = trimspace(try(user.manager_email, ""))
+      groups        = trimspace(try(user.groups, ""))
+    }
+  }
+  user_email_to_id = { for email, user in okta_user.csv_users : email => user.id }
+  user_groups = {
+    for email, user in local.csv_users : email => (
+      user.groups != "" ? [for g in split(",", user.groups) : trimspace(g)] : []
+    )
+  }
+  users_by_manager = {
+    for email, user in local.csv_users : user.manager_email => email...
+    if user.manager_email != ""
+  }
+}
+
+# Create users (Phase 1 - without manager)
+resource "okta_user" "csv_users" {
+  for_each   = local.csv_users
+  email      = each.value.email
+  first_name = each.value.first_name
+  last_name  = each.value.last_name
+  login      = each.value.login
+  status     = each.value.status
+  department = each.value.department != "" ? each.value.department : null
+  title      = each.value.title != "" ? each.value.title : null
+
+  lifecycle { ignore_changes = [manager_id] }
+}
+
+# Manager relationships (Phase 2 - after users exist)
+resource "okta_link_value" "manager_subordinates" {
+  for_each        = local.users_by_manager
+  primary_user_id = lookup(local.user_email_to_id, each.key, null)
+  primary_name    = "manager"
+  associated_user_ids = [
+    for email in each.value : lookup(local.user_email_to_id, email, null)
+    if lookup(local.user_email_to_id, email, null) != null
+  ]
+  depends_on = [okta_user.csv_users]
+}
+```
+
+**Key Points:**
+- Two-phase approach: create users first, then establish manager relationships via `okta_link_value`
+- Manager by email reference avoids circular dependency issues
+- Groups can be parsed from comma-separated column
+- Use `terraform apply -parallelism=10` for 1000+ users
+- See `environments/myorg/terraform/users_from_csv.tf.example` for complete implementation
+
 ## Group Examples
 
 ### Basic Group
