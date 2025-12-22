@@ -139,43 +139,44 @@ gh workflow run import-all-resources.yml \
   -f commit_changes=true
 
 # Manually trigger Terraform apply with approval
-gh workflow run terraform-apply-with-approval.yml \
+gh workflow run tf-apply.yml \
   -f environment=mycompany
 
 # Sync and apply resource owners
-gh workflow run apply-owners.yml \
+gh workflow run oig-owners.yml \
   -f environment=mycompany \
   -f dry_run=false
 
 # Import risk rules from Okta
-gh workflow run import-risk-rules.yml \
+gh workflow run oig-risk-rules-import.yml \
   -f environment=mycompany \
   -f commit_changes=true
 
 # Apply risk rules to Okta
-gh workflow run apply-risk-rules.yml \
+gh workflow run oig-risk-rules-apply.yml \
   -f environment=mycompany \
   -f dry_run=false
 
-# Auto-label admin entitlements
-gh workflow run apply-admin-labels.yml \
+# Apply labels (all or admin only)
+gh workflow run labels-apply.yml \
+  -f label_type=admin \
   -f environment=mycompany \
   -f dry_run=false
 
 # Manage entitlements (manual mode: list, enable, disable)
-gh workflow run manage-entitlements.yml \
+gh workflow run oig-manage-entitlements.yml \
   -f mode=manual \
   -f environment=mycompany \
   -f action=list
 
 # Manage entitlements (auto mode: detect and enable on apps)
-gh workflow run manage-entitlements.yml \
+gh workflow run oig-manage-entitlements.yml \
   -f mode=auto \
   -f environment=mycompany \
   -f dry_run=true
 
 # Cross-org migration: Copy groups, memberships, or grants between orgs
-gh workflow run cross-org-migrate.yml \
+gh workflow run migrate-cross-org.yml \
   -f resource_type=groups \
   -f source_environment=SourceEnv \
   -f target_environment=TargetEnv \
@@ -375,23 +376,42 @@ s3://okta-terraform-demo/
 
 ### GitHub Actions Workflows
 
-**Core Workflows:**
+Workflows are named with category prefixes for easy searchability:
+
+**Terraform Workflows (`tf-*`):**
+- `tf-plan.yml` - Run plan on PR and push to main (with AWS OIDC)
+- `tf-apply.yml` - Apply with manual approval gate (with AWS OIDC)
+- `tf-validate.yml` - Validate Terraform configuration
+
+**OIG/Governance Workflows (`oig-*`):**
+- `oig-owners.yml` - Sync resource owners (requires environment parameter)
+- `oig-manage-entitlements.yml` - Enable/disable entitlement management on apps
+- `oig-risk-rules-apply.yml` - Apply risk rules to Okta
+- `oig-risk-rules-import.yml` - Import risk rules from Okta
+
+**Labels Workflows (`labels-*`):**
+- `labels-apply.yml` - Apply labels (all or admin only)
+- `labels-apply-from-config.yml` - Deploy labels from JSON config
+- `labels-sync.yml` - Sync labels from Okta
+- `labels-validate.yml` - Validate label configuration (syntax-only)
+
+**Migration Workflows (`migrate-*`):**
+- `migrate-cross-org.yml` - Copy groups, memberships, or grants between orgs
+
+**Other Workflows:**
 - `import-all-resources.yml` - Import entire tenant to code
-- `terraform-plan.yml` - Run plan on PR and push to main (with AWS OIDC)
-- `terraform-apply-with-approval.yml` - Apply with manual approval gate (with AWS OIDC)
-- `apply-owners.yml` - Sync resource owners (requires environment parameter)
-- `apply-admin-labels.yml` - Auto-label admin resources (requires environment parameter)
-- `export-oig.yml` - Export OIG configs to JSON (requires environment parameter)
-- `validate-label-mappings.yml` - PR validation for label configuration (syntax-only, no secrets)
-- `apply-labels-from-config.yml` - Deploy labels to Okta (auto dry-run on merge, manual apply, requires environment parameter)
+- `export-oig.yml` - Export OIG configs to JSON
+- `opa-plan.yml` - Plan OPA resources
+- `deploy-oag-app.yml` - Deploy OAG applications
+- `deploy-scim-server.yml` - Deploy SCIM server
+- `sync-template.yml` - Sync from upstream template
+- `validate-pr.yml` - Validate pull requests
+- `generate-oauth-keys.yml` - Generate OAuth key pairs
+- `governance-setup.yml` - Initial governance setup
 
 **Authentication:**
 - **Okta:** GitHub Environments with `OKTA_API_TOKEN`, `OKTA_ORG_NAME`, `OKTA_BASE_URL`
 - **AWS:** OIDC authentication via `AWS_ROLE_ARN` secret (no long-lived credentials)
-
-**Label Validation Workflows:**
-- **PR Validation:** No environment needed (syntax check only)
-- **Deployment:** Uses environment specified via workflow input (API calls with secrets)
 
 ---
 
@@ -513,7 +533,7 @@ Labels are managed via a two-phase workflow that respects environment protection
 
 **Phase 1: PR Validation (No Secrets)**
 ```yaml
-# validate-label-mappings.yml
+# labels-validate.yml
 # NO environment specified
 # NO Okta API calls
 # Validates syntax and ORN formats only
@@ -521,7 +541,7 @@ Labels are managed via a two-phase workflow that respects environment protection
 
 **Phase 2: Deployment (With Secrets)**
 ```yaml
-# apply-labels-from-config.yml
+# labels-apply-from-config.yml
 environment: MyCompany  # Specified via input parameter
 # Uses Okta API secrets
 # Auto dry-run on merge to main
@@ -848,7 +868,7 @@ gh pr create --title "Add marketing team demo"
 # 6. Review automated plan in PR comments
 # 7. Get approval and merge
 # 8. Manually trigger apply workflow
-gh workflow run terraform-apply-with-approval.yml -f environment=mycompany
+gh workflow run tf-apply.yml -f environment=mycompany
 ```
 
 ### Syncing from Okta (Drift Detection)

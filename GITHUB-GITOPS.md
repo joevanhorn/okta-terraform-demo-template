@@ -403,7 +403,7 @@ gh workflow run import-all-resources.yml \
 ### Resource Owners
 
 ```bash
-gh workflow run apply-owners.yml \
+gh workflow run oig-owners.yml \
   -f environment=myorg \
   -f dry_run=false
 ```
@@ -411,7 +411,7 @@ gh workflow run apply-owners.yml \
 ### Governance Labels
 
 ```bash
-gh workflow run apply-labels-from-config.yml \
+gh workflow run labels-apply-from-config.yml \
   -f environment=myorg \
   -f dry_run=false
 ```
