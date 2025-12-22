@@ -9,101 +9,65 @@ This guide covers tools for migrating Okta resources between organizations. Thes
 
 ---
 
-## Available Workflows
+## Consolidated Workflow
 
-### 1. Copy Groups Between Orgs
+All cross-org migration operations are handled by a single unified workflow: `cross-org-migrate.yml`
 
-**Workflow:** `copy-groups-between-orgs.yml`
-
-Exports groups from a source org as Terraform configuration and applies them to a target org.
+### Basic Usage
 
 ```bash
-gh workflow run copy-groups-between-orgs.yml \
+# Copy groups between orgs
+gh workflow run cross-org-migrate.yml \
+  -f resource_type=groups \
   -f source_environment=ProductionEnv \
   -f target_environment=DemoEnv \
-  -f exclude_system=true \
-  -f dry_run=true \
-  -f commit_changes=true
-```
+  -f dry_run=true
 
-**Parameters:**
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `source_environment` | GitHub Environment for source Okta org | Required |
-| `target_environment` | GitHub Environment for target Okta org | Required |
-| `name_pattern` | Regex to filter groups by name | (all groups) |
-| `exclude_system` | Exclude Everyone, Administrators groups | `true` |
-| `dry_run` | Plan only, don't apply | `true` |
-| `commit_changes` | Commit generated Terraform file | `true` |
+# Copy group memberships between orgs
+gh workflow run cross-org-migrate.yml \
+  -f resource_type=memberships \
+  -f source_environment=ProductionEnv \
+  -f target_environment=DemoEnv \
+  -f dry_run=true
 
-**What it does:**
-1. Connects to source org and fetches all OKTA_GROUP type groups
-2. Generates Terraform configuration (`groups_imported.tf`)
-3. Runs `terraform plan` in target environment
-4. Optionally applies changes and commits the file
-
----
-
-### 2. Copy Group Memberships Between Orgs
-
-**Workflow:** `copy-group-memberships.yml`
-
-Exports group memberships from source org and recreates them in target org by matching users by email address.
-
-```bash
-gh workflow run copy-group-memberships.yml \
+# Copy entitlement bundle grants between orgs
+gh workflow run cross-org-migrate.yml \
+  -f resource_type=grants \
   -f source_environment=ProductionEnv \
   -f target_environment=DemoEnv \
   -f dry_run=true
 ```
 
-**Parameters:**
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `source_environment` | GitHub Environment for source Okta org | Required |
-| `target_environment` | GitHub Environment for target Okta org | Required |
-| `dry_run` | Preview only, don't apply changes | `true` |
+### Parameters
 
-**How it works:**
-1. Exports all group memberships from source (stores user emails)
-2. For each group in target org with matching name:
-   - Finds users by email address
-   - Adds matching users to the group
-3. Reports on missing groups and users
+| Parameter | Description | Default | Applies To |
+|-----------|-------------|---------|------------|
+| `resource_type` | Type of resource to migrate | Required | All |
+| `source_environment` | GitHub Environment for source Okta org | Required | All |
+| `target_environment` | GitHub Environment for target Okta org | Required | All |
+| `name_pattern` | Regex to filter groups by name | (all groups) | groups |
+| `exclude_system` | Exclude Everyone, Administrators groups | `true` | groups |
+| `exclude_apps` | Comma-separated app names to exclude | (none) | grants |
+| `dry_run` | Preview only, don't apply | `true` | All |
+| `commit_changes` | Commit generated Terraform file | `true` | groups |
 
-**Important:** Users must exist in both orgs with the same email address for matching to work.
+### Resource Types
 
----
+#### `groups`
+Exports groups from source org as Terraform configuration and applies to target org.
+- Generates `groups_imported.tf` in target environment
+- Runs terraform plan/apply
+- Optionally commits the file
 
-### 3. Copy Entitlement Bundle Grants Between Orgs
+#### `memberships`
+Exports group memberships and recreates in target org by matching users by email.
+- Users must exist in both orgs with same email address
+- Reports missing groups and unmatched users
 
-**Workflow:** `copy-grants-between-orgs.yml`
-
-Exports OIG entitlement bundle grants from source org and recreates them in target org.
-
-```bash
-gh workflow run copy-grants-between-orgs.yml \
-  -f source_environment=ProductionEnv \
-  -f target_environment=DemoEnv \
-  -f exclude_apps="App1,App2" \
-  -f dry_run=true
-```
-
-**Parameters:**
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `source_environment` | GitHub Environment for source Okta org | Required |
-| `target_environment` | GitHub Environment for target Okta org | Required |
-| `exclude_apps` | Comma-separated app names to exclude | (none) |
-| `dry_run` | Preview only, don't apply changes | `true` |
-
-**What it copies:**
-- Which groups/users have which entitlement bundles
-- Maps bundles and principals by name between orgs
-
-**Prerequisites:**
-- Entitlement bundles must exist in target org with matching names
-- Groups/users must exist in target org with matching names
+#### `grants`
+Exports OIG entitlement bundle grants and recreates in target org.
+- Bundles must exist in target org with matching names
+- Groups/users must exist with matching names
 
 ---
 
