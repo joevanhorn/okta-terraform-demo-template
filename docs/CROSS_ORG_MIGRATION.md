@@ -11,27 +11,27 @@ This guide covers tools for migrating Okta resources between organizations. Thes
 
 ## Consolidated Workflow
 
-All cross-org migration operations are handled by a single unified workflow: `cross-org-migrate.yml`
+All cross-org migration operations are handled by a single unified workflow: `migrate-cross-org.yml`
 
 ### Basic Usage
 
 ```bash
 # Copy groups between orgs
-gh workflow run cross-org-migrate.yml \
+gh workflow run migrate-cross-org.yml \
   -f resource_type=groups \
   -f source_environment=ProductionEnv \
   -f target_environment=DemoEnv \
   -f dry_run=true
 
 # Copy group memberships between orgs
-gh workflow run cross-org-migrate.yml \
+gh workflow run migrate-cross-org.yml \
   -f resource_type=memberships \
   -f source_environment=ProductionEnv \
   -f target_environment=DemoEnv \
   -f dry_run=true
 
 # Copy entitlement bundle grants between orgs
-gh workflow run cross-org-migrate.yml \
+gh workflow run migrate-cross-org.yml \
   -f resource_type=grants \
   -f source_environment=ProductionEnv \
   -f target_environment=DemoEnv \
@@ -138,7 +138,7 @@ python3 scripts/copy_grants_between_orgs.py import \
 When migrating a complete environment, follow this order:
 
 1. **Groups First**
-   - Run `copy-groups-between-orgs.yml` with `dry_run=false`
+   - Run `migrate-cross-org.yml` with `resource_type=groups` and `dry_run=false`
    - Groups must exist before memberships or grants
 
 2. **Users** (if needed)
@@ -146,7 +146,7 @@ When migrating a complete environment, follow this order:
    - Ensure email addresses match source org
 
 3. **Group Memberships**
-   - Run `copy-group-memberships.yml` with `dry_run=false`
+   - Run `migrate-cross-org.yml` with `resource_type=memberships` and `dry_run=false`
    - Verify memberships were created
 
 4. **Entitlement Bundles** (if needed)
@@ -154,7 +154,7 @@ When migrating a complete environment, follow this order:
    - Bundle names must match source org
 
 5. **Grants Last**
-   - Run `copy-grants-between-orgs.yml` with `dry_run=false`
+   - Run `migrate-cross-org.yml` with `resource_type=grants` and `dry_run=false`
    - Verifies bundles and principals exist before creating grants
 
 ---

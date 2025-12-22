@@ -317,25 +317,32 @@ See **[docs/GITOPS_WORKFLOW.md](./docs/GITOPS_WORKFLOW.md)** for detailed workfl
 
 ### GitHub Actions Workflows
 
-**Import and Sync:**
+Workflows are named with category prefixes for easy searchability.
+
+**Terraform (`tf-*`):**
+- `tf-plan.yml` - Run plan on PRs (with AWS OIDC)
+- `tf-apply.yml` - Apply with manual approval
+- `tf-validate.yml` - Validate Terraform configuration
+
+**OIG/Governance (`oig-*`):**
+- `oig-owners.yml` - Apply resource owner assignments
+- `oig-manage-entitlements.yml` - Enable/disable entitlement management
+- `oig-risk-rules-apply.yml` - Apply risk rules (SOD policies)
+- `oig-risk-rules-import.yml` - Import risk rules from Okta
+
+**Labels (`labels-*`):**
+- `labels-apply.yml` - Deploy governance labels
+- `labels-apply-from-config.yml` - Apply labels from config file
+- `labels-sync.yml` - Sync governance labels from Okta
+- `labels-validate.yml` - Label configuration validation
+
+**Migration (`migrate-*`):**
+- `migrate-cross-org.yml` - Copy groups, memberships, grants between orgs
+
+**Other:**
 - `import-all-resources.yml` - Import all OIG resources from Okta
-- `sync-labels.yml` - Sync governance labels from Okta
 - `export-oig.yml` - Export OIG configurations to JSON
-
-**Terraform Operations:**
-- `terraform-plan.yml` - Run plan on PRs (with AWS OIDC)
-- `terraform-apply-with-approval.yml` - Apply with manual approval
-
-**API Management:**
-- `apply-owners.yml` - Apply resource owner assignments
-- `apply-labels.yml` - Deploy governance labels
-- `apply-risk-rules.yml` - Apply risk rules (SOD policies)
-- `apply-admin-labels.yml` - Auto-label admin entitlements
-- `import-risk-rules.yml` - Import risk rules from Okta
-
-**Validation:**
 - `validate-pr.yml` - YAML syntax, security scanning
-- `validate-label-mappings.yml` - Label configuration validation
 
 ### Python Scripts
 
@@ -618,7 +625,7 @@ terraform plan
 ### Apply Changes with Approval
 ```bash
 # Trigger manual apply workflow (requires approval)
-gh workflow run terraform-apply-with-approval.yml \
+gh workflow run tf-apply.yml \
   -f environment=mycompany
 ```
 
@@ -629,7 +636,7 @@ python3 scripts/sync_owner_mappings.py \
   --output environments/mycompany/config/owner_mappings.json
 
 # Apply to Okta
-gh workflow run apply-owners.yml \
+gh workflow run oig-owners.yml \
   -f environment=mycompany \
   -f dry_run=false
 ```
@@ -641,14 +648,15 @@ python3 scripts/sync_label_mappings.py \
   --output environments/mycompany/config/label_mappings.json
 
 # Apply to Okta
-gh workflow run apply-labels-from-config.yml \
+gh workflow run labels-apply-from-config.yml \
   -f environment=mycompany \
   -f dry_run=false
 ```
 
 ### Auto-Label Admin Entitlements
 ```bash
-gh workflow run apply-admin-labels.yml \
+gh workflow run labels-apply.yml \
+  -f label_type=admin \
   -f environment=mycompany \
   -f dry_run=false
 ```

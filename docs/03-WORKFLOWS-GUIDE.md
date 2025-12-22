@@ -1,8 +1,14 @@
 # Workflows Guide - Which Workflow When?
 
-**Problem:** 12 workflows, which one do I use?
+**Problem:** 21 workflows, which one do I use?
 
 **Solution:** This guide! Find your task below and we'll tell you exactly which workflow to run.
+
+**Naming Convention:** Workflows use category prefixes for easy searchability:
+- `tf-*` - Terraform operations
+- `oig-*` - OIG/Governance operations
+- `labels-*` - Label management
+- `migrate-*` - Cross-org migration
 
 ---
 
@@ -14,10 +20,10 @@ These run automatically when you create PRs or merge to main:
 
 | Workflow | Triggers On | What It Does | Action Needed |
 |----------|-------------|--------------|---------------|
-| **terraform-plan.yml** | Pull Request, Push to main | Shows what would change | ✅ **Review output** |
+| **tf-plan.yml** | Pull Request, Push to main | Shows what would change | ✅ **Review output** |
 | **validate-pr.yml** | Pull Request | Validates YAML, security scan | ✅ **Fix any errors** |
-| **validate-label-mappings.yml** | PR with label changes | Validates JSON syntax | ✅ **Fix syntax errors** |
-| **apply-labels-from-config.yml** (dry-run) | Merge to main (if labels changed) | Shows label changes | ✅ **Review, then manual apply** |
+| **labels-validate.yml** | PR with label changes | Validates JSON syntax | ✅ **Fix syntax errors** |
+| **labels-apply-from-config.yml** (dry-run) | Merge to main (if labels changed) | Shows label changes | ✅ **Review, then manual apply** |
 
 **Key Point:** These workflows run automatically but **DON'T** change anything in Okta. They only validate and preview.
 
@@ -28,14 +34,15 @@ These require you to manually run them:
 | Workflow | When to Run | What It Does | Safety |
 |----------|-------------|--------------|---------|
 | **import-all-resources.yml** | Initial setup, weekly drift check | Import from Okta to code | ✅ Safe (read-only) |
-| **terraform-apply-with-approval.yml** | After merging Terraform changes | **Creates/updates/deletes** Okta resources | ⚠️ **Changes Okta!** |
-| **apply-owners.yml** | After editing owner_mappings.json | Assigns resource owners | ⚠️ **Changes Okta!** |
-| **apply-labels-from-config.yml** (apply) | After reviewing auto-dry-run | Applies labels to resources | ⚠️ **Changes Okta!** |
-| **apply-admin-labels.yml** | Initial setup or ad-hoc | Auto-labels admin entitlements | ⚠️ **Changes Okta!** |
-| **sync-labels.yml** | Before editing labels | Syncs current labels to code | ✅ Safe (read-only) |
+| **tf-apply.yml** | After merging Terraform changes | **Creates/updates/deletes** Okta resources | ⚠️ **Changes Okta!** |
+| **oig-owners.yml** | After editing owner_mappings.json | Assigns resource owners | ⚠️ **Changes Okta!** |
+| **labels-apply-from-config.yml** (apply) | After reviewing auto-dry-run | Applies labels to resources | ⚠️ **Changes Okta!** |
+| **labels-apply.yml** | Initial setup or ad-hoc | Auto-labels admin entitlements | ⚠️ **Changes Okta!** |
+| **labels-sync.yml** | Before editing labels | Syncs current labels to code | ✅ Safe (read-only) |
 | **export-oig.yml** | Backup, audit | Exports OIG to JSON | ✅ Safe (read-only) |
 | **fix-bundle-campaign-errors.yml** | When bundles have errors | Fixes stale campaign refs | ⚠️ **Changes Okta!** |
 | **governance-setup.yml** | Initial OIG setup | Creates baseline governance | ⚠️ **Changes Okta!** |
+| **migrate-cross-org.yml** | Copy resources between orgs | Migrates groups, memberships, grants | ⚠️ **Changes Okta!** |
 
 **Key Point:** Manual workflows that "Change Okta" require you to explicitly trigger them. This prevents accidental changes.
 
@@ -52,7 +59,7 @@ Here's what happens from PR to production:
 
 3. CREATE PR
    └─> You: Push branch, create PR
-   └─> ⚡ AUTO: terraform-plan.yml runs
+   └─> ⚡ AUTO: tf-plan.yml runs
    └─> ⚡ AUTO: validate-pr.yml runs
    └─> 👀 You: Review plan output
 
@@ -62,11 +69,11 @@ Here's what happens from PR to production:
 
 5. MERGE TO MAIN
    └─> You: Click merge button
-   └─> ⚡ AUTO: terraform-plan.yml runs again
-   └─> ⚡ AUTO: If labels changed, apply-labels-from-config.yml runs (dry-run)
+   └─> ⚡ AUTO: tf-plan.yml runs again
+   └─> ⚡ AUTO: If labels changed, labels-apply-from-config.yml runs (dry-run)
 
 6. APPLY TO OKTA (MANUAL!)
-   └─> 🎯 YOU MUST: Run terraform-apply-with-approval.yml manually
+   └─> 🎯 YOU MUST: Run tf-apply.yml manually
    └─> ⏸️ WAIT: Approval gate (if configured)
    └─> ✅ APPLY: Changes applied to Okta
 ```
@@ -82,12 +89,13 @@ Here's what happens from PR to production:
 | I want to... | Workflow to Use | Time |
 |-------------|-----------------|------|
 | **Import my Okta org** | `import-all-resources.yml` | 5 min |
-| **Apply my changes** | `terraform-apply-with-approval.yml` | 3 min |
-| **Sync resource owners** | `apply-owners.yml` | 2 min |
-| **Manage labels** | `apply-labels-from-config.yml` | 2 min |
-| **Auto-label admin stuff** | `apply-admin-labels.yml` | 3 min |
+| **Apply my changes** | `tf-apply.yml` | 3 min |
+| **Sync resource owners** | `oig-owners.yml` | 2 min |
+| **Manage labels** | `labels-apply-from-config.yml` | 2 min |
+| **Auto-label admin stuff** | `labels-apply.yml` (label_type=admin) | 3 min |
 | **Export for backup** | `export-oig.yml` | 2 min |
 | **Fix bundle errors** | `fix-bundle-campaign-errors.yml` | 5 min |
+| **Copy resources between orgs** | `migrate-cross-org.yml` | 5 min |
 
 ---
 
@@ -99,13 +107,13 @@ graph TD
     B -->|Import from Okta| C[import-all-resources.yml]
     B -->|Apply to Okta| D{What type of change?}
 
-    D -->|Terraform changes| E[terraform-apply-with-approval.yml]
+    D -->|Terraform changes| E[tf-apply.yml]
     D -->|Governance features| F{Which feature?}
 
-    F -->|Resource owners| G[apply-owners.yml]
-    F -->|Labels| H[apply-labels-from-config.yml]
-    F -->|Auto-label admins| I[apply-admin-labels.yml]
-    F -->|Sync labels| J[sync-labels.yml]
+    F -->|Resource owners| G[oig-owners.yml]
+    F -->|Labels| H[labels-apply-from-config.yml]
+    F -->|Auto-label admins| I[labels-apply.yml]
+    F -->|Sync labels| J[labels-sync.yml]
 
     A --> K{Having issues?}
     K -->|Bundle campaign errors| L[fix-bundle-campaign-errors.yml]
@@ -113,6 +121,9 @@ graph TD
 
     A --> N{Setting up?}
     N -->|Initial governance| O[governance-setup.yml]
+
+    A --> P{Cross-org migration?}
+    P -->|Copy groups/memberships/grants| Q[migrate-cross-org.yml]
 ```
 
 ---
@@ -174,7 +185,7 @@ gh workflow run import-all-resources.yml \
 - Applying entitlement bundle definitions
 - Applying access review configurations
 
-**Workflow:** `terraform-apply-with-approval.yml`
+**Workflow:** `tf-apply.yml`
 
 **What it does:**
 1. Checks out your code
@@ -188,11 +199,11 @@ gh workflow run import-all-resources.yml \
 
 ```bash
 # Via GitHub CLI
-gh workflow run terraform-apply-with-approval.yml \
+gh workflow run tf-apply.yml \
   -f environment=myenvironment
 
 # Or use GitHub web UI:
-# Actions → Terraform Apply with Approval → Run workflow
+# Actions → Terraform Apply → Run workflow
 ```
 
 **Parameters:**
@@ -216,7 +227,7 @@ gh workflow run terraform-apply-with-approval.yml \
 - Initial governance setup
 - Updating ownership assignments
 
-**Workflow:** `apply-owners.yml`
+**Workflow:** `oig-owners.yml`
 
 **What it does:**
 1. Reads `environments/{env}/config/owner_mappings.json`
@@ -227,12 +238,12 @@ gh workflow run terraform-apply-with-approval.yml \
 
 ```bash
 # Dry-run first (shows what would change)
-gh workflow run apply-owners.yml \
+gh workflow run oig-owners.yml \
   -f environment=myenvironment \
   -f dry_run=true
 
 # Review output, then apply for real
-gh workflow run apply-owners.yml \
+gh workflow run oig-owners.yml \
   -f environment=myenvironment \
   -f dry_run=false
 ```
@@ -308,7 +319,7 @@ gh workflow run apply-labels-from-config.yml \
 - Initial governance setup
 - Regular maintenance
 
-**Workflow:** `apply-admin-labels.yml`
+**Workflow:** `labels-apply.yml` with `label_type=admin`
 
 **What it does:**
 1. Scans entitlement bundles for "admin" keywords
@@ -320,17 +331,20 @@ gh workflow run apply-labels-from-config.yml \
 
 ```bash
 # Dry-run first
-gh workflow run apply-admin-labels.yml \
+gh workflow run labels-apply.yml \
+  -f label_type=admin \
   -f environment=myenvironment \
   -f dry_run=true
 
 # Apply for real
-gh workflow run apply-admin-labels.yml \
+gh workflow run labels-apply.yml \
+  -f label_type=admin \
   -f environment=myenvironment \
   -f dry_run=false
 ```
 
 **Parameters:**
+- `label_type` (required): Type of labels to apply (all or admin)
 - `environment` (required): Your environment name
 - `dry_run` (optional): Preview without applying (default: true)
 
@@ -351,7 +365,7 @@ gh workflow run apply-admin-labels.yml \
 - Drift detection for labels
 - Backup current label assignments
 
-**Workflow:** `sync-labels.yml`
+**Workflow:** `labels-sync.yml`
 
 **What it does:**
 1. Fetches all governance labels from Okta
@@ -362,7 +376,7 @@ gh workflow run apply-admin-labels.yml \
 **How to run:**
 
 ```bash
-gh workflow run sync-labels.yml \
+gh workflow run labels-sync.yml \
   -f environment=myenvironment \
   -f commit_changes=true
 ```
@@ -376,14 +390,14 @@ gh workflow run sync-labels.yml \
 **Use case:**
 ```bash
 # 1. Sync current state
-gh workflow run sync-labels.yml -f environment=myenv -f commit_changes=true
+gh workflow run labels-sync.yml -f environment=myenv -f commit_changes=true
 
 # 2. Edit label_mappings.json with changes
 
 # 3. Create PR and merge
 
 # 4. Apply changes
-gh workflow run apply-labels-from-config.yml -f environment=myenv -f dry_run=false
+gh workflow run labels-apply-from-config.yml -f environment=myenv -f dry_run=false
 ```
 
 ---
@@ -517,7 +531,7 @@ These run automatically, no manual trigger needed.
 
 ### 10. Terraform Plan (Auto on PR)
 
-**Workflow:** `terraform-plan.yml`
+**Workflow:** `tf-plan.yml`
 
 **Triggers:**
 - Automatically on pull request
@@ -552,7 +566,7 @@ These run automatically, no manual trigger needed.
 
 ### 12. Validate Label Mappings
 
-**Workflow:** `validate-label-mappings.yml`
+**Workflow:** `labels-validate.yml`
 
 **Triggers:**
 - Automatically on pull request (if label_mappings.json changed)
@@ -575,19 +589,20 @@ Print this for quick reference:
 TASK                              | WORKFLOW
 ------------------------------------------------------------------
 Import from Okta                  | import-all-resources.yml
-Apply Terraform changes           | terraform-apply-with-approval.yml
-Assign resource owners            | apply-owners.yml
-Apply governance labels           | apply-labels-from-config.yml
-Auto-label admin entitlements     | apply-admin-labels.yml
-Sync labels from Okta             | sync-labels.yml
+Apply Terraform changes           | tf-apply.yml
+Assign resource owners            | oig-owners.yml
+Apply governance labels           | labels-apply-from-config.yml
+Auto-label admin entitlements     | labels-apply.yml (label_type=admin)
+Sync labels from Okta             | labels-sync.yml
 Export for backup                 | export-oig.yml
 Fix bundle campaign errors        | fix-bundle-campaign-errors.yml
 Initial governance setup          | governance-setup.yml
+Copy resources between orgs       | migrate-cross-org.yml
 ------------------------------------------------------------------
 AUTO-TRIGGERED (no manual action needed):
-- terraform-plan.yml              | On PR/push
+- tf-plan.yml                     | On PR/push
 - validate-pr.yml                 | On PR
-- validate-label-mappings.yml     | On PR (label changes)
+- labels-validate.yml             | On PR (label changes)
 ```
 
 ---
@@ -607,7 +622,7 @@ gh workflow run governance-setup.yml \
   -f environment=myenvironment
 
 # 3. Apply to Okta
-gh workflow run terraform-apply-with-approval.yml \
+gh workflow run tf-apply.yml \
   -f environment=myenvironment
 ```
 
@@ -617,13 +632,13 @@ gh workflow run terraform-apply-with-approval.yml \
 # 1. Make changes locally
 vim environments/myenv/terraform/oig_entitlements.tf
 
-# 2. Create PR (terraform-plan.yml runs automatically)
+# 2. Create PR (tf-plan.yml runs automatically)
 gh pr create
 
 # 3. Merge after approval
 
 # 4. Apply changes
-gh workflow run terraform-apply-with-approval.yml \
+gh workflow run tf-apply.yml \
   -f environment=myenv
 ```
 
@@ -631,20 +646,20 @@ gh workflow run terraform-apply-with-approval.yml \
 
 ```bash
 # 1. Sync current state
-gh workflow run sync-labels.yml \
+gh workflow run labels-sync.yml \
   -f environment=myenv \
   -f commit_changes=true
 
 # 2. Edit label config
 vim environments/myenv/config/label_mappings.json
 
-# 3. Create PR (validate-label-mappings.yml runs automatically)
+# 3. Create PR (labels-validate.yml runs automatically)
 gh pr create
 
-# 4. Merge (apply-labels-from-config.yml auto-runs in dry-run mode)
+# 4. Merge (labels-apply-from-config.yml auto-runs in dry-run mode)
 
 # 5. Review dry-run output, then apply
-gh workflow run apply-labels-from-config.yml \
+gh workflow run labels-apply-from-config.yml \
   -f environment=myenv \
   -f dry_run=false
 ```
@@ -672,7 +687,7 @@ gh workflow run export-oig.yml \
 
 ### Q: Which workflow runs terraform apply?
 
-**A:** `terraform-apply-with-approval.yml`
+**A:** `tf-apply.yml`
 
 This is the ONLY workflow that applies Terraform changes to Okta.
 
@@ -701,12 +716,12 @@ terraform apply
 
 ```bash
 # See what would happen
-gh workflow run apply-owners.yml -f environment=myenv -f dry_run=true
+gh workflow run oig-owners.yml -f environment=myenv -f dry_run=true
 
 # Review output in Actions tab
 
 # Then apply for real
-gh workflow run apply-owners.yml -f environment=myenv -f dry_run=false
+gh workflow run oig-owners.yml -f environment=myenv -f dry_run=false
 ```
 
 ### Q: What if a workflow fails?
@@ -732,24 +747,38 @@ gh workflow run apply-owners.yml -f environment=myenv -f dry_run=false
 
 ## Summary
 
-**12 workflows, 3 categories:**
+**21 workflows, organized by category prefixes:**
 
-**Core (Use regularly):**
-- import-all-resources.yml
-- terraform-apply-with-approval.yml
-- apply-owners.yml
-- apply-labels-from-config.yml
+**Terraform (`tf-*`):**
+- tf-plan.yml - Auto-triggered on PR/push
+- tf-apply.yml - Manual trigger
+- tf-validate.yml - Validate configuration
 
-**Utility (Occasional):**
-- apply-admin-labels.yml
-- sync-labels.yml
-- export-oig.yml
-- fix-bundle-campaign-errors.yml
-- governance-setup.yml
+**OIG/Governance (`oig-*`):**
+- oig-owners.yml - Resource owners
+- oig-manage-entitlements.yml - Enable/disable entitlement management
+- oig-risk-rules-apply.yml - Apply risk rules
+- oig-risk-rules-import.yml - Import risk rules
 
-**Auto-triggered (No action needed):**
-- terraform-plan.yml
-- validate-pr.yml
-- validate-label-mappings.yml
+**Labels (`labels-*`):**
+- labels-apply.yml - Apply labels (all or admin)
+- labels-apply-from-config.yml - Apply from JSON config
+- labels-sync.yml - Sync from Okta
+- labels-validate.yml - Auto-triggered validation
+
+**Migration (`migrate-*`):**
+- migrate-cross-org.yml - Copy between orgs
+
+**Other:**
+- import-all-resources.yml - Import from Okta
+- export-oig.yml - Export to JSON
+- validate-pr.yml - Auto-triggered PR validation
+- governance-setup.yml - Initial setup
+- fix-bundle-campaign-errors.yml - Fix bundle errors
+- opa-plan.yml - OPA resource planning
+- deploy-oag-app.yml - Deploy OAG apps
+- deploy-scim-server.yml - Deploy SCIM server
+- sync-template.yml - Sync from template
+- generate-oauth-keys.yml - Generate OAuth keys
 
 **Need help deciding?** → See [Decision Tree](#-decision-tree) above!
