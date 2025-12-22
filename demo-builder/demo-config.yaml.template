@@ -1,0 +1,456 @@
+# =============================================================================
+# OKTA DEMO CONFIGURATION TEMPLATE
+# =============================================================================
+#
+# This file defines your complete Okta demo environment. Fill in the sections
+# below and run the generator to create Terraform files:
+#
+#   python scripts/build_demo.py --config demo-builder/demo-config.yaml
+#
+# For AI-assisted generation, fill out DEMO_WORKSHEET.md and paste to your
+# AI assistant with the prompt in ai-assisted/prompts/generate_demo_config.md
+#
+# =============================================================================
+
+version: "1.0"
+
+# =============================================================================
+# ENVIRONMENT SETTINGS
+# =============================================================================
+# These settings control where files are generated and basic configuration.
+
+environment:
+  # Name of your environment directory (e.g., "myorg", "demo-acme", "production")
+  # Files will be generated to: environments/{name}/terraform/
+  name: "myorg"
+
+  # Description for documentation and comments
+  description: "Demo environment for Acme Corp"
+
+  # Email domain for auto-generated user emails
+  # Example: "example.com" generates "john.doe@example.com"
+  email_domain: "example.com"
+
+# =============================================================================
+# OKTA CONNECTION (Optional)
+# =============================================================================
+# Leave empty to use environment variables or GitHub secrets.
+# NEVER put API tokens in this file - use OKTA_API_TOKEN env var.
+
+okta:
+  # Leave empty to use OKTA_ORG_NAME environment variable
+  org_name: ""
+  # Base URL (okta.com, oktapreview.com, okta-emea.com)
+  base_url: "okta.com"
+
+# =============================================================================
+# DEMO SCENARIO
+# =============================================================================
+# Describe your demo scenario. This helps with naming and documentation.
+
+scenario:
+  # Company/demo name
+  name: "Acme Corporation"
+
+  # Industry type - affects suggested apps and configurations
+  # Options: healthcare, financial_services, technology, retail, manufacturing,
+  #          government, education, media, other
+  industry: "technology"
+
+  # Company size affects user count suggestions
+  # Options: small (<50 users), medium (50-500), large (500+), enterprise (5000+)
+  company_size: "medium"
+
+# =============================================================================
+# ORGANIZATIONAL STRUCTURE
+# =============================================================================
+# Define departments with managers and employees.
+# Each department automatically creates a group.
+
+departments:
+  # -------------------------------------------------------------------------
+  # Engineering Department
+  # -------------------------------------------------------------------------
+  - name: "Engineering"
+    # Department manager (required)
+    manager:
+      first_name: "Jane"
+      last_name: "Smith"
+      title: "VP of Engineering"
+      # Optional: custom email (otherwise auto-generated)
+      # email: "jane.smith@example.com"
+
+    # Employees can be defined two ways:
+    #
+    # OPTION 1: Explicit list (for specific demo users)
+    employees:
+      - first_name: "Alice"
+        last_name: "Developer"
+        title: "Senior Software Engineer"
+      - first_name: "Bob"
+        last_name: "Backend"
+        title: "Backend Developer"
+      - first_name: "Charlie"
+        last_name: "Frontend"
+        title: "Frontend Developer"
+
+    # OPTION 2: Auto-generate (for bulk users)
+    # employees:
+    #   count: 10
+    #   title_pattern: "Software Engineer"
+    #   # Names are auto-generated as "Employee1", "Employee2", etc.
+
+  # -------------------------------------------------------------------------
+  # Marketing Department
+  # -------------------------------------------------------------------------
+  - name: "Marketing"
+    manager:
+      first_name: "Mike"
+      last_name: "Marketing"
+      title: "Marketing Director"
+    # Example using auto-generation
+    employees:
+      count: 3
+      title_pattern: "Marketing Specialist"
+
+  # -------------------------------------------------------------------------
+  # Finance Department
+  # -------------------------------------------------------------------------
+  - name: "Finance"
+    manager:
+      first_name: "Carol"
+      last_name: "CFO"
+      title: "Chief Financial Officer"
+    employees:
+      - first_name: "David"
+        last_name: "Accountant"
+        title: "Senior Accountant"
+      - first_name: "Eva"
+        last_name: "Analyst"
+        title: "Financial Analyst"
+
+  # -------------------------------------------------------------------------
+  # Add more departments as needed
+  # -------------------------------------------------------------------------
+  # - name: "Sales"
+  #   manager:
+  #     first_name: "Sam"
+  #     last_name: "Sales"
+  #     title: "VP of Sales"
+  #   employees:
+  #     count: 5
+  #     title_pattern: "Account Executive"
+
+# =============================================================================
+# ADDITIONAL USERS
+# =============================================================================
+# Users outside the department structure (contractors, executives, etc.)
+
+additional_users:
+  # Contractor example
+  - first_name: "Sam"
+    last_name: "Contractor"
+    email: "sam.contractor@example.com"  # Explicit email
+    user_type: "contractor"  # Creates a contractor user type
+    department: "Engineering"  # Still associated with a department
+    title: "Contract Developer"
+
+  # Executive example
+  - first_name: "Chris"
+    last_name: "CEO"
+    title: "Chief Executive Officer"
+    # No department - will be in Leadership group
+
+  # Staged user (not yet activated)
+  # - first_name: "New"
+  #   last_name: "Hire"
+  #   title: "Incoming Engineer"
+  #   status: "STAGED"
+
+# =============================================================================
+# GROUPS
+# =============================================================================
+# Department groups are created automatically.
+# Define additional groups for cross-department access.
+
+groups:
+  # Additional groups beyond department groups
+  additional:
+    # All employees group
+    - name: "All Employees"
+      description: "All full-time employees across departments"
+      # Include all users from these departments
+      include_departments: ["Engineering", "Marketing", "Finance"]
+
+    # Leadership group
+    - name: "Leadership"
+      description: "Department managers and executives"
+      # Automatically include all managers
+      include_managers: true
+      # Also include additional users with these titles
+      include_titles: ["CEO", "CFO", "CTO"]
+
+    # Contractors group
+    - name: "Contractors"
+      description: "External contractors and consultants"
+      # Include users with specific user_type
+      include_user_types: ["contractor"]
+
+    # Custom group with explicit members
+    # - name: "Project Alpha Team"
+    #   description: "Cross-functional project team"
+    #   members:
+    #     - "jane.smith@example.com"
+    #     - "mike.marketing@example.com"
+
+# =============================================================================
+# APPLICATIONS
+# =============================================================================
+# Define OAuth, SAML, and other applications.
+
+applications:
+  # -------------------------------------------------------------------------
+  # OAuth Web Application (Traditional Server-Side)
+  # -------------------------------------------------------------------------
+  - name: "salesforce"
+    type: "oauth_web"
+    label: "Salesforce CRM"
+    description: "Customer relationship management platform"
+    # Assign to these groups (department names or additional group names)
+    assign_to_groups: ["Marketing", "Leadership"]
+    settings:
+      redirect_uris:
+        - "https://login.salesforce.com/services/oauth2/callback"
+      # Optional: post_logout_redirect_uris, grant_types, etc.
+      grant_types: ["authorization_code", "refresh_token"]
+
+  # -------------------------------------------------------------------------
+  # OAuth Web Application (Developer Tool)
+  # -------------------------------------------------------------------------
+  - name: "github"
+    type: "oauth_web"
+    label: "GitHub Enterprise"
+    description: "Source code management and collaboration"
+    assign_to_groups: ["Engineering"]
+    settings:
+      redirect_uris:
+        - "https://github.example.com/oauth/callback"
+
+  # -------------------------------------------------------------------------
+  # OAuth Single Page Application (SPA)
+  # -------------------------------------------------------------------------
+  - name: "admin_dashboard"
+    type: "oauth_spa"
+    label: "Admin Dashboard"
+    description: "Internal administration portal"
+    assign_to_groups: ["Leadership"]
+    settings:
+      redirect_uris:
+        - "https://admin.example.com/callback"
+        - "http://localhost:3000/callback"  # Development
+      # SPAs use PKCE and no client secret
+      # These are set automatically by the generator
+
+  # -------------------------------------------------------------------------
+  # OAuth Service Application (Machine-to-Machine)
+  # -------------------------------------------------------------------------
+  - name: "payment_api"
+    type: "oauth_service"
+    label: "Payment Processing API"
+    description: "Backend payment processing service"
+    # Service apps don't get group assignments
+    settings:
+      # Client credentials flow - no redirect URIs needed
+      grant_types: ["client_credentials"]
+
+  # -------------------------------------------------------------------------
+  # Native/Mobile Application
+  # -------------------------------------------------------------------------
+  # - name: "mobile_app"
+  #   type: "oauth_native"
+  #   label: "Acme Mobile App"
+  #   description: "iOS and Android mobile application"
+  #   assign_to_groups: ["All Employees"]
+  #   settings:
+  #     redirect_uris:
+  #       - "com.acme.app:/callback"
+
+  # -------------------------------------------------------------------------
+  # SAML Application
+  # -------------------------------------------------------------------------
+  # - name: "workday"
+  #   type: "saml"
+  #   label: "Workday HCM"
+  #   description: "Human capital management"
+  #   assign_to_groups: ["All Employees"]
+  #   settings:
+  #     sso_url: "https://acme.workday.com/saml"
+  #     audience: "https://acme.workday.com"
+  #     recipient: "https://acme.workday.com/saml"
+  #     destination: "https://acme.workday.com/saml"
+
+# =============================================================================
+# OIG FEATURES (Okta Identity Governance)
+# =============================================================================
+# Requires OIG license. Set enabled: false if you don't have OIG.
+
+oig:
+  enabled: true
+
+  # -------------------------------------------------------------------------
+  # Entitlement Bundles
+  # -------------------------------------------------------------------------
+  # Define access packages. Note: Bundle ASSIGNMENTS (who gets them) are
+  # managed in Okta Admin UI, not Terraform.
+  entitlement_bundles:
+    - name: "Basic Employee Access"
+      description: "Standard access package for all employees"
+      # status defaults to "ACTIVE"
+
+    - name: "Engineering Tools Bundle"
+      description: "Developer tools and source code access"
+
+    - name: "Financial Systems Access"
+      description: "Access to financial applications and reporting"
+
+    - name: "Admin Access Bundle"
+      description: "Administrative access for IT staff"
+
+  # -------------------------------------------------------------------------
+  # Access Review Campaigns
+  # -------------------------------------------------------------------------
+  # Schedule periodic access certifications
+  access_reviews:
+    - name: "Q1 2025 Access Review"
+      description: "Quarterly access certification - Q1 2025"
+      # ISO 8601 date format
+      start_date: "2025-01-15T00:00:00Z"
+      end_date: "2025-02-15T23:59:59Z"
+      # USER_ACCESS_REVIEW or ENTITLEMENT_ACCESS_REVIEW
+      review_type: "USER_ACCESS_REVIEW"
+      # MANAGER, APPLICATION_OWNER, or specific user
+      reviewer_type: "MANAGER"
+
+    - name: "Q2 2025 Access Review"
+      description: "Quarterly access certification - Q2 2025"
+      start_date: "2025-04-15T00:00:00Z"
+      end_date: "2025-05-15T23:59:59Z"
+      review_type: "USER_ACCESS_REVIEW"
+      reviewer_type: "MANAGER"
+
+  # -------------------------------------------------------------------------
+  # Governance Configuration
+  # -------------------------------------------------------------------------
+  # These features require API scripts (not Terraform)
+  governance:
+    # Generate owner_mappings.json for resource owners
+    enable_owner_assignments: true
+    # Generate label_mappings.json for governance labels
+    enable_labels: true
+
+# =============================================================================
+# POLICIES (Optional)
+# =============================================================================
+# Define sign-on and password policies.
+
+policies:
+  # -------------------------------------------------------------------------
+  # Sign-On Policies
+  # -------------------------------------------------------------------------
+  sign_on:
+    - name: "MFA Required for Admins"
+      description: "Require MFA for administrative access"
+      apply_to_groups: ["Leadership"]
+      require_mfa: true
+      # mfa_prompt: "ALWAYS" or "SESSION"
+
+    # - name: "Passwordless for Mobile"
+    #   description: "Enable passwordless for mobile users"
+    #   apply_to_groups: ["All Employees"]
+    #   allow_passwordless: true
+
+  # -------------------------------------------------------------------------
+  # Password Policies
+  # -------------------------------------------------------------------------
+  password:
+    - name: "Standard Password Policy"
+      description: "Default password requirements"
+      min_length: 12
+      require_lowercase: true
+      require_uppercase: true
+      require_number: true
+      require_symbol: true
+      # password_expire_days: 90
+      # password_history_count: 5
+      # lockout_attempts: 5
+
+# =============================================================================
+# INFRASTRUCTURE (Optional - AWS Resources)
+# =============================================================================
+# Enable to generate AWS infrastructure for advanced demos.
+
+infrastructure:
+  enabled: false
+
+  # -------------------------------------------------------------------------
+  # Active Directory
+  # -------------------------------------------------------------------------
+  active_directory:
+    enabled: false
+    domain_name: "demo.local"
+    netbios_name: "DEMO"
+    # admin_password: Use AD_ADMIN_PASSWORD env var
+    # Creates: VPC, subnets, security groups, EC2 domain controller
+
+  # -------------------------------------------------------------------------
+  # SCIM Server
+  # -------------------------------------------------------------------------
+  scim_server:
+    enabled: false
+    # Creates: ECS Fargate service with SCIM endpoints
+    # See: environments/myorg/infrastructure/scim-server/
+
+  # -------------------------------------------------------------------------
+  # Okta Privileged Access (OPA)
+  # -------------------------------------------------------------------------
+  opa:
+    enabled: false
+    # Requires separate oktapam provider credentials
+    # Creates: Resource groups, projects, security policies
+
+# =============================================================================
+# OUTPUT OPTIONS
+# =============================================================================
+# Control how Terraform files are generated.
+
+output:
+  # Output directory (supports template variables)
+  directory: "environments/{{ environment.name }}/terraform"
+
+  # Create separate files (users.tf, groups.tf) vs single demo.tf
+  separate_files: true
+
+  # Include explanatory comments in generated code
+  include_comments: true
+
+  # Run terraform fmt and validate after generation
+  validate_on_generate: true
+
+  # Backup existing files before overwriting
+  backup_existing: true
+
+  # Prefix for generated files (e.g., "demo_" creates "demo_users.tf")
+  file_prefix: ""
+
+# =============================================================================
+# END OF CONFIGURATION
+# =============================================================================
+#
+# Next Steps:
+# 1. Save this file as demo-builder/my-demo.yaml
+# 2. Run: python scripts/build_demo.py --config demo-builder/my-demo.yaml
+# 3. Review generated files in environments/{name}/terraform/
+# 4. Run: terraform init && terraform plan && terraform apply
+#
+# For help: python scripts/build_demo.py --help
+# =============================================================================

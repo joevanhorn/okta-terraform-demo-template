@@ -1,0 +1,298 @@
+# =============================================================================
+# HEALTHCARE DEMO
+# =============================================================================
+# A complete demo environment for a healthcare organization.
+# Includes: Clinical apps, HIPAA-compliant access, patient data systems
+#
+# To use:
+#   cp demo-builder/examples/healthcare-demo.yaml demo-builder/my-demo.yaml
+#   # Edit as needed
+#   python scripts/build_demo.py --config demo-builder/my-demo.yaml
+# =============================================================================
+
+version: "1.0"
+
+environment:
+  name: "healthcare-demo"
+  description: "Regional Medical Center - Healthcare Provider Demo"
+  email_domain: "regionalmed.example.com"
+
+scenario:
+  name: "Regional Medical Center"
+  industry: "healthcare"
+  company_size: "large"
+
+# =============================================================================
+# ORGANIZATIONAL STRUCTURE
+# =============================================================================
+
+departments:
+  - name: "Clinical"
+    manager:
+      first_name: "Dr. Sarah"
+      last_name: "Williams"
+      title: "Chief Medical Officer"
+    employees:
+      - first_name: "Dr. James"
+        last_name: "Chen"
+        title: "Attending Physician"
+      - first_name: "Dr. Emily"
+        last_name: "Rodriguez"
+        title: "Resident Physician"
+      - first_name: "Maria"
+        last_name: "Nurse"
+        title: "Registered Nurse"
+      - first_name: "Jennifer"
+        last_name: "RN"
+        title: "Charge Nurse"
+
+  - name: "Nursing"
+    manager:
+      first_name: "Patricia"
+      last_name: "Johnson"
+      title: "Chief Nursing Officer"
+    employees:
+      count: 5
+      title_pattern: "Registered Nurse"
+
+  - name: "Pharmacy"
+    manager:
+      first_name: "Dr. Robert"
+      last_name: "Pharmacist"
+      title: "Chief Pharmacist"
+    employees:
+      - first_name: "Lisa"
+        last_name: "PharmD"
+        title: "Clinical Pharmacist"
+      - first_name: "David"
+        last_name: "Tech"
+        title: "Pharmacy Technician"
+
+  - name: "IT"
+    manager:
+      first_name: "Michael"
+      last_name: "Tech"
+      title: "Chief Information Officer"
+    employees:
+      - first_name: "Alex"
+        last_name: "Security"
+        title: "Security Engineer"
+      - first_name: "Taylor"
+        last_name: "Admin"
+        title: "System Administrator"
+
+  - name: "Administration"
+    manager:
+      first_name: "Susan"
+      last_name: "Admin"
+      title: "Chief Operating Officer"
+    employees:
+      - first_name: "Karen"
+        last_name: "HR"
+        title: "HR Director"
+      - first_name: "Tom"
+        last_name: "Finance"
+        title: "CFO"
+
+  - name: "Medical Records"
+    manager:
+      first_name: "Angela"
+      last_name: "Records"
+      title: "Director of Health Information"
+    employees:
+      count: 3
+      title_pattern: "Health Information Specialist"
+
+additional_users:
+  - first_name: "Contract"
+    last_name: "Physician"
+    user_type: "contractor"
+    title: "Locum Tenens Physician"
+    department: "Clinical"
+
+  - first_name: "Travel"
+    last_name: "Nurse"
+    user_type: "contractor"
+    title: "Travel Nurse"
+    department: "Nursing"
+
+# =============================================================================
+# GROUPS
+# =============================================================================
+
+groups:
+  additional:
+    - name: "Clinical Staff"
+      description: "All patient-facing clinical staff"
+      include_departments: ["Clinical", "Nursing", "Pharmacy"]
+
+    - name: "Prescribers"
+      description: "Staff authorized to prescribe medications"
+      include_titles: ["Attending Physician", "Resident Physician", "Chief Medical Officer"]
+
+    - name: "Administrators"
+      description: "Hospital administrators and leadership"
+      include_managers: true
+
+    - name: "PHI Access"
+      description: "Staff authorized for Protected Health Information"
+      include_departments: ["Clinical", "Nursing", "Medical Records", "Pharmacy"]
+
+    - name: "IT Staff"
+      description: "Information technology team"
+      include_departments: ["IT"]
+
+    - name: "Contractors"
+      description: "Contract and temporary staff"
+      include_user_types: ["contractor"]
+
+# =============================================================================
+# APPLICATIONS
+# =============================================================================
+
+applications:
+  - name: "epic_ehr"
+    type: "oauth_web"
+    label: "Epic EHR"
+    description: "Electronic Health Records system"
+    assign_to_groups: ["Clinical Staff", "Medical Records"]
+    settings:
+      redirect_uris:
+        - "https://epic.regionalmed.example.com/oauth/callback"
+      grant_types: ["authorization_code", "refresh_token"]
+
+  - name: "cpoe"
+    type: "oauth_web"
+    label: "Computerized Provider Order Entry"
+    description: "Medication and order management"
+    assign_to_groups: ["Prescribers", "Pharmacy"]
+    settings:
+      redirect_uris:
+        - "https://cpoe.regionalmed.example.com/callback"
+
+  - name: "pacs"
+    type: "oauth_web"
+    label: "PACS Imaging"
+    description: "Medical imaging and radiology"
+    assign_to_groups: ["Clinical Staff"]
+    settings:
+      redirect_uris:
+        - "https://pacs.regionalmed.example.com/callback"
+
+  - name: "patient_portal"
+    type: "oauth_spa"
+    label: "Patient Portal"
+    description: "Patient-facing health portal"
+    assign_to_groups: ["Medical Records"]
+    settings:
+      redirect_uris:
+        - "https://myhealth.regionalmed.example.com/callback"
+
+  - name: "lab_system"
+    type: "oauth_web"
+    label: "Laboratory Information System"
+    description: "Lab results and orders"
+    assign_to_groups: ["Clinical Staff", "Pharmacy"]
+    settings:
+      redirect_uris:
+        - "https://lab.regionalmed.example.com/callback"
+
+  - name: "hl7_integration"
+    type: "oauth_service"
+    label: "HL7 Integration API"
+    description: "Healthcare data integration service"
+    settings:
+      grant_types: ["client_credentials"]
+
+  - name: "scheduling"
+    type: "oauth_spa"
+    label: "Staff Scheduling"
+    description: "Employee scheduling and time management"
+    assign_to_groups: ["Administrators", "Nursing"]
+    settings:
+      redirect_uris:
+        - "https://schedule.regionalmed.example.com/callback"
+
+# =============================================================================
+# OIG FEATURES
+# =============================================================================
+
+oig:
+  enabled: true
+
+  entitlement_bundles:
+    - name: "Clinical Access Bundle"
+      description: "Standard access for clinical staff"
+
+    - name: "PHI Access Bundle"
+      description: "Access to Protected Health Information"
+
+    - name: "Prescriber Bundle"
+      description: "Medication prescribing privileges"
+
+    - name: "Administrative Bundle"
+      description: "Hospital administration access"
+
+    - name: "IT Admin Bundle"
+      description: "IT system administration access"
+
+  access_reviews:
+    - name: "HIPAA Quarterly Review - Q1 2025"
+      description: "Quarterly HIPAA access certification"
+      start_date: "2025-01-15T00:00:00Z"
+      end_date: "2025-02-15T23:59:59Z"
+      review_type: "USER_ACCESS_REVIEW"
+      reviewer_type: "MANAGER"
+
+    - name: "HIPAA Quarterly Review - Q2 2025"
+      description: "Quarterly HIPAA access certification"
+      start_date: "2025-04-15T00:00:00Z"
+      end_date: "2025-05-15T23:59:59Z"
+      review_type: "USER_ACCESS_REVIEW"
+      reviewer_type: "MANAGER"
+
+    - name: "Annual Prescriber Certification"
+      description: "Annual certification of prescriber access"
+      start_date: "2025-06-01T00:00:00Z"
+      end_date: "2025-06-30T23:59:59Z"
+      review_type: "ENTITLEMENT_ACCESS_REVIEW"
+      reviewer_type: "APPLICATION_OWNER"
+
+  governance:
+    enable_owner_assignments: true
+    enable_labels: true
+
+# =============================================================================
+# POLICIES
+# =============================================================================
+
+policies:
+  sign_on:
+    - name: "MFA for PHI Access"
+      description: "Require MFA for Protected Health Information access"
+      apply_to_groups: ["PHI Access"]
+      require_mfa: true
+
+    - name: "MFA for Prescribers"
+      description: "Require MFA for prescription systems"
+      apply_to_groups: ["Prescribers"]
+      require_mfa: true
+
+  password:
+    - name: "HIPAA Password Policy"
+      description: "HIPAA-compliant password requirements"
+      min_length: 12
+      require_lowercase: true
+      require_uppercase: true
+      require_number: true
+      require_symbol: true
+
+# =============================================================================
+# OUTPUT
+# =============================================================================
+
+output:
+  directory: "environments/{{ environment.name }}/terraform"
+  separate_files: true
+  include_comments: true
+  validate_on_generate: true

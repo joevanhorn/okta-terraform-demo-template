@@ -1,0 +1,186 @@
+name: Build Demo from Config
+
+on:
+  workflow_dispatch:
+    inputs:
+      config_file:
+        description: 'Path to demo config file (e.g., demo-builder/my-demo.yaml)'
+        required: true
+        type: string
+      environment:
+        description: 'GitHub Environment for secrets (must match config environment.name)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Preview changes without creating PR'
+        required: false
+        type: boolean
+        default: true
+      validate:
+        description: 'Run terraform validate after generation'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  validate-config:
+    name: Validate Configuration
+    runs-on: ubuntu-latest
+
+    outputs:
+      env_name: ${{ steps.parse.outputs.env_name }}
+      output_dir: ${{ steps.parse.outputs.output_dir }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          pip install pyyaml jsonschema
+
+      - name: Validate Config File Exists
+        run: |
+          if [ ! -f "${{ inputs.config_file }}" ]; then
+            echo "Error: Config file not found: ${{ inputs.config_file }}"
+            exit 1
+          fi
+          echo "Config file found: ${{ inputs.config_file }}"
+
+      - name: Parse Config and Validate
+        id: parse
+        run: |
+          python scripts/build_demo.py \
+            --config "${{ inputs.config_file }}" \
+            --schema-check
+
+          # Extract environment name from config
+          ENV_NAME=$(python -c "
+          import yaml
+          with open('${{ inputs.config_file }}') as f:
+              config = yaml.safe_load(f)
+          print(config.get('environment', {}).get('name', 'myorg'))
+          ")
+          echo "env_name=$ENV_NAME" >> $GITHUB_OUTPUT
+          echo "output_dir=environments/$ENV_NAME/terraform" >> $GITHUB_OUTPUT
+          echo "Environment name: $ENV_NAME"
+
+  generate-terraform:
+    name: Generate Terraform Files
+    needs: validate-config
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          pip install pyyaml jsonschema
+
+      - name: Generate Terraform Files
+        run: |
+          echo "Generating Terraform from: ${{ inputs.config_file }}"
+          echo "Output directory: ${{ needs.validate-config.outputs.output_dir }}"
+
+          python scripts/build_demo.py \
+            --config "${{ inputs.config_file }}" \
+            --no-backup
+
+      - name: List Generated Files
+        run: |
+          echo "Generated files:"
+          ls -la ${{ needs.validate-config.outputs.output_dir }}/*.tf 2>/dev/null || echo "No .tf files found"
+
+      - name: Set up Terraform
+        if: inputs.validate
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.0
+
+      - name: Terraform Format
+        if: inputs.validate
+        working-directory: ${{ needs.validate-config.outputs.output_dir }}
+        run: terraform fmt
+
+      - name: Terraform Init (No Backend)
+        if: inputs.validate
+        working-directory: ${{ needs.validate-config.outputs.output_dir }}
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        if: inputs.validate
+        working-directory: ${{ needs.validate-config.outputs.output_dir }}
+        run: terraform validate
+
+      - name: Show Changes (Dry Run)
+        if: inputs.dry_run
+        run: |
+          echo "=== DRY RUN MODE ==="
+          echo ""
+          echo "The following files would be created/modified:"
+          git status --short
+          echo ""
+          echo "Generated Terraform files:"
+          for f in ${{ needs.validate-config.outputs.output_dir }}/*.tf; do
+            if [ -f "$f" ]; then
+              echo ""
+              echo "=== $f ==="
+              head -50 "$f"
+              echo "... (truncated)"
+            fi
+          done
+
+      - name: Create Pull Request
+        if: "!inputs.dry_run"
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "feat: Generate demo environment from ${{ inputs.config_file }}"
+          title: "feat: Demo environment - ${{ needs.validate-config.outputs.env_name }}"
+          body: |
+            ## Demo Environment Generated
+
+            **Config file:** `${{ inputs.config_file }}`
+            **Environment:** `${{ needs.validate-config.outputs.env_name }}`
+            **Output directory:** `${{ needs.validate-config.outputs.output_dir }}`
+
+            ### Generated Files
+
+            Check the Files Changed tab for the complete list of generated Terraform files.
+
+            ### Next Steps
+
+            1. Review the generated files
+            2. Merge this PR
+            3. Run `tf-apply.yml` workflow to apply to Okta
+
+            ---
+            Generated by [Demo Builder](.github/workflows/build-demo.yml)
+          branch: demo/${{ needs.validate-config.outputs.env_name }}-${{ github.run_number }}
+          labels: demo-builder,terraform
+
+      - name: Summary
+        run: |
+          echo "## Demo Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Config:** \`${{ inputs.config_file }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** \`${{ needs.validate-config.outputs.env_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry Run:** ${{ inputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Validated:** ${{ inputs.validate }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "No PR created (dry run mode)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "PR created with generated files" >> $GITHUB_STEP_SUMMARY
+          fi
