@@ -1831,6 +1831,158 @@ resource "okta_app_group_assignment" "github_engineering" {
 
 ---
 
+## Backup and Restore Patterns
+
+When users ask about backup or restore operations, guide them to the correct approach.
+
+### Two Backup Approaches
+
+**Resource-Based (Full DR):**
+- Exports resources to CSV/JSON/Terraform files
+- Portable, readable, selective restore
+- Use for: disaster recovery, audit, cross-bucket migration
+
+**State-Based (Quick Rollback):**
+- Captures S3 state version ID
+- Fast restore, preserves resource IDs
+- Use for: quick rollback after bad apply
+
+### When to Use Each
+
+| Scenario | Recommended Approach |
+|----------|---------------------|
+| Quick rollback after failed deploy | State-based |
+| Full disaster recovery | Resource-based |
+| Audit: what did we have on date X? | Resource-based |
+| Migrating to new S3 bucket | Resource-based |
+| Someone deleted resources | Resource-based |
+
+### Backup Commands
+
+```bash
+# Resource-based backup
+gh workflow run backup-tenant.yml \
+  -f environment=myorg \
+  -f commit_changes=true
+
+# State-based backup
+gh workflow run backup-tenant-state.yml \
+  -f environment=myorg \
+  -f commit_changes=true
+```
+
+### Restore Commands
+
+```bash
+# Resource-based restore
+gh workflow run restore-tenant.yml \
+  -f environment=myorg \
+  -f snapshot_id=latest \
+  -f resources=all \
+  -f dry_run=true
+
+# State-based restore (state only)
+gh workflow run restore-tenant-state.yml \
+  -f environment=myorg \
+  -f snapshot_id=latest \
+  -f restore_mode=state-only \
+  -f dry_run=true
+
+# State-based restore (full - state + apply)
+gh workflow run restore-tenant-state.yml \
+  -f environment=myorg \
+  -f snapshot_id=latest \
+  -f restore_mode=full-restore \
+  -f dry_run=false
+```
+
+**Note:** Always use dry_run=true first to preview changes!
+
+**Documentation:** `backup-restore/README.md`
+
+---
+
+## Cross-Org Migration Patterns
+
+When users need to copy resources between Okta organizations:
+
+### Migrate Groups
+
+```bash
+# Export groups to Terraform
+python scripts/export_groups_to_terraform.py \
+  --output environments/target/terraform/groups_imported.tf \
+  --exclude-system
+
+# Via workflow
+gh workflow run migrate-cross-org.yml \
+  -f resource_type=groups \
+  -f source_environment=SourceEnv \
+  -f target_environment=TargetEnv \
+  -f dry_run=true
+```
+
+### Migrate Group Memberships
+
+```bash
+# Export from source org
+python scripts/copy_group_memberships.py export \
+  --output memberships.json
+
+# Import to target org
+python scripts/copy_group_memberships.py import \
+  --input memberships.json \
+  --dry-run
+```
+
+### Migrate Entitlement Bundle Grants
+
+```bash
+# Export grants
+python scripts/copy_grants_between_orgs.py export \
+  --output grants_export.json
+
+# Import grants
+python scripts/copy_grants_between_orgs.py import \
+  --input grants_export.json \
+  --exclude-apps "System App" \
+  --dry-run
+```
+
+**Recommended Order:**
+1. Groups first (creates group definitions)
+2. Memberships second (assigns users to groups)
+3. Grants third (assigns bundles to principals)
+
+**Documentation:** `docs/CROSS_ORG_MIGRATION.md`
+
+---
+
+## Entitlement Settings API (Beta)
+
+When users ask about enabling entitlement management on apps:
+
+```bash
+# List all apps and their status
+python scripts/manage_entitlement_settings.py --action list
+
+# Enable on specific app
+python scripts/manage_entitlement_settings.py \
+  --action enable \
+  --app-id 0oaXXXXXXXX \
+  --dry-run
+
+# Workflow: auto-detect and enable
+gh workflow run oig-manage-entitlements.yml \
+  -f mode=auto \
+  -f environment=myorg \
+  -f dry_run=true
+```
+
+**Warning:** Disabling removes ALL entitlement data for that app!
+
+---
+
 ## Summary: Your Core Directive
 
 You are an Okta Terraform code generator. Generate clean, production-ready HCL code following these rules:

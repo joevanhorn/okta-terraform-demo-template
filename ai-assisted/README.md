@@ -205,6 +205,9 @@ Use pre-written prompts and context files with any AI assistant. No installation
 | **Add Users** | `prompts/add_users.md` | Adding users to existing setup |
 | **Create Application** | `prompts/create_app.md` | OAuth/OIDC app configuration |
 | **OIG Setup** | `prompts/oig_setup.md` | Identity Governance features |
+| **Backup & Restore** | `prompts/backup_restore.md` | Disaster recovery, snapshots, rollback |
+| **Cross-Org Migration** | `prompts/cross_org_migration.md` | Copy groups/memberships between orgs |
+| **Risk Rules** | `prompts/manage_risk_rules.md` | SOD policies and compliance controls |
 
 #### 2. Prepare Context
 
@@ -674,7 +677,11 @@ ai-assisted/
 │   ├── deploy_infrastructure.md       # AWS infrastructure for Active Directory
 │   ├── add_users.md                   # Add users to existing setup
 │   ├── create_app.md                  # Create OAuth applications
-│   └── oig_setup.md                   # OIG features (entitlements, reviews)
+│   ├── oig_setup.md                   # OIG features (entitlements, reviews)
+│   ├── backup_restore.md              # Backup and restore operations
+│   ├── cross_org_migration.md         # Cross-org migration workflows
+│   ├── deploy_scim_server.md          # SCIM server deployment
+│   └── manage_risk_rules.md           # Risk rules and SOD policies
 │
 ├── context/                           # Context files for AI
 │   ├── repository_structure.md        # How the repo is organized
@@ -816,6 +823,40 @@ ai-assisted/
 **Time to generate:** 5-10 minutes (Tier 1) or 2-3 minutes (Tier 2)
 
 **Important:** Infrastructure goes in `environments/{env}/infrastructure/`, NOT `terraform/` directory
+
+### 7. Backup and Restore
+**File:** `prompts/backup_restore.md`
+
+**Use for:**
+- Setting up backup workflows
+- Disaster recovery planning
+- Point-in-time snapshots
+- Tenant cloning
+- Quick rollback operations
+
+**Covers:**
+- Resource-based backup (full DR capability)
+- State-based backup (quick rollback)
+- Scheduled backups
+- Selective restore
+
+**Time to generate:** 2-3 minutes (Tier 1) or 1 minute (Tier 2)
+
+### 8. Cross-Org Migration
+**File:** `prompts/cross_org_migration.md`
+
+**Use for:**
+- Copying groups between Okta orgs
+- Migrating group memberships
+- Copying entitlement bundle grants
+- Environment cloning
+
+**Covers:**
+- Migration order (groups → memberships → grants)
+- Name-based matching between orgs
+- Verification and troubleshooting
+
+**Time to generate:** 2-3 minutes (Tier 1) or 1 minute (Tier 2)
 
 ---
 
@@ -1116,6 +1157,6 @@ Filename: complete_demo.tf
 
 ---
 
-**Last Updated:** 2025-11-12
+**Last Updated:** 2025-12-22
 
 **Happy Generating! 🚀**
