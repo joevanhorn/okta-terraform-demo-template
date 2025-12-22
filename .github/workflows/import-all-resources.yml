@@ -358,10 +358,15 @@ jobs:
           fi
 
           # Create terraform.tfvars
+          # Note: OPA variables prevent terraform init from hanging on interactive prompts
+          # even if OPA provider is commented out but variables are defined
           cat > terraform.tfvars << EOF
           okta_org_name  = "${{ secrets.OKTA_ORG_NAME }}"
           okta_base_url  = "${{ secrets.OKTA_BASE_URL }}"
           okta_api_token = "${{ secrets.OKTA_API_TOKEN }}"
+          oktapam_key    = "${{ secrets.OKTAPAM_KEY }}"
+          oktapam_secret = "${{ secrets.OKTAPAM_SECRET }}"
+          oktapam_team   = "${{ secrets.OKTAPAM_TEAM }}"
           EOF
 
           echo "🔧 Initializing Terraform with S3 backend..."
@@ -491,6 +496,8 @@ jobs:
 
       - name: "Step 9: Create Pull Request with Changes"
         if: inputs.commit_changes == 'true' && success()
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           echo ""
           echo "=================================================================="
