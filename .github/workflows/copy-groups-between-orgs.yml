@@ -1,0 +1,240 @@
+name: Copy Groups Between Orgs
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_environment:
+        description: 'Source environment (to export groups from)'
+        required: true
+        type: string
+      target_environment:
+        description: 'Target environment (to create groups in)'
+        required: true
+        type: string
+      name_pattern:
+        description: 'Group name pattern to filter (regex, optional)'
+        required: false
+        type: string
+        default: ''
+      exclude_system:
+        description: 'Exclude system groups (Everyone, Administrators)'
+        required: true
+        type: boolean
+        default: true
+      dry_run:
+        description: 'Dry run (plan only, no apply)'
+        required: true
+        type: boolean
+        default: true
+      commit_changes:
+        description: 'Commit generated Terraform file'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  export-groups:
+    name: Export Groups from Source
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.source_environment }}
+    outputs:
+      resource_count: ${{ steps.export.outputs.resource_count }}
+
+    steps:
+      - name: Validate Inputs
+        run: |
+          if [ "${{ inputs.source_environment }}" == "${{ inputs.target_environment }}" ]; then
+            echo "❌ Source and target environments must be different"
+            exit 1
+          fi
+          echo "✅ Will copy groups from ${{ inputs.source_environment }} to ${{ inputs.target_environment }}"
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install requests
+
+      - name: Export Groups from Source Org
+        id: export
+        env:
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+        run: |
+          echo "Exporting groups from ${{ inputs.source_environment }}..."
+
+          OUTPUT_FILE="environments/${{ inputs.target_environment }}/terraform/groups_imported.tf"
+
+          CMD="python3 scripts/export_groups_to_terraform.py --output $OUTPUT_FILE"
+
+          if [ "${{ inputs.exclude_system }}" == "true" ]; then
+            CMD="$CMD --exclude-system"
+          fi
+
+          if [ -n "${{ inputs.name_pattern }}" ]; then
+            CMD="$CMD --name-pattern '${{ inputs.name_pattern }}'"
+          fi
+
+          echo "Running: $CMD"
+          eval $CMD
+
+          echo ""
+          echo "Generated Terraform file (first 50 lines):"
+          head -50 "$OUTPUT_FILE" || echo "No file generated"
+
+          # Count resources
+          RESOURCE_COUNT=$(grep -c 'resource "okta_group"' "$OUTPUT_FILE" 2>/dev/null || echo "0")
+          echo ""
+          echo "Generated $RESOURCE_COUNT group resources"
+          echo "resource_count=$RESOURCE_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Upload Generated Terraform
+        uses: actions/upload-artifact@v4
+        with:
+          name: groups-terraform
+          path: environments/${{ inputs.target_environment }}/terraform/groups_imported.tf
+          retention-days: 1
+
+  import-groups:
+    name: Import Groups to Target
+    needs: export-groups
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.target_environment }}
+
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Generated Terraform
+        uses: actions/download-artifact@v4
+        with:
+          name: groups-terraform
+          path: environments/${{ inputs.target_environment }}/terraform/
+
+      - name: Show Generated File
+        run: |
+          echo "Downloaded Terraform file:"
+          cat environments/${{ inputs.target_environment }}/terraform/groups_imported.tf | head -100
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-CopyGroups
+          aws-region: us-east-1
+
+      - name: Terraform Init
+        working-directory: environments/${{ inputs.target_environment }}/terraform
+        env:
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+          TF_VAR_okta_org_name: ${{ secrets.OKTA_ORG_NAME }}
+          TF_VAR_okta_base_url: ${{ secrets.OKTA_BASE_URL }}
+          TF_VAR_okta_api_token: ${{ secrets.OKTA_API_TOKEN }}
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: environments/${{ inputs.target_environment }}/terraform
+        env:
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+          TF_VAR_okta_org_name: ${{ secrets.OKTA_ORG_NAME }}
+          TF_VAR_okta_base_url: ${{ secrets.OKTA_BASE_URL }}
+          TF_VAR_okta_api_token: ${{ secrets.OKTA_API_TOKEN }}
+        run: |
+          terraform plan -out=tfplan 2>&1 | tee plan_output.txt
+
+          # Extract summary
+          echo ""
+          echo "=========================================="
+          echo "PLAN SUMMARY"
+          echo "=========================================="
+          grep -E "(Plan:|No changes|to add|to change|to destroy)" plan_output.txt || echo "See full output above"
+
+      - name: Terraform Apply
+        if: inputs.dry_run == false
+        working-directory: environments/${{ inputs.target_environment }}/terraform
+        env:
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+          TF_VAR_okta_org_name: ${{ secrets.OKTA_ORG_NAME }}
+          TF_VAR_okta_base_url: ${{ secrets.OKTA_BASE_URL }}
+          TF_VAR_okta_api_token: ${{ secrets.OKTA_API_TOKEN }}
+        run: |
+          echo "Applying Terraform changes..."
+          terraform apply -auto-approve tfplan
+
+      - name: Commit Changes
+        if: inputs.commit_changes == true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add environments/${{ inputs.target_environment }}/terraform/groups_imported.tf
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "feat: Import groups from ${{ inputs.source_environment }}
+
+          Groups imported for policy-based entitlement assignments.
+          Resource count: ${{ needs.export-groups.outputs.resource_count }}
+
+          🤖 Generated with [Claude Code](https://claude.com/claude-code)"
+            git push
+            echo "✅ Changes committed and pushed"
+          fi
+
+      - name: Summary
+        run: |
+          echo ""
+          echo "=================================================================="
+          echo "  COPY GROUPS SUMMARY"
+          echo "=================================================================="
+          echo ""
+          echo "Source: ${{ inputs.source_environment }}"
+          echo "Target: ${{ inputs.target_environment }}"
+          echo "Groups exported: ${{ needs.export-groups.outputs.resource_count }}"
+          echo "Mode: ${{ inputs.dry_run == true && 'Dry Run (plan only)' || 'Applied' }}"
+          echo ""
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
+            echo "To apply changes, run this workflow again with dry_run=false"
+          else
+            echo "✅ Groups have been created in ${{ inputs.target_environment }}"
+            echo ""
+            echo "Next steps:"
+            echo "  1. Create entitlement policies in Okta Admin Console"
+            echo "  2. Assign users to groups to grant entitlements"
+          fi
+          echo "=================================================================="
+
+          # GitHub Step Summary
+          echo "## Copy Groups Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Source | ${{ inputs.source_environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Target | ${{ inputs.target_environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Groups | ${{ needs.export-groups.outputs.resource_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mode | ${{ inputs.dry_run == true && 'Dry Run' || 'Applied' }} |" >> $GITHUB_STEP_SUMMARY

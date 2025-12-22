@@ -171,6 +171,24 @@ gh workflow run manage-entitlement-settings.yml \
 gh workflow run auto-enable-entitlements.yml \
   -f environment=mycompany \
   -f dry_run=true
+
+# Cross-org migration: Copy groups between orgs
+gh workflow run copy-groups-between-orgs.yml \
+  -f source_environment=SourceEnv \
+  -f target_environment=TargetEnv \
+  -f dry_run=true
+
+# Cross-org migration: Copy group memberships between orgs
+gh workflow run copy-group-memberships.yml \
+  -f source_environment=SourceEnv \
+  -f target_environment=TargetEnv \
+  -f dry_run=true
+
+# Cross-org migration: Copy entitlement bundle grants between orgs
+gh workflow run copy-grants-between-orgs.yml \
+  -f source_environment=SourceEnv \
+  -f target_environment=TargetEnv \
+  -f dry_run=true
 ```
 
 ### Python Scripts (API Management)
@@ -224,6 +242,30 @@ python3 scripts/manage_entitlement_settings.py \
   --action enable \
   --app-id 0oaXXXXXXXX \
   --dry-run  # Remove for actual apply
+
+# Cross-org migration: Export groups to Terraform
+python3 scripts/export_groups_to_terraform.py \
+  --output environments/target/terraform/groups_imported.tf \
+  --exclude-system
+
+# Cross-org migration: Export group memberships
+python3 scripts/copy_group_memberships.py export \
+  --output memberships.json
+
+# Cross-org migration: Import group memberships
+python3 scripts/copy_group_memberships.py import \
+  --input memberships.json \
+  --dry-run
+
+# Cross-org migration: Export entitlement bundle grants
+python3 scripts/copy_grants_between_orgs.py export \
+  --output grants_export.json
+
+# Cross-org migration: Import entitlement bundle grants
+python3 scripts/copy_grants_between_orgs.py import \
+  --input grants_export.json \
+  --exclude-apps "App Name" \
+  --dry-run
 ```
 
 ### AI-Assisted Code Generation
