@@ -338,6 +338,60 @@ python backup-restore/state-based/scripts/restore_state.py \
   --restore-state --dry-run
 ```
 
+### Demo Builder (Generate Complete Environments)
+
+**Option 1: Use Pre-built Examples**
+```bash
+# Copy industry-specific example
+cp demo-builder/examples/financial-services-demo.yaml demo-builder/my-demo.yaml
+cp demo-builder/examples/healthcare-demo.yaml demo-builder/my-demo.yaml
+cp demo-builder/examples/technology-company-demo.yaml demo-builder/my-demo.yaml
+
+# Customize and generate
+vim demo-builder/my-demo.yaml
+python scripts/build_demo.py --config demo-builder/my-demo.yaml
+```
+
+**Option 2: Fill Out Worksheet with AI**
+```bash
+# 1. Fill out the worksheet
+cat demo-builder/DEMO_WORKSHEET.md
+# Fill in your requirements
+
+# 2. Paste to AI with prompt
+cat ai-assisted/prompts/generate_demo_config.md
+# Copy the prompt, paste your worksheet, get YAML config
+
+# 3. Save and generate
+python scripts/build_demo.py --config demo-builder/my-demo.yaml
+```
+
+**Option 3: Edit Config Template Directly**
+```bash
+# Copy template and edit
+cp demo-builder/demo-config.yaml.template demo-builder/my-demo.yaml
+vim demo-builder/my-demo.yaml
+
+# Validate before generating
+python scripts/build_demo.py --config demo-builder/my-demo.yaml --schema-check
+
+# Generate Terraform files
+python scripts/build_demo.py --config demo-builder/my-demo.yaml
+
+# Preview without writing files
+python scripts/build_demo.py --config demo-builder/my-demo.yaml --dry-run
+```
+
+**Option 4: GitHub Workflow (CI/CD)**
+```bash
+# Commit your config file to the repo first
+gh workflow run build-demo.yml \
+  -f config_file=demo-builder/my-demo.yaml \
+  -f environment=mycompany \
+  -f dry_run=true \
+  -f validate=true
+```
+
 ### AI-Assisted Code Generation
 
 **Option 1: Manual (Tier 1) - Prompt Engineering**
@@ -866,7 +920,17 @@ john@example.com,John,Doe,john@example.com,ACTIVE,Engineering,Developer,alice@ex
 │   ├── production/            # Production template
 │   ├── staging/               # Staging template
 │   └── development/           # Development template
+├── demo-builder/              # Demo environment generator
+│   ├── demo-config.yaml.template  # Full config template
+│   ├── demo-config.schema.json    # JSON Schema for validation
+│   ├── DEMO_WORKSHEET.md         # Fill-in-the-blanks questionnaire
+│   ├── README.md                 # Demo builder documentation
+│   └── examples/                 # Pre-built industry demos
+│       ├── financial-services-demo.yaml
+│       ├── healthcare-demo.yaml
+│       └── technology-company-demo.yaml
 ├── scripts/                   # Python automation
+│   ├── build_demo.py         # Demo builder CLI (generates Terraform)
 │   ├── import_oig_resources.py
 │   ├── sync_owner_mappings.py
 │   ├── apply_resource_owners.py
@@ -874,8 +938,13 @@ john@example.com,John,Doe,john@example.com,ACTIVE,Engineering,Developer,alice@ex
 ├── ai-assisted/               # AI code generation tools
 │   ├── generate.py           # CLI tool (Tier 2)
 │   ├── prompts/              # Prompt templates (Tier 1)
+│   │   ├── generate_demo_config.md  # Generate demo-config.yaml
+│   │   └── create_demo_environment.md
 │   ├── context/              # Context for AI
 │   └── providers/            # AI provider integrations
+├── backup-restore/            # Backup and disaster recovery
+│   ├── resource-based/       # Export resources to files
+│   └── state-based/          # S3 state version rollback
 ├── docs/                      # Comprehensive documentation
 ├── testing/                   # Validation guides
 └── .github/workflows/         # GitHub Actions
@@ -888,6 +957,8 @@ john@example.com,John,Doe,john@example.com,ACTIVE,Engineering,Developer,alice@ex
 - `TEMPLATE_SETUP.md` - Step-by-step setup guide
 - `DIRECTORY_GUIDE.md` - Environment structure explained
 - `OIG_PREREQUISITES.md` - OIG setup requirements
+- `demo-builder/README.md` - Demo builder documentation
+- `demo-builder/DEMO_WORKSHEET.md` - Fill-in-the-blanks questionnaire for demos
 - `docs/GITOPS_WORKFLOW.md` - GitOps patterns
 - `docs/API_MANAGEMENT.md` - Python scripts reference (1190+ lines)
 - `docs/LESSONS_LEARNED.md` - Critical troubleshooting insights
@@ -940,7 +1011,17 @@ This repository supports optional OPA integration via the `oktapam` provider:
 
 ### Creating a Demo Environment
 
-**Quick method (AI-assisted):**
+**Quickest method (Demo Builder):**
+1. Choose an approach:
+   - Use pre-built example: `cp demo-builder/examples/healthcare-demo.yaml demo-builder/my-demo.yaml`
+   - Fill out worksheet and generate with AI (see `demo-builder/DEMO_WORKSHEET.md`)
+   - Edit config template directly: `cp demo-builder/demo-config.yaml.template demo-builder/my-demo.yaml`
+2. Generate Terraform: `python scripts/build_demo.py --config demo-builder/my-demo.yaml`
+3. Apply: `cd environments/<env>/terraform && terraform apply`
+4. Assign entitlements in Okta Admin UI
+5. Set up resource owners via Python scripts
+
+**AI-assisted method:**
 1. Use AI to generate Terraform code (see AI-Assisted Commands above)
 2. Apply the generated code
 3. Assign entitlements in Okta Admin UI
@@ -957,7 +1038,13 @@ This repository supports optional OPA integration via the `oktapam` provider:
 
 ### Demo Scenarios
 
+**Industry-specific demos available:**
+- `demo-builder/examples/financial-services-demo.yaml` - Bank/fintech with SOX compliance
+- `demo-builder/examples/healthcare-demo.yaml` - Healthcare with HIPAA compliance
+- `demo-builder/examples/technology-company-demo.yaml` - SaaS with SOC2 compliance
+
 **Common demo patterns documented in:**
+- `demo-builder/README.md` - Demo builder documentation
 - `DEMO_GUIDE.md` - Demo building with templates, AI, or manual approaches
 - `ai-assisted/prompts/create_demo_environment.md` - AI prompt template
 - `ai-assisted/examples/example_session_gemini.md` - Real example session

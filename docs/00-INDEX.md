@@ -15,7 +15,8 @@ This index helps you find the right documentation for your needs.
 | **Learn Terraform basics** | [LOCAL-USAGE.md](../LOCAL-USAGE.md) | 15 min |
 | **Back up code in GitHub** | [GITHUB-BASIC.md](../GITHUB-BASIC.md) | 20 min |
 | **Full GitOps with CI/CD** | [GITHUB-GITOPS.md](../GITHUB-GITOPS.md) | 45 min |
-| **Build demos** | [DEMO_GUIDE.md](../DEMO_GUIDE.md) | 30-60 min |
+| **Build demos (config-based)** | [demo-builder/README.md](../demo-builder/README.md) | 15-30 min |
+| **Build demos (manual)** | [DEMO_GUIDE.md](../DEMO_GUIDE.md) | 30-60 min |
 | **Terraform examples** | [TERRAFORM-BASICS.md](../TERRAFORM-BASICS.md) | Reference |
 | **Fix problems** | [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) | Reference |
 
@@ -30,6 +31,15 @@ LOCAL-USAGE.md → GITHUB-BASIC.md → GITHUB-GITOPS.md
 ## Reference Documentation
 
 This folder contains advanced reference documentation for specific topics.
+
+### Demo Builder
+
+| Document | Purpose |
+|----------|---------|
+| [demo-builder/README.md](../demo-builder/README.md) | Demo builder documentation |
+| [demo-builder/DEMO_WORKSHEET.md](../demo-builder/DEMO_WORKSHEET.md) | Fill-in-the-blanks questionnaire |
+| [demo-builder/examples/](../demo-builder/examples/) | Pre-built industry demos (healthcare, finserv, tech) |
+| [ai-assisted/prompts/generate_demo_config.md](../ai-assisted/prompts/generate_demo_config.md) | AI prompt for generating demo configs |
 
 ### Workflows & Operations
 
@@ -114,7 +124,8 @@ This folder contains advanced reference documentation for specific topics.
 |------|-----------|
 | **Get started quickly** | [LOCAL-USAGE.md](../LOCAL-USAGE.md) |
 | **Set up full GitOps** | [GITHUB-GITOPS.md](../GITHUB-GITOPS.md) |
-| **Build a demo** | [DEMO_GUIDE.md](../DEMO_GUIDE.md) |
+| **Build a demo (easiest)** | [demo-builder/README.md](../demo-builder/README.md) |
+| **Build a demo (manual)** | [DEMO_GUIDE.md](../DEMO_GUIDE.md) |
 | **Set up AWS backend** | [AWS_BACKEND_SETUP.md](AWS_BACKEND_SETUP.md) |
 | **Manage governance labels** | [LABEL_WORKFLOW_GUIDE.md](LABEL_WORKFLOW_GUIDE.md) |
 | **Manage resource owners** | [API_MANAGEMENT.md](API_MANAGEMENT.md) |

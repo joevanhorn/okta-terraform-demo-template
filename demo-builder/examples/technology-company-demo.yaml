@@ -1,0 +1,314 @@
+# =============================================================================
+# TECHNOLOGY COMPANY DEMO
+# =============================================================================
+# A complete demo environment for a SaaS/technology company.
+# Includes: Developer tools, cloud platforms, CI/CD pipelines
+#
+# To use:
+#   cp demo-builder/examples/technology-company-demo.yaml demo-builder/my-demo.yaml
+#   # Edit as needed
+#   python scripts/build_demo.py --config demo-builder/my-demo.yaml
+# =============================================================================
+
+version: "1.0"
+
+environment:
+  name: "tech-demo"
+  description: "TechStartup Inc - SaaS Platform Company"
+  email_domain: "techstartup.example.com"
+
+scenario:
+  name: "TechStartup Inc"
+  industry: "technology"
+  company_size: "medium"
+
+# =============================================================================
+# ORGANIZATIONAL STRUCTURE
+# =============================================================================
+
+departments:
+  - name: "Engineering"
+    manager:
+      first_name: "Alex"
+      last_name: "CTO"
+      title: "Chief Technology Officer"
+    employees:
+      - first_name: "Sarah"
+        last_name: "Backend"
+        title: "Senior Backend Engineer"
+      - first_name: "Mike"
+        last_name: "Frontend"
+        title: "Senior Frontend Engineer"
+      - first_name: "Lisa"
+        last_name: "Fullstack"
+        title: "Full Stack Developer"
+      - first_name: "David"
+        last_name: "Mobile"
+        title: "Mobile Developer"
+
+  - name: "DevOps"
+    manager:
+      first_name: "Jordan"
+      last_name: "Platform"
+      title: "VP of Platform Engineering"
+    employees:
+      - first_name: "Taylor"
+        last_name: "SRE"
+        title: "Site Reliability Engineer"
+      - first_name: "Casey"
+        last_name: "Cloud"
+        title: "Cloud Engineer"
+
+  - name: "Security"
+    manager:
+      first_name: "Morgan"
+      last_name: "CISO"
+      title: "Chief Information Security Officer"
+    employees:
+      - first_name: "Riley"
+        last_name: "SecOps"
+        title: "Security Engineer"
+
+  - name: "Product"
+    manager:
+      first_name: "Jamie"
+      last_name: "Product"
+      title: "VP of Product"
+    employees:
+      - first_name: "Sam"
+        last_name: "PM"
+        title: "Senior Product Manager"
+      - first_name: "Chris"
+        last_name: "Designer"
+        title: "UX Designer"
+
+  - name: "Sales"
+    manager:
+      first_name: "Pat"
+      last_name: "Sales"
+      title: "VP of Sales"
+    employees:
+      count: 4
+      title_pattern: "Account Executive"
+
+  - name: "Customer Success"
+    manager:
+      first_name: "Robin"
+      last_name: "Success"
+      title: "VP of Customer Success"
+    employees:
+      count: 3
+      title_pattern: "Customer Success Manager"
+
+additional_users:
+  - first_name: "Emily"
+    last_name: "CEO"
+    title: "Chief Executive Officer"
+
+  - first_name: "Contract"
+    last_name: "Dev"
+    user_type: "contractor"
+    title: "Contract Developer"
+    department: "Engineering"
+
+# =============================================================================
+# GROUPS
+# =============================================================================
+
+groups:
+  additional:
+    - name: "Engineering Team"
+      description: "All engineering staff"
+      include_departments: ["Engineering", "DevOps"]
+
+    - name: "Platform Team"
+      description: "DevOps and platform engineering"
+      include_departments: ["DevOps"]
+
+    - name: "Security Team"
+      description: "Security operations"
+      include_departments: ["Security"]
+
+    - name: "Go-to-Market"
+      description: "Sales and customer success"
+      include_departments: ["Sales", "Customer Success"]
+
+    - name: "Leadership"
+      description: "Company leadership"
+      include_managers: true
+      include_titles: ["CEO"]
+
+    - name: "All Employees"
+      description: "All full-time staff"
+      include_departments: ["Engineering", "DevOps", "Security", "Product", "Sales", "Customer Success"]
+
+    - name: "Contractors"
+      description: "Contract workers"
+      include_user_types: ["contractor"]
+
+# =============================================================================
+# APPLICATIONS
+# =============================================================================
+
+applications:
+  - name: "github"
+    type: "oauth_web"
+    label: "GitHub Enterprise"
+    description: "Source code management"
+    assign_to_groups: ["Engineering Team", "Security Team"]
+    settings:
+      redirect_uris:
+        - "https://github.techstartup.example.com/callback"
+      grant_types: ["authorization_code", "refresh_token"]
+
+  - name: "jira"
+    type: "oauth_web"
+    label: "Jira"
+    description: "Project and issue tracking"
+    assign_to_groups: ["All Employees"]
+    settings:
+      redirect_uris:
+        - "https://techstartup.atlassian.net/callback"
+
+  - name: "slack"
+    type: "oauth_web"
+    label: "Slack"
+    description: "Team communication"
+    assign_to_groups: ["All Employees"]
+    settings:
+      redirect_uris:
+        - "https://techstartup.slack.com/callback"
+
+  - name: "aws_console"
+    type: "oauth_web"
+    label: "AWS Console"
+    description: "Amazon Web Services management"
+    assign_to_groups: ["Platform Team", "Security Team"]
+    settings:
+      redirect_uris:
+        - "https://signin.aws.amazon.com/saml"
+
+  - name: "datadog"
+    type: "oauth_web"
+    label: "Datadog"
+    description: "Monitoring and observability"
+    assign_to_groups: ["Platform Team", "Engineering Team"]
+    settings:
+      redirect_uris:
+        - "https://app.datadoghq.com/oauth/callback"
+
+  - name: "salesforce"
+    type: "oauth_web"
+    label: "Salesforce"
+    description: "CRM platform"
+    assign_to_groups: ["Go-to-Market", "Leadership"]
+    settings:
+      redirect_uris:
+        - "https://login.salesforce.com/services/oauth2/callback"
+
+  - name: "figma"
+    type: "oauth_spa"
+    label: "Figma"
+    description: "Design and prototyping"
+    assign_to_groups: ["Product", "Engineering Team"]
+    settings:
+      redirect_uris:
+        - "https://www.figma.com/callback"
+
+  - name: "internal_api"
+    type: "oauth_service"
+    label: "Internal Platform API"
+    description: "Internal service-to-service API"
+    settings:
+      grant_types: ["client_credentials"]
+
+  - name: "ci_cd_pipeline"
+    type: "oauth_service"
+    label: "CI/CD Pipeline"
+    description: "Continuous integration and deployment"
+    settings:
+      grant_types: ["client_credentials"]
+
+# =============================================================================
+# OIG FEATURES
+# =============================================================================
+
+oig:
+  enabled: true
+
+  entitlement_bundles:
+    - name: "Developer Access"
+      description: "Standard developer toolchain access"
+
+    - name: "Platform Admin Access"
+      description: "Cloud and infrastructure administration"
+
+    - name: "Security Operations Access"
+      description: "Security tools and audit systems"
+
+    - name: "Sales Tools Access"
+      description: "CRM and sales enablement tools"
+
+    - name: "Production Access"
+      description: "Production environment access"
+
+  access_reviews:
+    - name: "Q1 2025 SOC2 Access Review"
+      description: "Quarterly access certification for SOC2 compliance"
+      start_date: "2025-01-15T00:00:00Z"
+      end_date: "2025-02-15T23:59:59Z"
+      review_type: "USER_ACCESS_REVIEW"
+      reviewer_type: "MANAGER"
+
+    - name: "Q2 2025 SOC2 Access Review"
+      description: "Quarterly access certification for SOC2 compliance"
+      start_date: "2025-04-15T00:00:00Z"
+      end_date: "2025-05-15T23:59:59Z"
+      review_type: "USER_ACCESS_REVIEW"
+      reviewer_type: "MANAGER"
+
+    - name: "Production Access Review"
+      description: "Monthly certification of production access"
+      start_date: "2025-02-01T00:00:00Z"
+      end_date: "2025-02-15T23:59:59Z"
+      review_type: "ENTITLEMENT_ACCESS_REVIEW"
+      reviewer_type: "APPLICATION_OWNER"
+
+  governance:
+    enable_owner_assignments: true
+    enable_labels: true
+
+# =============================================================================
+# POLICIES
+# =============================================================================
+
+policies:
+  sign_on:
+    - name: "MFA for Production Access"
+      description: "Require MFA for production environment access"
+      apply_to_groups: ["Platform Team"]
+      require_mfa: true
+
+    - name: "MFA for Cloud Console"
+      description: "Require MFA for cloud provider access"
+      apply_to_groups: ["Platform Team", "Security Team"]
+      require_mfa: true
+
+  password:
+    - name: "Tech Company Password Policy"
+      description: "Strong password requirements"
+      min_length: 12
+      require_lowercase: true
+      require_uppercase: true
+      require_number: true
+      require_symbol: false
+
+# =============================================================================
+# OUTPUT
+# =============================================================================
+
+output:
+  directory: "environments/{{ environment.name }}/terraform"
+  separate_files: true
+  include_comments: true
+  validate_on_generate: true

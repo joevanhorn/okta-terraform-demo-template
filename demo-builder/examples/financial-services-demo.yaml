@@ -1,0 +1,275 @@
+# =============================================================================
+# FINANCIAL SERVICES DEMO
+# =============================================================================
+# A complete demo environment for a financial services company.
+# Includes: Banking apps, compliance features, OIG access reviews
+#
+# To use:
+#   cp demo-builder/examples/financial-services-demo.yaml demo-builder/my-demo.yaml
+#   # Edit as needed
+#   python scripts/build_demo.py --config demo-builder/my-demo.yaml
+# =============================================================================
+
+version: "1.0"
+
+environment:
+  name: "finserv-demo"
+  description: "Acme Financial Services - Banking and Wealth Management"
+  email_domain: "acmefinancial.example.com"
+
+scenario:
+  name: "Acme Financial Services"
+  industry: "financial_services"
+  company_size: "large"
+
+# =============================================================================
+# ORGANIZATIONAL STRUCTURE
+# =============================================================================
+
+departments:
+  - name: "Technology"
+    manager:
+      first_name: "Sarah"
+      last_name: "Chen"
+      title: "Chief Technology Officer"
+    employees:
+      - first_name: "Alex"
+        last_name: "Kumar"
+        title: "Senior Software Engineer"
+      - first_name: "Jordan"
+        last_name: "Williams"
+        title: "DevOps Engineer"
+      - first_name: "Taylor"
+        last_name: "Brown"
+        title: "Security Engineer"
+
+  - name: "Trading"
+    manager:
+      first_name: "Michael"
+      last_name: "Goldman"
+      title: "Head of Trading"
+    employees:
+      - first_name: "Emily"
+        last_name: "Trader"
+        title: "Senior Trader"
+      - first_name: "James"
+        last_name: "Analyst"
+        title: "Quantitative Analyst"
+
+  - name: "Wealth Management"
+    manager:
+      first_name: "Patricia"
+      last_name: "Morgan"
+      title: "VP Wealth Management"
+    employees:
+      count: 4
+      title_pattern: "Wealth Advisor"
+
+  - name: "Compliance"
+    manager:
+      first_name: "Robert"
+      last_name: "Regulator"
+      title: "Chief Compliance Officer"
+    employees:
+      - first_name: "Lisa"
+        last_name: "Auditor"
+        title: "Compliance Analyst"
+      - first_name: "David"
+        last_name: "Risk"
+        title: "Risk Manager"
+
+  - name: "Operations"
+    manager:
+      first_name: "Jennifer"
+      last_name: "Operations"
+      title: "COO"
+    employees:
+      count: 3
+      title_pattern: "Operations Specialist"
+
+additional_users:
+  - first_name: "William"
+    last_name: "CEO"
+    title: "Chief Executive Officer"
+
+  - first_name: "External"
+    last_name: "Auditor"
+    user_type: "contractor"
+    title: "External Auditor"
+    department: "Compliance"
+
+# =============================================================================
+# GROUPS
+# =============================================================================
+
+groups:
+  additional:
+    - name: "Executive Team"
+      description: "C-level executives and department heads"
+      include_managers: true
+      include_titles: ["CEO", "CFO", "COO", "CTO"]
+
+    - name: "All Employees"
+      description: "All full-time employees"
+      include_departments: ["Technology", "Trading", "Wealth Management", "Compliance", "Operations"]
+
+    - name: "Trading Floor"
+      description: "Trading and quantitative staff"
+      include_departments: ["Trading"]
+
+    - name: "Client Facing"
+      description: "Staff with client interactions"
+      include_departments: ["Wealth Management", "Trading"]
+
+    - name: "Compliance Team"
+      description: "Compliance and audit staff"
+      include_departments: ["Compliance"]
+
+    - name: "External Contractors"
+      description: "External contractors and auditors"
+      include_user_types: ["contractor"]
+
+# =============================================================================
+# APPLICATIONS
+# =============================================================================
+
+applications:
+  - name: "bloomberg_terminal"
+    type: "oauth_web"
+    label: "Bloomberg Terminal"
+    description: "Financial data and trading platform"
+    assign_to_groups: ["Trading Floor", "Executive Team"]
+    settings:
+      redirect_uris:
+        - "https://bloomberg.example.com/oauth/callback"
+      grant_types: ["authorization_code", "refresh_token"]
+
+  - name: "wealth_platform"
+    type: "oauth_web"
+    label: "Wealth Management Platform"
+    description: "Client portfolio management"
+    assign_to_groups: ["Wealth Management", "Executive Team"]
+    settings:
+      redirect_uris:
+        - "https://wealth.acmefinancial.example.com/callback"
+
+  - name: "compliance_portal"
+    type: "oauth_spa"
+    label: "Compliance Portal"
+    description: "Regulatory compliance and audit management"
+    assign_to_groups: ["Compliance Team", "Executive Team"]
+    settings:
+      redirect_uris:
+        - "https://compliance.acmefinancial.example.com/callback"
+
+  - name: "trading_api"
+    type: "oauth_service"
+    label: "Trading API"
+    description: "Automated trading and order management API"
+    settings:
+      grant_types: ["client_credentials"]
+
+  - name: "risk_dashboard"
+    type: "oauth_spa"
+    label: "Risk Dashboard"
+    description: "Real-time risk monitoring"
+    assign_to_groups: ["Compliance Team", "Trading Floor", "Executive Team"]
+    settings:
+      redirect_uris:
+        - "https://risk.acmefinancial.example.com/callback"
+
+  - name: "client_portal"
+    type: "oauth_web"
+    label: "Client Portal"
+    description: "Client-facing account access"
+    assign_to_groups: ["Client Facing"]
+    settings:
+      redirect_uris:
+        - "https://clients.acmefinancial.example.com/callback"
+
+# =============================================================================
+# OIG FEATURES
+# =============================================================================
+
+oig:
+  enabled: true
+
+  entitlement_bundles:
+    - name: "Basic Employee Access"
+      description: "Standard access for all employees"
+
+    - name: "Trading Systems Access"
+      description: "Access to trading platforms and market data"
+
+    - name: "Wealth Management Tools"
+      description: "Client portfolio and advisory tools"
+
+    - name: "Compliance and Audit Access"
+      description: "Regulatory and audit systems"
+
+    - name: "Executive Dashboard Access"
+      description: "Executive reporting and analytics"
+
+    - name: "API Access Bundle"
+      description: "Programmatic API access for integrations"
+
+  access_reviews:
+    - name: "Q1 2025 SOX Compliance Review"
+      description: "Quarterly access certification for SOX compliance"
+      start_date: "2025-01-15T00:00:00Z"
+      end_date: "2025-02-15T23:59:59Z"
+      review_type: "USER_ACCESS_REVIEW"
+      reviewer_type: "MANAGER"
+
+    - name: "Q2 2025 SOX Compliance Review"
+      description: "Quarterly access certification for SOX compliance"
+      start_date: "2025-04-15T00:00:00Z"
+      end_date: "2025-05-15T23:59:59Z"
+      review_type: "USER_ACCESS_REVIEW"
+      reviewer_type: "MANAGER"
+
+    - name: "Annual Trading Access Review"
+      description: "Annual certification of trading system access"
+      start_date: "2025-03-01T00:00:00Z"
+      end_date: "2025-03-31T23:59:59Z"
+      review_type: "ENTITLEMENT_ACCESS_REVIEW"
+      reviewer_type: "APPLICATION_OWNER"
+
+  governance:
+    enable_owner_assignments: true
+    enable_labels: true
+
+# =============================================================================
+# POLICIES
+# =============================================================================
+
+policies:
+  sign_on:
+    - name: "MFA Required for Trading"
+      description: "Mandatory MFA for trading floor access"
+      apply_to_groups: ["Trading Floor"]
+      require_mfa: true
+
+    - name: "MFA Required for Executives"
+      description: "Mandatory MFA for executive access"
+      apply_to_groups: ["Executive Team"]
+      require_mfa: true
+
+  password:
+    - name: "Financial Services Password Policy"
+      description: "Strong password requirements for financial services"
+      min_length: 14
+      require_lowercase: true
+      require_uppercase: true
+      require_number: true
+      require_symbol: true
+
+# =============================================================================
+# OUTPUT
+# =============================================================================
+
+output:
+  directory: "environments/{{ environment.name }}/terraform"
+  separate_files: true
+  include_comments: true
+  validate_on_generate: true

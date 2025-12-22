@@ -1,0 +1,557 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/okta-terraform-demo-template/demo-config.schema.json",
+  "title": "Okta Demo Configuration",
+  "description": "Schema for validating Okta demo configuration files",
+  "type": "object",
+  "required": ["version", "environment"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$",
+      "description": "Configuration schema version"
+    },
+    "environment": {
+      "type": "object",
+      "required": ["name", "email_domain"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$",
+          "minLength": 1,
+          "maxLength": 50,
+          "description": "Environment directory name (lowercase, alphanumeric, hyphens)"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Human-readable description"
+        },
+        "email_domain": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9-]*\\.[a-zA-Z]{2,}$",
+          "description": "Email domain for auto-generated users"
+        }
+      }
+    },
+    "okta": {
+      "type": "object",
+      "properties": {
+        "org_name": {
+          "type": "string",
+          "description": "Okta organization name (leave empty to use env var)"
+        },
+        "base_url": {
+          "type": "string",
+          "enum": ["okta.com", "oktapreview.com", "okta-emea.com"],
+          "default": "okta.com"
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Company or demo scenario name"
+        },
+        "industry": {
+          "type": "string",
+          "enum": ["healthcare", "financial_services", "technology", "retail", "manufacturing", "government", "education", "media", "other"],
+          "default": "technology"
+        },
+        "company_size": {
+          "type": "string",
+          "enum": ["small", "medium", "large", "enterprise"],
+          "default": "medium"
+        }
+      }
+    },
+    "departments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/department"
+      },
+      "minItems": 1,
+      "description": "List of departments with managers and employees"
+    },
+    "additional_users": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/user"
+      },
+      "description": "Users outside department structure"
+    },
+    "groups": {
+      "type": "object",
+      "properties": {
+        "additional": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/group"
+          }
+        }
+      }
+    },
+    "applications": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/application"
+      },
+      "description": "OAuth, SAML, and other applications"
+    },
+    "oig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "entitlement_bundles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/entitlement_bundle"
+          }
+        },
+        "access_reviews": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/access_review"
+          }
+        },
+        "governance": {
+          "type": "object",
+          "properties": {
+            "enable_owner_assignments": {
+              "type": "boolean",
+              "default": false
+            },
+            "enable_labels": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        }
+      }
+    },
+    "policies": {
+      "type": "object",
+      "properties": {
+        "sign_on": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/sign_on_policy"
+          }
+        },
+        "password": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/password_policy"
+          }
+        }
+      }
+    },
+    "infrastructure": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "active_directory": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "domain_name": { "type": "string" },
+            "netbios_name": { "type": "string", "maxLength": 15 }
+          }
+        },
+        "scim_server": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false }
+          }
+        },
+        "opa": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false }
+          }
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "directory": {
+          "type": "string",
+          "default": "environments/{{ environment.name }}/terraform"
+        },
+        "separate_files": {
+          "type": "boolean",
+          "default": true
+        },
+        "include_comments": {
+          "type": "boolean",
+          "default": true
+        },
+        "validate_on_generate": {
+          "type": "boolean",
+          "default": true
+        },
+        "backup_existing": {
+          "type": "boolean",
+          "default": true
+        },
+        "file_prefix": {
+          "type": "string",
+          "default": ""
+        }
+      }
+    }
+  },
+  "definitions": {
+    "department": {
+      "type": "object",
+      "required": ["name", "manager"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "manager": {
+          "$ref": "#/definitions/manager"
+        },
+        "employees": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/employee"
+              }
+            },
+            {
+              "type": "object",
+              "required": ["count"],
+              "properties": {
+                "count": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "title_pattern": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "manager": {
+      "type": "object",
+      "required": ["first_name", "last_name"],
+      "properties": {
+        "first_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "last_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        }
+      }
+    },
+    "employee": {
+      "type": "object",
+      "required": ["first_name", "last_name"],
+      "properties": {
+        "first_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "last_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        }
+      }
+    },
+    "user": {
+      "type": "object",
+      "required": ["first_name", "last_name"],
+      "properties": {
+        "first_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "last_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "department": {
+          "type": "string"
+        },
+        "user_type": {
+          "type": "string",
+          "enum": ["employee", "contractor", "intern", "vendor"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "STAGED", "PROVISIONED"],
+          "default": "ACTIVE"
+        }
+      }
+    },
+    "group": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "include_departments": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "include_managers": {
+          "type": "boolean"
+        },
+        "include_titles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "include_user_types": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "members": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "application": {
+      "type": "object",
+      "required": ["name", "type", "label"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Terraform resource name (snake_case)"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["oauth_web", "oauth_spa", "oauth_service", "oauth_native", "saml"]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "assign_to_groups": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "redirect_uris": {
+              "type": "array",
+              "items": { "type": "string", "format": "uri" }
+            },
+            "post_logout_redirect_uris": {
+              "type": "array",
+              "items": { "type": "string", "format": "uri" }
+            },
+            "grant_types": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["authorization_code", "refresh_token", "client_credentials", "implicit"]
+              }
+            },
+            "sso_url": { "type": "string", "format": "uri" },
+            "audience": { "type": "string" },
+            "recipient": { "type": "string" },
+            "destination": { "type": "string" }
+          }
+        }
+      }
+    },
+    "entitlement_bundle": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "INACTIVE"],
+          "default": "ACTIVE"
+        }
+      }
+    },
+    "access_review": {
+      "type": "object",
+      "required": ["name", "start_date", "end_date"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end_date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "review_type": {
+          "type": "string",
+          "enum": ["USER_ACCESS_REVIEW", "ENTITLEMENT_ACCESS_REVIEW"],
+          "default": "USER_ACCESS_REVIEW"
+        },
+        "reviewer_type": {
+          "type": "string",
+          "enum": ["MANAGER", "APPLICATION_OWNER"],
+          "default": "MANAGER"
+        }
+      }
+    },
+    "sign_on_policy": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string"
+        },
+        "apply_to_groups": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "require_mfa": {
+          "type": "boolean",
+          "default": false
+        },
+        "mfa_prompt": {
+          "type": "string",
+          "enum": ["ALWAYS", "SESSION"]
+        },
+        "allow_passwordless": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "password_policy": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string"
+        },
+        "min_length": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 72,
+          "default": 12
+        },
+        "require_lowercase": {
+          "type": "boolean",
+          "default": true
+        },
+        "require_uppercase": {
+          "type": "boolean",
+          "default": true
+        },
+        "require_number": {
+          "type": "boolean",
+          "default": true
+        },
+        "require_symbol": {
+          "type": "boolean",
+          "default": false
+        },
+        "password_expire_days": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "password_history_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 24
+        },
+        "lockout_attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      }
+    }
+  }
+}
