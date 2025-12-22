@@ -1,0 +1,292 @@
+name: Backup Tenant (State-Based)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to backup (matches environments/ directory)'
+        required: true
+        type: string
+        default: 'myorg'
+      schedule_type:
+        description: 'Backup schedule type (for manifest metadata)'
+        type: choice
+        options:
+          - manual
+          - daily
+          - weekly
+        default: manual
+      download_state:
+        description: 'Download state file to backup (larger backup, but portable)'
+        type: boolean
+        default: false
+      retention_count:
+        description: 'Number of snapshots to retain (0 = unlimited)'
+        type: number
+        default: 30
+      commit_changes:
+        description: 'Commit backup to repository'
+        type: boolean
+        default: true
+
+  schedule:
+    # Daily at 3 AM UTC (offset from resource-based backup)
+    # Uncomment to enable scheduled backups
+    # - cron: '0 3 * * *'
+    []
+
+jobs:
+  backup:
+    name: Backup Okta Tenant (State-Based)
+    runs-on: ubuntu-latest
+
+    environment:
+      name: ${{ inputs.environment || 'myorg' }}
+
+    permissions:
+      contents: write
+      id-token: write
+
+    env:
+      ENV_NAME: ${{ inputs.environment || 'myorg' }}
+      SCHEDULE_TYPE: ${{ inputs.schedule_type || 'manual' }}
+      RETENTION_COUNT: ${{ inputs.retention_count || 30 }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Environment
+        run: |
+          if [ ! -d "environments/${{ env.ENV_NAME }}" ]; then
+            echo "❌ Environment not found: ${{ env.ENV_NAME }}"
+            echo "Available environments:"
+            ls -1 environments/ | grep -v README.md
+            exit 1
+          fi
+          echo "✅ Environment found: ${{ env.ENV_NAME }}"
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install boto3 requests
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-BackupState-${{ inputs.environment }}
+          aws-region: us-east-1
+
+      - name: Set up environment
+        env:
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+        run: |
+          # Set timestamp for snapshot ID
+          SNAPSHOT_ID=$(date -u +%Y-%m-%dT%H-%M-%S)
+          echo "SNAPSHOT_ID=${SNAPSHOT_ID}" >> $GITHUB_ENV
+
+          # Set backup directories
+          BACKUP_DIR="environments/${{ env.ENV_NAME }}/backups/state-based"
+          LATEST_DIR="${BACKUP_DIR}/latest"
+          SNAPSHOT_DIR="${BACKUP_DIR}/snapshots/${SNAPSHOT_ID}"
+
+          echo "BACKUP_DIR=${BACKUP_DIR}" >> $GITHUB_ENV
+          echo "LATEST_DIR=${LATEST_DIR}" >> $GITHUB_ENV
+          echo "SNAPSHOT_DIR=${SNAPSHOT_DIR}" >> $GITHUB_ENV
+
+          # S3 state backend configuration
+          STATE_BUCKET="okta-terraform-demo"
+          STATE_KEY="Okta-GitOps/${{ env.ENV_NAME }}/terraform.tfstate"
+
+          echo "STATE_BUCKET=${STATE_BUCKET}" >> $GITHUB_ENV
+          echo "STATE_KEY=${STATE_KEY}" >> $GITHUB_ENV
+
+          # Create backup directories
+          mkdir -p "${LATEST_DIR}"
+          mkdir -p "${SNAPSHOT_DIR}"
+
+          echo "📦 State-Based Backup Configuration"
+          echo "  Environment: ${{ env.ENV_NAME }}"
+          echo "  Snapshot ID: ${SNAPSHOT_ID}"
+          echo "  Schedule: ${{ env.SCHEDULE_TYPE }}"
+          echo "  State Bucket: ${STATE_BUCKET}"
+          echo "  State Key: ${STATE_KEY}"
+          echo "  Org: ${OKTA_ORG_NAME}"
+
+      # ============================================================================
+      # Capture State Version
+      # ============================================================================
+      - name: Capture State Version
+        id: capture_state
+        run: |
+          echo "📸 Capturing Terraform state version..."
+
+          DOWNLOAD_FLAG=""
+          if [ "${{ inputs.download_state }}" == "true" ]; then
+            DOWNLOAD_FLAG="--download-state"
+            echo "  Will download state file to backup"
+          fi
+
+          python backup-restore/state-based/scripts/backup_state.py \
+            --environment "${{ env.ENV_NAME }}" \
+            --output-dir "${{ env.LATEST_DIR }}" \
+            --state-bucket "${{ env.STATE_BUCKET }}" \
+            --state-key "${{ env.STATE_KEY }}" \
+            --org-name "${{ secrets.OKTA_ORG_NAME }}" \
+            --schedule "${{ env.SCHEDULE_TYPE }}" \
+            $DOWNLOAD_FLAG
+
+          # Extract version ID from manifest
+          if [ -f "${{ env.LATEST_DIR }}/MANIFEST.json" ]; then
+            VERSION_ID=$(jq -r '.terraform_state.version_id // "N/A"' "${{ env.LATEST_DIR }}/MANIFEST.json")
+            ETAG=$(jq -r '.terraform_state.etag // "N/A"' "${{ env.LATEST_DIR }}/MANIFEST.json")
+            echo "version_id=$VERSION_ID" >> $GITHUB_OUTPUT
+            echo "etag=$ETAG" >> $GITHUB_OUTPUT
+            echo "✅ State version captured: $VERSION_ID"
+          else
+            echo "❌ Manifest not created"
+            exit 1
+          fi
+
+      # ============================================================================
+      # Archive Snapshot
+      # ============================================================================
+      - name: Archive Snapshot
+        run: |
+          echo "📁 Archiving snapshot: ${{ env.SNAPSHOT_ID }}"
+
+          # Copy latest to snapshot directory
+          cp -r "${{ env.LATEST_DIR }}/"* "${{ env.SNAPSHOT_DIR }}/"
+
+          echo "✅ Snapshot archived to: ${{ env.SNAPSHOT_DIR }}"
+
+      # ============================================================================
+      # Cleanup Old Snapshots
+      # ============================================================================
+      - name: Cleanup Old Snapshots
+        if: env.RETENTION_COUNT != '0'
+        run: |
+          SNAPSHOTS_DIR="${{ env.BACKUP_DIR }}/snapshots"
+
+          if [ -d "$SNAPSHOTS_DIR" ]; then
+            SNAPSHOT_COUNT=$(ls -1 "$SNAPSHOTS_DIR" 2>/dev/null | wc -l)
+            echo "📊 Current snapshots: $SNAPSHOT_COUNT"
+
+            if [ "$SNAPSHOT_COUNT" -gt "${{ env.RETENTION_COUNT }}" ]; then
+              TO_DELETE=$((SNAPSHOT_COUNT - RETENTION_COUNT))
+              echo "🗑️  Removing $TO_DELETE old snapshots..."
+
+              ls -1t "$SNAPSHOTS_DIR" | tail -n "$TO_DELETE" | while read dir; do
+                echo "  Removing: $dir"
+                rm -rf "$SNAPSHOTS_DIR/$dir"
+              done
+
+              echo "✅ Cleanup complete"
+            else
+              echo "✅ No cleanup needed"
+            fi
+          fi
+
+      # ============================================================================
+      # Commit Changes
+      # ============================================================================
+      - name: Commit Backup
+        if: inputs.commit_changes == true || inputs.commit_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add "${{ env.BACKUP_DIR }}/"
+
+          if git diff --staged --quiet; then
+            echo "ℹ️  No changes to commit"
+          else
+            git commit -m "$(cat <<EOF
+          backup(state): Snapshot ${{ env.SNAPSHOT_ID }} for ${{ env.ENV_NAME }}
+
+          State-based backup:
+          - State Version: ${{ steps.capture_state.outputs.version_id }}
+          - State ETag: ${{ steps.capture_state.outputs.etag }}
+          - Schedule: ${{ env.SCHEDULE_TYPE }}
+
+          Restore command:
+            python backup-restore/state-based/scripts/restore_state.py \\
+              --manifest ${{ env.SNAPSHOT_DIR }}/MANIFEST.json \\
+              --restore-state --dry-run
+
+          🤖 Generated by state-based backup workflow
+          EOF
+          )"
+
+            # Create tag for snapshot
+            git tag "backup-state/${{ env.ENV_NAME }}/${{ env.SNAPSHOT_ID }}"
+
+            git push origin HEAD --tags
+
+            echo "✅ Backup committed and tagged"
+          fi
+
+      # ============================================================================
+      # Upload Artifacts
+      # ============================================================================
+      - name: Upload Backup Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-state-${{ env.ENV_NAME }}-${{ env.SNAPSHOT_ID }}
+          path: ${{ env.LATEST_DIR }}/
+          retention-days: 90
+
+      # ============================================================================
+      # Summary
+      # ============================================================================
+      - name: Generate Summary
+        if: always()
+        run: |
+          echo "# 📦 State-Based Backup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ env.ENV_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Snapshot ID:** \`${{ env.SNAPSHOT_ID }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Schedule:** ${{ env.SCHEDULE_TYPE }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## Terraform State" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Bucket | \`${{ env.STATE_BUCKET }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Key | \`${{ env.STATE_KEY }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version ID | \`${{ steps.capture_state.outputs.version_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| ETag | \`${{ steps.capture_state.outputs.etag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## Restore Commands" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Restore State Only (Rollback S3)" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "python backup-restore/state-based/scripts/restore_state.py \\\\" >> $GITHUB_STEP_SUMMARY
+          echo "  --manifest ${{ env.SNAPSHOT_DIR }}/MANIFEST.json \\\\" >> $GITHUB_STEP_SUMMARY
+          echo "  --restore-state --dry-run" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Full Restore (State + Terraform Apply)" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "python backup-restore/state-based/scripts/restore_state.py \\\\" >> $GITHUB_STEP_SUMMARY
+          echo "  --manifest ${{ env.SNAPSHOT_DIR }}/MANIFEST.json \\\\" >> $GITHUB_STEP_SUMMARY
+          echo "  --full-restore --dry-run" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Via GitHub Workflow" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "gh workflow run restore-tenant-state.yml \\\\" >> $GITHUB_STEP_SUMMARY
+          echo "  -f environment=${{ env.ENV_NAME }} \\\\" >> $GITHUB_STEP_SUMMARY
+          echo "  -f snapshot_id=${{ env.SNAPSHOT_ID }} \\\\" >> $GITHUB_STEP_SUMMARY
+          echo "  -f dry_run=true" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

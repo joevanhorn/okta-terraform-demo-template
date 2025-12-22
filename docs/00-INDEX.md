@@ -36,7 +36,6 @@ This folder contains advanced reference documentation for specific topics.
 | Document | Purpose |
 |----------|---------|
 | [03-WORKFLOWS-GUIDE.md](03-WORKFLOWS-GUIDE.md) | Complete GitHub Actions workflow reference |
-| [ROLLBACK_GUIDE.md](ROLLBACK_GUIDE.md) | Disaster recovery procedures |
 
 ### Infrastructure
 
@@ -64,6 +63,15 @@ This folder contains advanced reference documentation for specific topics.
 | [LABEL_MANAGEMENT.md](LABEL_MANAGEMENT.md) | Governance labels technical guide |
 | [LABEL_WORKFLOW_GUIDE.md](LABEL_WORKFLOW_GUIDE.md) | Label management GitOps workflow |
 | [TROUBLESHOOTING_ENTITLEMENT_BUNDLES.md](TROUBLESHOOTING_ENTITLEMENT_BUNDLES.md) | Bundle-specific troubleshooting |
+
+### Backup & Disaster Recovery
+
+| Document | Purpose |
+|----------|---------|
+| [backup-restore/](../backup-restore/) | **Main backup guide** - Choose your approach |
+| [backup-restore/resource-based/](../backup-restore/resource-based/) | Resource export/import approach |
+| [backup-restore/state-based/](../backup-restore/state-based/) | S3 state versioning approach |
+| [ROLLBACK_GUIDE.md](ROLLBACK_GUIDE.md) | Git and state rollback procedures |
 
 ### Import & Migration
 
@@ -114,6 +122,7 @@ This folder contains advanced reference documentation for specific topics.
 | **Set up Okta Privileged Access** | [OPA_SETUP.md](OPA_SETUP.md) |
 | **Import from Okta** | [03-WORKFLOWS-GUIDE.md](03-WORKFLOWS-GUIDE.md) |
 | **Copy resources between orgs** | [CROSS_ORG_MIGRATION.md](CROSS_ORG_MIGRATION.md) |
+| **Backup and restore tenant** | [backup-restore/](../backup-restore/) |
 | **Troubleshoot issues** | [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) |
 | **Use AI to generate code** | [ai-assisted/README.md](../ai-assisted/README.md) |
 | **Understand provider coverage** | [PROVIDER_COVERAGE_MATRIX.md](PROVIDER_COVERAGE_MATRIX.md) |
@@ -136,4 +145,4 @@ Older documentation that has been superseded is available in [archive/](archive/
 
 ---
 
-**Last Updated:** 2025-12-14
+**Last Updated:** 2025-12-22

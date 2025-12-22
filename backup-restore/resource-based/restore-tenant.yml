@@ -1,0 +1,458 @@
+name: Restore Tenant (Resource-Based)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to restore (matches environments/ directory)'
+        required: true
+        type: string
+        default: 'myorg'
+      snapshot_id:
+        description: 'Snapshot ID to restore (or "latest")'
+        required: true
+        type: string
+        default: 'latest'
+      resources:
+        description: 'Resources to restore (comma-separated: all, users, groups, apps, oig, config)'
+        type: string
+        default: 'all'
+      dry_run:
+        description: 'Preview changes without applying'
+        type: boolean
+        default: true
+
+jobs:
+  validate:
+    name: Validate Snapshot
+    runs-on: ubuntu-latest
+
+    outputs:
+      snapshot_path: ${{ steps.validate.outputs.snapshot_path }}
+      manifest: ${{ steps.validate.outputs.manifest }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Snapshot
+        id: validate
+        run: |
+          ENV_NAME="${{ inputs.environment }}"
+          SNAPSHOT_ID="${{ inputs.snapshot_id }}"
+          BACKUP_DIR="environments/${ENV_NAME}/backups"
+
+          echo "🔍 Validating snapshot..."
+          echo "  Environment: ${ENV_NAME}"
+          echo "  Snapshot ID: ${SNAPSHOT_ID}"
+
+          # Determine snapshot path
+          if [ "$SNAPSHOT_ID" == "latest" ]; then
+            SNAPSHOT_PATH="${BACKUP_DIR}/latest"
+          else
+            SNAPSHOT_PATH="${BACKUP_DIR}/snapshots/${SNAPSHOT_ID}"
+          fi
+
+          # Check if snapshot exists
+          if [ ! -d "$SNAPSHOT_PATH" ]; then
+            echo "❌ Snapshot not found: $SNAPSHOT_PATH"
+            echo ""
+            echo "Available snapshots:"
+            if [ -d "${BACKUP_DIR}/snapshots" ]; then
+              ls -1 "${BACKUP_DIR}/snapshots/" | head -20
+            else
+              echo "  (no snapshots found)"
+            fi
+            exit 1
+          fi
+
+          # Check for manifest
+          if [ ! -f "$SNAPSHOT_PATH/MANIFEST.json" ]; then
+            echo "⚠️  No manifest found in snapshot"
+          fi
+
+          echo "snapshot_path=$SNAPSHOT_PATH" >> $GITHUB_OUTPUT
+
+          # Output manifest summary
+          if [ -f "$SNAPSHOT_PATH/MANIFEST.json" ]; then
+            MANIFEST=$(cat "$SNAPSHOT_PATH/MANIFEST.json")
+            echo "manifest<<EOF" >> $GITHUB_OUTPUT
+            echo "$MANIFEST" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+          echo "✅ Snapshot validated: $SNAPSHOT_PATH"
+
+      - name: Display Snapshot Contents
+        run: |
+          SNAPSHOT_PATH="${{ steps.validate.outputs.snapshot_path }}"
+
+          echo "📋 Snapshot Contents"
+          echo "===================="
+
+          if [ -f "$SNAPSHOT_PATH/MANIFEST.json" ]; then
+            echo ""
+            echo "Manifest:"
+            jq -r '
+              "  Snapshot ID: \(.snapshot_id)",
+              "  Created: \(.created_at)",
+              "  Org: \(.org_name)",
+              "  Schedule: \(.schedule)",
+              "",
+              "Resources:",
+              (.resources | to_entries[] | "  \(.key): \(.value.count // "N/A")")
+            ' "$SNAPSHOT_PATH/MANIFEST.json"
+          fi
+
+          echo ""
+          echo "Files:"
+          ls -la "$SNAPSHOT_PATH/"
+
+  restore:
+    name: Restore Resources
+    needs: validate
+    runs-on: ubuntu-latest
+
+    # Uses GitHub Environment for approval gate and secrets
+    environment:
+      name: ${{ inputs.environment }}
+
+    permissions:
+      contents: write
+      id-token: write
+
+    env:
+      SNAPSHOT_PATH: ${{ needs.validate.outputs.snapshot_path }}
+      DRY_RUN: ${{ inputs.dry_run }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-RestoreTenant-${{ inputs.environment }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.0
+
+      - name: Set up environment
+        env:
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+        run: |
+          echo "OKTA_ORG_NAME=${OKTA_ORG_NAME}" >> $GITHUB_ENV
+          echo "OKTA_BASE_URL=${OKTA_BASE_URL}" >> $GITHUB_ENV
+          echo "OKTA_API_TOKEN=${OKTA_API_TOKEN}" >> $GITHUB_ENV
+
+          ENV_DIR="environments/${{ inputs.environment }}"
+          echo "ENV_DIR=${ENV_DIR}" >> $GITHUB_ENV
+
+          if [ "${{ env.DRY_RUN }}" == "true" ]; then
+            echo "⚠️  DRY RUN MODE - No changes will be made"
+          else
+            echo "🚨 LIVE MODE - Changes will be applied to Okta"
+          fi
+
+      - name: Verify API Access
+        run: |
+          echo "Testing API access..."
+          RESPONSE=$(curl -s -w "%{http_code}" -o /dev/null \
+            -H "Authorization: SSWS ${OKTA_API_TOKEN}" \
+            -H "Accept: application/json" \
+            "https://${OKTA_ORG_NAME}.${OKTA_BASE_URL}/api/v1/users?limit=1")
+
+          if [ "$RESPONSE" != "200" ]; then
+            echo "❌ API authentication failed (HTTP $RESPONSE)"
+            exit 1
+          fi
+          echo "✅ API access confirmed"
+
+      # ============================================================================
+      # Restore Users
+      # ============================================================================
+      - name: Restore Users
+        id: restore_users
+        if: contains(inputs.resources, 'users') || inputs.resources == 'all'
+        run: |
+          echo "👥 Restoring users..."
+
+          if [ ! -f "${{ env.SNAPSHOT_PATH }}/users.csv" ]; then
+            echo "⚠️  No users.csv found in snapshot - skipping"
+            echo "restored=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Copy users.csv to terraform directory
+          cp "${{ env.SNAPSHOT_PATH }}/users.csv" "${{ env.ENV_DIR }}/terraform/users.csv"
+
+          # Check if users_from_csv.tf exists
+          if [ ! -f "${{ env.ENV_DIR }}/terraform/users_from_csv.tf" ]; then
+            echo "⚠️  users_from_csv.tf not found - copying example"
+            if [ -f "${{ env.ENV_DIR }}/terraform/users_from_csv.tf.example" ]; then
+              cp "${{ env.ENV_DIR }}/terraform/users_from_csv.tf.example" \
+                 "${{ env.ENV_DIR }}/terraform/users_from_csv.tf"
+            else
+              echo "❌ No users_from_csv.tf.example found"
+              exit 1
+            fi
+          fi
+
+          cd "${{ env.ENV_DIR }}/terraform"
+
+          # Initialize Terraform
+          terraform init
+
+          # Create tfvars
+          cat > terraform.tfvars << EOF
+          okta_org_name  = "${OKTA_ORG_NAME}"
+          okta_base_url  = "${OKTA_BASE_URL}"
+          okta_api_token = "${OKTA_API_TOKEN}"
+          EOF
+
+          # Plan
+          echo "📋 Planning user restore..."
+          terraform plan -target=okta_user.csv_users -out=restore_users.tfplan
+
+          if [ "${{ env.DRY_RUN }}" == "true" ]; then
+            echo "✅ DRY RUN - Users would be restored"
+            echo "restored=0" >> $GITHUB_OUTPUT
+          else
+            echo "🚀 Applying user restore..."
+            terraform apply restore_users.tfplan
+            echo "restored=1" >> $GITHUB_OUTPUT
+          fi
+
+          # Cleanup
+          rm -f terraform.tfvars restore_users.tfplan
+
+      # ============================================================================
+      # Restore Group Memberships
+      # ============================================================================
+      - name: Restore Group Memberships
+        id: restore_groups
+        if: contains(inputs.resources, 'groups') || inputs.resources == 'all'
+        run: |
+          echo "👥 Restoring group memberships..."
+
+          if [ ! -f "${{ env.SNAPSHOT_PATH }}/memberships.json" ]; then
+            echo "⚠️  No memberships.json found in snapshot - skipping"
+            echo "restored=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          DRY_RUN_FLAG=""
+          if [ "${{ env.DRY_RUN }}" == "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+            echo "📋 Planning group membership restore..."
+          else
+            echo "🚀 Applying group membership restore..."
+          fi
+
+          python scripts/copy_group_memberships.py import \
+            --input "${{ env.SNAPSHOT_PATH }}/memberships.json" \
+            $DRY_RUN_FLAG
+
+          echo "restored=1" >> $GITHUB_OUTPUT
+
+      # ============================================================================
+      # Restore Config Resources (Owners, Labels, Risk Rules)
+      # ============================================================================
+      - name: Restore Resource Owners
+        id: restore_owners
+        if: contains(inputs.resources, 'config') || inputs.resources == 'all'
+        run: |
+          echo "👤 Restoring resource owners..."
+
+          if [ ! -f "${{ env.SNAPSHOT_PATH }}/owner_mappings.json" ]; then
+            echo "⚠️  No owner_mappings.json found - skipping"
+            echo "restored=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          DRY_RUN_FLAG=""
+          if [ "${{ env.DRY_RUN }}" == "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+
+          python scripts/apply_resource_owners.py \
+            --config "${{ env.SNAPSHOT_PATH }}/owner_mappings.json" \
+            $DRY_RUN_FLAG || true
+
+          echo "restored=1" >> $GITHUB_OUTPUT
+
+      - name: Restore Governance Labels
+        id: restore_labels
+        if: contains(inputs.resources, 'config') || inputs.resources == 'all'
+        run: |
+          echo "🏷️  Restoring governance labels..."
+
+          if [ ! -f "${{ env.SNAPSHOT_PATH }}/label_mappings.json" ]; then
+            echo "⚠️  No label_mappings.json found - skipping"
+            echo "restored=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Copy to config directory for apply workflow
+          cp "${{ env.SNAPSHOT_PATH }}/label_mappings.json" \
+             "${{ env.ENV_DIR }}/config/label_mappings.json"
+
+          if [ "${{ env.DRY_RUN }}" == "true" ]; then
+            echo "✅ DRY RUN - Labels config copied, would be applied via labels-apply workflow"
+          else
+            echo "⚠️  Labels need to be applied via labels-apply-from-config workflow"
+          fi
+
+          echo "restored=1" >> $GITHUB_OUTPUT
+
+      - name: Restore Risk Rules
+        id: restore_rules
+        if: contains(inputs.resources, 'config') || inputs.resources == 'all'
+        run: |
+          echo "🛡️  Restoring risk rules..."
+
+          if [ ! -f "${{ env.SNAPSHOT_PATH }}/risk_rules.json" ]; then
+            echo "⚠️  No risk_rules.json found - skipping"
+            echo "restored=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          DRY_RUN_FLAG=""
+          if [ "${{ env.DRY_RUN }}" == "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+
+          python scripts/apply_risk_rules.py \
+            --config "${{ env.SNAPSHOT_PATH }}/risk_rules.json" \
+            $DRY_RUN_FLAG || true
+
+          echo "restored=1" >> $GITHUB_OUTPUT
+
+      # ============================================================================
+      # Restore OIG Resources
+      # ============================================================================
+      - name: Restore OIG Resources
+        id: restore_oig
+        if: contains(inputs.resources, 'oig') || inputs.resources == 'all'
+        run: |
+          echo "🏛️  Restoring OIG resources..."
+
+          OIG_DIR="${{ env.SNAPSHOT_PATH }}/oig"
+          if [ ! -d "$OIG_DIR" ]; then
+            echo "⚠️  No OIG directory found in snapshot - skipping"
+            echo "restored=0" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Copy OIG terraform files to environment
+          if [ -f "$OIG_DIR/entitlements.tf" ]; then
+            cp "$OIG_DIR/entitlements.tf" "${{ env.ENV_DIR }}/terraform/oig_entitlements.tf"
+          fi
+
+          if [ -f "$OIG_DIR/reviews.tf" ]; then
+            cp "$OIG_DIR/reviews.tf" "${{ env.ENV_DIR }}/terraform/oig_reviews.tf"
+          fi
+
+          if [ -f "$OIG_DIR/request_sequences.tf" ]; then
+            cp "$OIG_DIR/request_sequences.tf" "${{ env.ENV_DIR }}/terraform/oig_request_sequences.tf"
+          fi
+
+          cd "${{ env.ENV_DIR }}/terraform"
+
+          # Initialize Terraform
+          terraform init
+
+          # Create tfvars
+          cat > terraform.tfvars << EOF
+          okta_org_name  = "${OKTA_ORG_NAME}"
+          okta_base_url  = "${OKTA_BASE_URL}"
+          okta_api_token = "${OKTA_API_TOKEN}"
+          EOF
+
+          # Plan OIG resources
+          echo "📋 Planning OIG restore..."
+          terraform plan -out=restore_oig.tfplan \
+            -target=okta_entitlement_bundle \
+            -target=okta_reviews \
+            -target=okta_request_sequences || true
+
+          if [ "${{ env.DRY_RUN }}" == "true" ]; then
+            echo "✅ DRY RUN - OIG resources would be restored"
+          else
+            echo "🚀 Applying OIG restore..."
+            terraform apply restore_oig.tfplan || true
+          fi
+
+          # Cleanup
+          rm -f terraform.tfvars restore_oig.tfplan
+
+          echo "restored=1" >> $GITHUB_OUTPUT
+
+      # ============================================================================
+      # Summary
+      # ============================================================================
+      - name: Generate Summary
+        if: always()
+        run: |
+          echo "# 🔄 Restore Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ env.DRY_RUN }}" == "true" ]; then
+            echo "⚠️ **DRY RUN** - No changes were made" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **LIVE RUN** - Changes were applied" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Snapshot:** ${{ inputs.snapshot_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Resources:** ${{ inputs.resources }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## Restore Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Users | ${{ steps.restore_users.outcome || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Group Memberships | ${{ steps.restore_groups.outcome || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource Owners | ${{ steps.restore_owners.outcome || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Governance Labels | ${{ steps.restore_labels.outcome || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Risk Rules | ${{ steps.restore_rules.outcome || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| OIG Resources | ${{ steps.restore_oig.outcome || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ env.DRY_RUN }}" == "true" ]; then
+            echo "## Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "To apply these changes, run the restore workflow again with \`dry_run=false\`:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "gh workflow run restore-tenant.yml \\\\" >> $GITHUB_STEP_SUMMARY
+            echo "  -f environment=${{ inputs.environment }} \\\\" >> $GITHUB_STEP_SUMMARY
+            echo "  -f snapshot_id=${{ inputs.snapshot_id }} \\\\" >> $GITHUB_STEP_SUMMARY
+            echo "  -f resources=${{ inputs.resources }} \\\\" >> $GITHUB_STEP_SUMMARY
+            echo "  -f dry_run=false" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Verification" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "1. Check Okta Admin Console to verify restored resources" >> $GITHUB_STEP_SUMMARY
+            echo "2. Run \`terraform plan\` to verify state is consistent" >> $GITHUB_STEP_SUMMARY
+            echo "3. Test critical user workflows" >> $GITHUB_STEP_SUMMARY
+          fi

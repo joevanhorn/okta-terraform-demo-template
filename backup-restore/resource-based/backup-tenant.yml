@@ -1,0 +1,413 @@
+name: Backup Tenant (Resource-Based)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to backup (matches environments/ directory)'
+        required: true
+        type: string
+        default: 'myorg'
+      schedule_type:
+        description: 'Backup schedule type (for manifest metadata)'
+        type: choice
+        options:
+          - manual
+          - daily
+          - weekly
+        default: manual
+      retention_count:
+        description: 'Number of snapshots to retain (0 = unlimited)'
+        type: number
+        default: 30
+      commit_changes:
+        description: 'Commit backup to repository'
+        type: boolean
+        default: true
+
+  schedule:
+    # Daily at 2 AM UTC (disabled by default - uncomment to enable)
+    # - cron: '0 2 * * *'
+    # Weekly on Sunday at 2 AM UTC
+    # - cron: '0 2 * * 0'
+    []
+
+jobs:
+  backup:
+    name: Backup Okta Tenant
+    runs-on: ubuntu-latest
+
+    environment:
+      name: ${{ inputs.environment || 'myorg' }}
+
+    permissions:
+      contents: write
+      id-token: write
+
+    env:
+      ENV_NAME: ${{ inputs.environment || 'myorg' }}
+      SCHEDULE_TYPE: ${{ inputs.schedule_type || 'manual' }}
+      RETENTION_COUNT: ${{ inputs.retention_count || 30 }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Environment
+        run: |
+          if [ ! -d "environments/${{ env.ENV_NAME }}" ]; then
+            echo "❌ Environment not found: ${{ env.ENV_NAME }}"
+            echo "Available environments:"
+            ls -1 environments/ | grep -v README.md
+            exit 1
+          fi
+          echo "✅ Environment found: ${{ env.ENV_NAME }}"
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Set up environment
+        env:
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+        run: |
+          # Set timestamp for snapshot ID
+          SNAPSHOT_ID=$(date -u +%Y-%m-%dT%H-%M-%S)
+          echo "SNAPSHOT_ID=${SNAPSHOT_ID}" >> $GITHUB_ENV
+
+          # Set backup directories
+          BACKUP_DIR="environments/${{ env.ENV_NAME }}/backups"
+          LATEST_DIR="${BACKUP_DIR}/latest"
+          SNAPSHOT_DIR="${BACKUP_DIR}/snapshots/${SNAPSHOT_ID}"
+
+          echo "BACKUP_DIR=${BACKUP_DIR}" >> $GITHUB_ENV
+          echo "LATEST_DIR=${LATEST_DIR}" >> $GITHUB_ENV
+          echo "SNAPSHOT_DIR=${SNAPSHOT_DIR}" >> $GITHUB_ENV
+
+          # Export Okta vars for scripts
+          echo "OKTA_ORG_NAME=${OKTA_ORG_NAME}" >> $GITHUB_ENV
+          echo "OKTA_BASE_URL=${OKTA_BASE_URL}" >> $GITHUB_ENV
+          echo "OKTA_API_TOKEN=${OKTA_API_TOKEN}" >> $GITHUB_ENV
+
+          # Create backup directories
+          mkdir -p "${LATEST_DIR}/oig"
+          mkdir -p "${SNAPSHOT_DIR}/oig"
+
+          echo "📦 Backup Configuration"
+          echo "  Environment: ${{ env.ENV_NAME }}"
+          echo "  Snapshot ID: ${SNAPSHOT_ID}"
+          echo "  Schedule: ${{ env.SCHEDULE_TYPE }}"
+          echo "  Org: ${OKTA_ORG_NAME}"
+
+      - name: Verify API Access
+        run: |
+          echo "Testing API access..."
+          RESPONSE=$(curl -s -w "%{http_code}" -o /dev/null \
+            -H "Authorization: SSWS ${OKTA_API_TOKEN}" \
+            -H "Accept: application/json" \
+            "https://${OKTA_ORG_NAME}.${OKTA_BASE_URL}/api/v1/users?limit=1")
+
+          if [ "$RESPONSE" != "200" ]; then
+            echo "❌ API authentication failed (HTTP $RESPONSE)"
+            exit 1
+          fi
+          echo "✅ API access confirmed"
+
+      # ============================================================================
+      # Export Users
+      # ============================================================================
+      - name: Export Users to CSV
+        id: export_users
+        run: |
+          echo "📤 Exporting users..."
+          python backup-restore/resource-based/scripts/export_users_to_csv.py \
+            --output "${{ env.LATEST_DIR }}/users.csv" \
+            --no-groups
+
+          # Count users
+          USER_COUNT=$(grep -c "^[^#]" "${{ env.LATEST_DIR }}/users.csv" 2>/dev/null | tail -1 || echo "0")
+          # Subtract 1 for header
+          USER_COUNT=$((USER_COUNT - 1))
+          echo "user_count=$USER_COUNT" >> $GITHUB_OUTPUT
+          echo "✅ Exported $USER_COUNT users"
+
+      # ============================================================================
+      # Export Groups
+      # ============================================================================
+      - name: Export Groups
+        id: export_groups
+        run: |
+          echo "📤 Exporting groups..."
+          python scripts/copy_group_memberships.py export \
+            --output "${{ env.LATEST_DIR }}/memberships.json"
+
+          # Count groups
+          if [ -f "${{ env.LATEST_DIR }}/memberships.json" ]; then
+            GROUP_COUNT=$(jq '.group_count // 0' "${{ env.LATEST_DIR }}/memberships.json")
+            MEMBER_COUNT=$(jq '.total_members // 0' "${{ env.LATEST_DIR }}/memberships.json")
+          else
+            GROUP_COUNT=0
+            MEMBER_COUNT=0
+          fi
+
+          echo "group_count=$GROUP_COUNT" >> $GITHUB_OUTPUT
+          echo "member_count=$MEMBER_COUNT" >> $GITHUB_OUTPUT
+          echo "✅ Exported $GROUP_COUNT groups with $MEMBER_COUNT member assignments"
+
+      # ============================================================================
+      # Export App Assignments
+      # ============================================================================
+      - name: Export App Assignments
+        id: export_apps
+        run: |
+          echo "📤 Exporting app assignments..."
+          python backup-restore/resource-based/scripts/export_app_assignments.py \
+            --output "${{ env.LATEST_DIR }}/app_assignments.json" \
+            --exclude-system
+
+          # Count assignments
+          if [ -f "${{ env.LATEST_DIR }}/app_assignments.json" ]; then
+            APP_COUNT=$(jq '.metadata.app_count // 0' "${{ env.LATEST_DIR }}/app_assignments.json")
+            USER_ASSIGN=$(jq '.metadata.total_user_assignments // 0' "${{ env.LATEST_DIR }}/app_assignments.json")
+            GROUP_ASSIGN=$(jq '.metadata.total_group_assignments // 0' "${{ env.LATEST_DIR }}/app_assignments.json")
+          else
+            APP_COUNT=0
+            USER_ASSIGN=0
+            GROUP_ASSIGN=0
+          fi
+
+          echo "app_count=$APP_COUNT" >> $GITHUB_OUTPUT
+          echo "user_assignments=$USER_ASSIGN" >> $GITHUB_OUTPUT
+          echo "group_assignments=$GROUP_ASSIGN" >> $GITHUB_OUTPUT
+          echo "✅ Exported $APP_COUNT apps ($USER_ASSIGN user, $GROUP_ASSIGN group assignments)"
+
+      # ============================================================================
+      # Export OIG Resources
+      # ============================================================================
+      - name: Export OIG Resources
+        id: export_oig
+        run: |
+          echo "📤 Exporting OIG resources..."
+          python scripts/import_oig_resources.py \
+            --output-dir "${{ env.LATEST_DIR }}/oig" 2>&1 || true
+
+          # Count resources
+          BUNDLES=0
+          REVIEWS=0
+
+          if [ -f "${{ env.LATEST_DIR }}/oig/entitlements.json" ]; then
+            BUNDLES=$(jq '.entitlements | length' "${{ env.LATEST_DIR }}/oig/entitlements.json" 2>/dev/null || echo "0")
+          fi
+
+          if [ -f "${{ env.LATEST_DIR }}/oig/reviews.json" ]; then
+            REVIEWS=$(jq '.reviews | length' "${{ env.LATEST_DIR }}/oig/reviews.json" 2>/dev/null || echo "0")
+          fi
+
+          echo "bundle_count=$BUNDLES" >> $GITHUB_OUTPUT
+          echo "review_count=$REVIEWS" >> $GITHUB_OUTPUT
+          echo "✅ Exported $BUNDLES bundles, $REVIEWS reviews"
+
+      # ============================================================================
+      # Export Config Resources (Owners, Labels, Risk Rules)
+      # ============================================================================
+      - name: Export Config Resources
+        id: export_config
+        run: |
+          echo "📤 Exporting config resources..."
+
+          # Resource owners
+          python scripts/sync_owner_mappings.py \
+            --output "${{ env.LATEST_DIR }}/owner_mappings.json" 2>&1 || true
+
+          # Labels
+          python scripts/sync_label_mappings.py \
+            --output "${{ env.LATEST_DIR }}/label_mappings.json" 2>&1 || true
+
+          # Risk rules
+          python scripts/import_risk_rules.py \
+            --output "${{ env.LATEST_DIR }}/risk_rules.json" 2>&1 || true
+
+          # Count resources
+          OWNERS=0
+          LABELS=0
+          RULES=0
+
+          if [ -f "${{ env.LATEST_DIR }}/owner_mappings.json" ]; then
+            OWNERS=$(jq '[.apps, .groups, .entitlement_bundles | length] | add // 0' "${{ env.LATEST_DIR }}/owner_mappings.json" 2>/dev/null || echo "0")
+          fi
+
+          if [ -f "${{ env.LATEST_DIR }}/label_mappings.json" ]; then
+            LABELS=$(jq '.labels | length // 0' "${{ env.LATEST_DIR }}/label_mappings.json" 2>/dev/null || echo "0")
+          fi
+
+          if [ -f "${{ env.LATEST_DIR }}/risk_rules.json" ]; then
+            RULES=$(jq '.rules | length // 0' "${{ env.LATEST_DIR }}/risk_rules.json" 2>/dev/null || echo "0")
+          fi
+
+          echo "owner_count=$OWNERS" >> $GITHUB_OUTPUT
+          echo "label_count=$LABELS" >> $GITHUB_OUTPUT
+          echo "rule_count=$RULES" >> $GITHUB_OUTPUT
+          echo "✅ Exported $OWNERS owners, $LABELS labels, $RULES rules"
+
+      # ============================================================================
+      # Create Manifest
+      # ============================================================================
+      - name: Create Backup Manifest
+        run: |
+          echo "📋 Creating backup manifest..."
+          python backup-restore/resource-based/scripts/create_backup_manifest.py \
+            --backup-dir "${{ env.LATEST_DIR }}" \
+            --output "${{ env.LATEST_DIR }}/MANIFEST.json" \
+            --org-name "${OKTA_ORG_NAME}" \
+            --schedule "${{ env.SCHEDULE_TYPE }}"
+
+          echo "✅ Manifest created"
+
+      # ============================================================================
+      # Archive Snapshot
+      # ============================================================================
+      - name: Archive Snapshot
+        run: |
+          echo "📁 Archiving snapshot: ${{ env.SNAPSHOT_ID }}"
+
+          # Copy latest to snapshot directory
+          cp -r "${{ env.LATEST_DIR }}/"* "${{ env.SNAPSHOT_DIR }}/"
+
+          echo "✅ Snapshot archived to: ${{ env.SNAPSHOT_DIR }}"
+
+      # ============================================================================
+      # Cleanup Old Snapshots
+      # ============================================================================
+      - name: Cleanup Old Snapshots
+        if: env.RETENTION_COUNT != '0'
+        run: |
+          SNAPSHOTS_DIR="${{ env.BACKUP_DIR }}/snapshots"
+
+          if [ -d "$SNAPSHOTS_DIR" ]; then
+            SNAPSHOT_COUNT=$(ls -1 "$SNAPSHOTS_DIR" 2>/dev/null | wc -l)
+            echo "📊 Current snapshots: $SNAPSHOT_COUNT"
+
+            if [ "$SNAPSHOT_COUNT" -gt "${{ env.RETENTION_COUNT }}" ]; then
+              TO_DELETE=$((SNAPSHOT_COUNT - RETENTION_COUNT))
+              echo "🗑️  Removing $TO_DELETE old snapshots..."
+
+              ls -1t "$SNAPSHOTS_DIR" | tail -n "$TO_DELETE" | while read dir; do
+                echo "  Removing: $dir"
+                rm -rf "$SNAPSHOTS_DIR/$dir"
+              done
+
+              echo "✅ Cleanup complete"
+            else
+              echo "✅ No cleanup needed"
+            fi
+          fi
+
+      # ============================================================================
+      # Commit Changes
+      # ============================================================================
+      - name: Commit Backup
+        if: inputs.commit_changes == true || inputs.commit_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add "${{ env.BACKUP_DIR }}/"
+
+          if git diff --staged --quiet; then
+            echo "ℹ️  No changes to commit"
+          else
+            git commit -m "$(cat <<EOF
+          backup: Snapshot ${{ env.SNAPSHOT_ID }} for ${{ env.ENV_NAME }}
+
+          Resources backed up:
+          - Users: ${{ steps.export_users.outputs.user_count }}
+          - Groups: ${{ steps.export_groups.outputs.group_count }}
+          - Memberships: ${{ steps.export_groups.outputs.member_count }}
+          - Apps: ${{ steps.export_apps.outputs.app_count }}
+          - Bundles: ${{ steps.export_oig.outputs.bundle_count }}
+          - Reviews: ${{ steps.export_oig.outputs.review_count }}
+          - Owners: ${{ steps.export_config.outputs.owner_count }}
+          - Labels: ${{ steps.export_config.outputs.label_count }}
+          - Rules: ${{ steps.export_config.outputs.rule_count }}
+
+          Schedule: ${{ env.SCHEDULE_TYPE }}
+          Org: ${OKTA_ORG_NAME}
+
+          🤖 Generated by backup-tenant workflow
+          EOF
+          )"
+
+            # Create tag for snapshot
+            git tag "backup/${{ env.ENV_NAME }}/${{ env.SNAPSHOT_ID }}"
+
+            git push origin HEAD --tags
+
+            echo "✅ Backup committed and tagged"
+          fi
+
+      # ============================================================================
+      # Upload Artifacts
+      # ============================================================================
+      - name: Upload Backup Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-${{ env.ENV_NAME }}-${{ env.SNAPSHOT_ID }}
+          path: ${{ env.LATEST_DIR }}/
+          retention-days: 90
+
+      # ============================================================================
+      # Summary
+      # ============================================================================
+      - name: Generate Summary
+        if: always()
+        run: |
+          echo "# 📦 Backup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ env.ENV_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Snapshot ID:** \`${{ env.SNAPSHOT_ID }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Schedule:** ${{ env.SCHEDULE_TYPE }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Org:** ${OKTA_ORG_NAME}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## Resources Backed Up" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Users | ${{ steps.export_users.outputs.user_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Groups | ${{ steps.export_groups.outputs.group_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Memberships | ${{ steps.export_groups.outputs.member_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Applications | ${{ steps.export_apps.outputs.app_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| User App Assignments | ${{ steps.export_apps.outputs.user_assignments }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Group App Assignments | ${{ steps.export_apps.outputs.group_assignments }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Entitlement Bundles | ${{ steps.export_oig.outputs.bundle_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Access Reviews | ${{ steps.export_oig.outputs.review_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource Owners | ${{ steps.export_config.outputs.owner_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Governance Labels | ${{ steps.export_config.outputs.label_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Risk Rules | ${{ steps.export_config.outputs.rule_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## Files Generated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ env.LATEST_DIR }}/" >> $GITHUB_STEP_SUMMARY
+          ls -la "${{ env.LATEST_DIR }}/" 2>/dev/null || echo "(no files)"
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## Restore Command" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To restore from this backup:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "gh workflow run restore-tenant.yml \\\\" >> $GITHUB_STEP_SUMMARY
+          echo "  -f environment=${{ env.ENV_NAME }} \\\\" >> $GITHUB_STEP_SUMMARY
+          echo "  -f snapshot_id=${{ env.SNAPSHOT_ID }} \\\\" >> $GITHUB_STEP_SUMMARY
+          echo "  -f dry_run=true" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

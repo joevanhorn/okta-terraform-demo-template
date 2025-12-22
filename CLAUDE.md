@@ -260,6 +260,82 @@ python3 scripts/copy_grants_between_orgs.py import \
   --input grants_export.json \
   --exclude-apps "App Name" \
   --dry-run
+
+# Export users to CSV for backup
+python3 scripts/export_users_to_csv.py \
+  --output backups/users.csv \
+  --include-groups \
+  --include-manager
+
+# Export app assignments for backup
+python3 scripts/export_app_assignments.py \
+  --output backups/app_assignments.json \
+  --exclude-system
+
+# Create backup manifest
+python3 scripts/create_backup_manifest.py \
+  --backup-dir environments/mycompany/backups/latest \
+  --output environments/mycompany/backups/latest/MANIFEST.json
+```
+
+### Backup and Restore
+
+Two approaches available in `backup-restore/`:
+
+**Resource-Based (Full DR, Audit):**
+```bash
+# Create backup (exports all resources)
+gh workflow run backup-tenant.yml \
+  -f environment=mycompany \
+  -f commit_changes=true
+
+# Restore from backup
+gh workflow run restore-tenant.yml \
+  -f environment=mycompany \
+  -f snapshot_id=latest \
+  -f resources=all \
+  -f dry_run=true
+```
+
+**State-Based (Quick Rollback):**
+```bash
+# Create backup (captures S3 state version)
+gh workflow run backup-tenant-state.yml \
+  -f environment=mycompany \
+  -f commit_changes=true
+
+# Restore state (rollback S3 version)
+gh workflow run restore-tenant-state.yml \
+  -f environment=mycompany \
+  -f snapshot_id=latest \
+  -f restore_mode=state-only \
+  -f dry_run=true
+
+# Full restore (state + terraform apply)
+gh workflow run restore-tenant-state.yml \
+  -f environment=mycompany \
+  -f snapshot_id=latest \
+  -f restore_mode=full-restore \
+  -f dry_run=false
+```
+
+**CLI Usage:**
+```bash
+# Resource-based backup
+python backup-restore/resource-based/scripts/export_users_to_csv.py \
+  --output backups/users.csv
+
+# State-based backup
+python backup-restore/state-based/scripts/backup_state.py \
+  --environment mycompany \
+  --output-dir backups/state \
+  --state-bucket okta-terraform-demo \
+  --state-key Okta-GitOps/mycompany/terraform.tfstate
+
+# State-based restore
+python backup-restore/state-based/scripts/restore_state.py \
+  --manifest backups/state/MANIFEST.json \
+  --restore-state --dry-run
 ```
 
 ### AI-Assisted Code Generation
@@ -397,6 +473,14 @@ Workflows are named with category prefixes for easy searchability:
 
 **Migration Workflows (`migrate-*`):**
 - `migrate-cross-org.yml` - Copy groups, memberships, or grants between orgs
+
+**Backup & Restore Workflows (in `backup-restore/` folder):**
+- Resource-Based:
+  - `backup-restore/resource-based/backup-tenant.yml` - Export resources to files
+  - `backup-restore/resource-based/restore-tenant.yml` - Restore from exported files
+- State-Based:
+  - `backup-restore/state-based/backup-tenant.yml` - Capture S3 state version
+  - `backup-restore/state-based/restore-tenant.yml` - Rollback S3 state version
 
 **Other Workflows:**
 - `import-all-resources.yml` - Import entire tenant to code
