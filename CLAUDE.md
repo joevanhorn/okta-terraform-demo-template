@@ -51,6 +51,7 @@ Understanding what goes where is critical:
 - Resource Owners (not in Terraform provider yet)
 - Governance Labels (not in Terraform provider yet)
 - Risk Rules / SOD Policies (not in Terraform provider yet)
+- Entitlement Settings - enable/disable on apps (Beta API - December 2025)
 - Managed in `environments/{env}/config/*.json` files
 - Applied via `scripts/*.py` or GitHub Actions
 
@@ -160,6 +161,16 @@ gh workflow run apply-risk-rules.yml \
 gh workflow run apply-admin-labels.yml \
   -f environment=mycompany \
   -f dry_run=false
+
+# Manage entitlement settings on apps (requires environment secrets)
+gh workflow run manage-entitlement-settings.yml \
+  -f environment=mycompany \
+  -f action=list
+
+# Auto-enable entitlements (opt-in feature, requires AUTO_ENABLE_ENTITLEMENTS=true variable)
+gh workflow run auto-enable-entitlements.yml \
+  -f environment=mycompany \
+  -f dry_run=true
 ```
 
 ### Python Scripts (API Management)
@@ -203,6 +214,16 @@ python3 scripts/find_admin_resources.py
 
 # Label admin entitlements
 python3 scripts/apply_admin_labels.py --dry-run
+
+# Manage entitlement settings on apps (Beta API - December 2025)
+# List all apps and their entitlement management status
+python3 scripts/manage_entitlement_settings.py --action list
+
+# Enable entitlement management on an app
+python3 scripts/manage_entitlement_settings.py \
+  --action enable \
+  --app-id 0oaXXXXXXXX \
+  --dry-run  # Remove for actual apply
 ```
 
 ### AI-Assisted Code Generation
