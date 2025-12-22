@@ -260,6 +260,51 @@ python3 scripts/copy_grants_between_orgs.py import \
   --input grants_export.json \
   --exclude-apps "App Name" \
   --dry-run
+
+# Export users to CSV for backup
+python3 scripts/export_users_to_csv.py \
+  --output backups/users.csv \
+  --include-groups \
+  --include-manager
+
+# Export app assignments for backup
+python3 scripts/export_app_assignments.py \
+  --output backups/app_assignments.json \
+  --exclude-system
+
+# Create backup manifest
+python3 scripts/create_backup_manifest.py \
+  --backup-dir environments/mycompany/backups/latest \
+  --output environments/mycompany/backups/latest/MANIFEST.json
+```
+
+### Backup and Restore
+
+```bash
+# Create a manual backup
+gh workflow run backup-tenant.yml \
+  -f environment=mycompany \
+  -f schedule_type=manual \
+  -f commit_changes=true
+
+# View available backups
+ls environments/mycompany/backups/snapshots/
+
+# View latest backup manifest
+jq . environments/mycompany/backups/latest/MANIFEST.json
+
+# Restore from backup (dry run first!)
+gh workflow run restore-tenant.yml \
+  -f environment=mycompany \
+  -f snapshot_id=latest \
+  -f dry_run=true
+
+# Restore specific resources only
+gh workflow run restore-tenant.yml \
+  -f environment=mycompany \
+  -f snapshot_id=2025-01-15T10-30-00 \
+  -f resources=users,groups \
+  -f dry_run=false
 ```
 
 ### AI-Assisted Code Generation
@@ -397,6 +442,10 @@ Workflows are named with category prefixes for easy searchability:
 
 **Migration Workflows (`migrate-*`):**
 - `migrate-cross-org.yml` - Copy groups, memberships, or grants between orgs
+
+**Backup & Restore Workflows:**
+- `backup-tenant.yml` - Create snapshots of Okta tenant (users, groups, apps, OIG, config)
+- `restore-tenant.yml` - Restore from backup snapshots (with approval gate)
 
 **Other Workflows:**
 - `import-all-resources.yml` - Import entire tenant to code
