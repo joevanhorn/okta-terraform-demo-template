@@ -1,4 +1,4 @@
-name: Restore Tenant
+name: Restore Tenant (Resource-Based)
 
 on:
   workflow_dispatch:

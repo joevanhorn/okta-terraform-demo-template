@@ -280,31 +280,62 @@ python3 scripts/create_backup_manifest.py \
 
 ### Backup and Restore
 
+Two approaches available in `backup-restore/`:
+
+**Resource-Based (Full DR, Audit):**
 ```bash
-# Create a manual backup
+# Create backup (exports all resources)
 gh workflow run backup-tenant.yml \
   -f environment=mycompany \
-  -f schedule_type=manual \
   -f commit_changes=true
 
-# View available backups
-ls environments/mycompany/backups/snapshots/
-
-# View latest backup manifest
-jq . environments/mycompany/backups/latest/MANIFEST.json
-
-# Restore from backup (dry run first!)
+# Restore from backup
 gh workflow run restore-tenant.yml \
   -f environment=mycompany \
   -f snapshot_id=latest \
+  -f resources=all \
+  -f dry_run=true
+```
+
+**State-Based (Quick Rollback):**
+```bash
+# Create backup (captures S3 state version)
+gh workflow run backup-tenant-state.yml \
+  -f environment=mycompany \
+  -f commit_changes=true
+
+# Restore state (rollback S3 version)
+gh workflow run restore-tenant-state.yml \
+  -f environment=mycompany \
+  -f snapshot_id=latest \
+  -f restore_mode=state-only \
   -f dry_run=true
 
-# Restore specific resources only
-gh workflow run restore-tenant.yml \
+# Full restore (state + terraform apply)
+gh workflow run restore-tenant-state.yml \
   -f environment=mycompany \
-  -f snapshot_id=2025-01-15T10-30-00 \
-  -f resources=users,groups \
+  -f snapshot_id=latest \
+  -f restore_mode=full-restore \
   -f dry_run=false
+```
+
+**CLI Usage:**
+```bash
+# Resource-based backup
+python backup-restore/resource-based/scripts/export_users_to_csv.py \
+  --output backups/users.csv
+
+# State-based backup
+python backup-restore/state-based/scripts/backup_state.py \
+  --environment mycompany \
+  --output-dir backups/state \
+  --state-bucket okta-terraform-demo \
+  --state-key Okta-GitOps/mycompany/terraform.tfstate
+
+# State-based restore
+python backup-restore/state-based/scripts/restore_state.py \
+  --manifest backups/state/MANIFEST.json \
+  --restore-state --dry-run
 ```
 
 ### AI-Assisted Code Generation
@@ -443,9 +474,13 @@ Workflows are named with category prefixes for easy searchability:
 **Migration Workflows (`migrate-*`):**
 - `migrate-cross-org.yml` - Copy groups, memberships, or grants between orgs
 
-**Backup & Restore Workflows:**
-- `backup-tenant.yml` - Create snapshots of Okta tenant (users, groups, apps, OIG, config)
-- `restore-tenant.yml` - Restore from backup snapshots (with approval gate)
+**Backup & Restore Workflows (in `backup-restore/` folder):**
+- Resource-Based:
+  - `backup-restore/resource-based/backup-tenant.yml` - Export resources to files
+  - `backup-restore/resource-based/restore-tenant.yml` - Restore from exported files
+- State-Based:
+  - `backup-restore/state-based/backup-tenant.yml` - Capture S3 state version
+  - `backup-restore/state-based/restore-tenant.yml` - Rollback S3 state version
 
 **Other Workflows:**
 - `import-all-resources.yml` - Import entire tenant to code

@@ -1,0 +1,286 @@
+name: Restore Tenant (State-Based)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to restore (matches environments/ directory)'
+        required: true
+        type: string
+        default: 'myorg'
+      snapshot_id:
+        description: 'Snapshot ID to restore (or "latest")'
+        required: true
+        type: string
+        default: 'latest'
+      restore_mode:
+        description: 'Restore mode'
+        type: choice
+        options:
+          - state-only
+          - full-restore
+        default: 'state-only'
+      dry_run:
+        description: 'Preview changes without applying'
+        type: boolean
+        default: true
+
+jobs:
+  validate:
+    name: Validate Snapshot
+    runs-on: ubuntu-latest
+
+    outputs:
+      snapshot_path: ${{ steps.validate.outputs.snapshot_path }}
+      manifest: ${{ steps.validate.outputs.manifest }}
+      version_id: ${{ steps.validate.outputs.version_id }}
+      state_bucket: ${{ steps.validate.outputs.state_bucket }}
+      state_key: ${{ steps.validate.outputs.state_key }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Snapshot
+        id: validate
+        run: |
+          ENV_NAME="${{ inputs.environment }}"
+          SNAPSHOT_ID="${{ inputs.snapshot_id }}"
+          BACKUP_DIR="environments/${ENV_NAME}/backups/state-based"
+
+          echo "🔍 Validating state-based snapshot..."
+          echo "  Environment: ${ENV_NAME}"
+          echo "  Snapshot ID: ${SNAPSHOT_ID}"
+
+          # Determine snapshot path
+          if [ "$SNAPSHOT_ID" == "latest" ]; then
+            SNAPSHOT_PATH="${BACKUP_DIR}/latest"
+          else
+            SNAPSHOT_PATH="${BACKUP_DIR}/snapshots/${SNAPSHOT_ID}"
+          fi
+
+          # Check if snapshot exists
+          if [ ! -d "$SNAPSHOT_PATH" ]; then
+            echo "❌ Snapshot not found: $SNAPSHOT_PATH"
+            echo ""
+            echo "Available state-based snapshots:"
+            if [ -d "${BACKUP_DIR}/snapshots" ]; then
+              ls -1 "${BACKUP_DIR}/snapshots/" | head -20
+            else
+              echo "  (no snapshots found)"
+            fi
+            exit 1
+          fi
+
+          # Check for manifest
+          if [ ! -f "$SNAPSHOT_PATH/MANIFEST.json" ]; then
+            echo "❌ No manifest found in snapshot"
+            exit 1
+          fi
+
+          # Validate manifest type
+          BACKUP_TYPE=$(jq -r '.backup_type // "unknown"' "$SNAPSHOT_PATH/MANIFEST.json")
+          if [ "$BACKUP_TYPE" != "state-based" ]; then
+            echo "❌ Invalid backup type: $BACKUP_TYPE (expected: state-based)"
+            exit 1
+          fi
+
+          echo "snapshot_path=$SNAPSHOT_PATH" >> $GITHUB_OUTPUT
+
+          # Extract state info from manifest
+          VERSION_ID=$(jq -r '.terraform_state.version_id // ""' "$SNAPSHOT_PATH/MANIFEST.json")
+          STATE_BUCKET=$(jq -r '.terraform_state.bucket // ""' "$SNAPSHOT_PATH/MANIFEST.json")
+          STATE_KEY=$(jq -r '.terraform_state.key // ""' "$SNAPSHOT_PATH/MANIFEST.json")
+
+          if [ -z "$VERSION_ID" ]; then
+            echo "❌ No state version ID found in manifest"
+            exit 1
+          fi
+
+          echo "version_id=$VERSION_ID" >> $GITHUB_OUTPUT
+          echo "state_bucket=$STATE_BUCKET" >> $GITHUB_OUTPUT
+          echo "state_key=$STATE_KEY" >> $GITHUB_OUTPUT
+
+          echo "✅ Snapshot validated"
+          echo "  State Version: $VERSION_ID"
+          echo "  State Bucket: $STATE_BUCKET"
+          echo "  State Key: $STATE_KEY"
+
+      - name: Display Snapshot Details
+        run: |
+          SNAPSHOT_PATH="${{ steps.validate.outputs.snapshot_path }}"
+
+          echo "📋 Snapshot Details"
+          echo "==================="
+
+          if [ -f "$SNAPSHOT_PATH/MANIFEST.json" ]; then
+            echo ""
+            echo "Manifest:"
+            jq -r '
+              "  Backup Type: \(.backup_type)",
+              "  Snapshot ID: \(.snapshot_id)",
+              "  Created: \(.created_at)",
+              "  Created By: \(.created_by)",
+              "  Environment: \(.environment)",
+              "  Org: \(.org_name)",
+              "",
+              "Terraform State:",
+              "  Version ID: \(.terraform_state.version_id)",
+              "  Bucket: \(.terraform_state.bucket)",
+              "  Key: \(.terraform_state.key)",
+              "  ETag: \(.terraform_state.etag)",
+              "  Last Modified: \(.terraform_state.last_modified)"
+            ' "$SNAPSHOT_PATH/MANIFEST.json"
+          fi
+
+  restore:
+    name: Restore State
+    needs: validate
+    runs-on: ubuntu-latest
+
+    # Uses GitHub Environment for approval gate and secrets
+    environment:
+      name: ${{ inputs.environment }}
+
+    permissions:
+      contents: write
+      id-token: write
+
+    env:
+      SNAPSHOT_PATH: ${{ needs.validate.outputs.snapshot_path }}
+      VERSION_ID: ${{ needs.validate.outputs.version_id }}
+      STATE_BUCKET: ${{ needs.validate.outputs.state_bucket }}
+      STATE_KEY: ${{ needs.validate.outputs.state_key }}
+      DRY_RUN: ${{ inputs.dry_run }}
+      RESTORE_MODE: ${{ inputs.restore_mode }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install boto3 requests
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-RestoreState-${{ inputs.environment }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        if: inputs.restore_mode == 'full-restore'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.0
+
+      - name: Display Restore Plan
+        run: |
+          echo "🔄 Restore Plan"
+          echo "==============="
+          echo ""
+          echo "Mode: ${{ env.RESTORE_MODE }}"
+          echo "Dry Run: ${{ env.DRY_RUN }}"
+          echo ""
+          echo "State Details:"
+          echo "  Bucket: ${{ env.STATE_BUCKET }}"
+          echo "  Key: ${{ env.STATE_KEY }}"
+          echo "  Target Version: ${{ env.VERSION_ID }}"
+          echo ""
+
+          if [ "${{ env.DRY_RUN }}" == "true" ]; then
+            echo "⚠️  DRY RUN MODE - No changes will be made"
+          else
+            echo "🚨 LIVE MODE - State will be restored!"
+          fi
+
+      # ============================================================================
+      # Restore State
+      # ============================================================================
+      - name: Restore Terraform State
+        id: restore_state
+        run: |
+          echo "📥 Restoring Terraform state..."
+
+          DRY_RUN_FLAG=""
+          if [ "${{ env.DRY_RUN }}" == "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+
+          MODE_FLAG="--restore-state"
+          TERRAFORM_DIR_FLAG=""
+
+          if [ "${{ env.RESTORE_MODE }}" == "full-restore" ]; then
+            MODE_FLAG="--full-restore"
+            TERRAFORM_DIR_FLAG="--terraform-dir environments/${{ inputs.environment }}/terraform --auto-approve"
+          fi
+
+          python backup-restore/state-based/scripts/restore_state.py \
+            --manifest "${{ env.SNAPSHOT_PATH }}/MANIFEST.json" \
+            $MODE_FLAG \
+            $TERRAFORM_DIR_FLAG \
+            $DRY_RUN_FLAG
+
+          echo "restore_status=success" >> $GITHUB_OUTPUT
+
+      # ============================================================================
+      # Summary
+      # ============================================================================
+      - name: Generate Summary
+        if: always()
+        run: |
+          echo "# 🔄 State-Based Restore Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ env.DRY_RUN }}" == "true" ]; then
+            echo "⚠️ **DRY RUN** - No changes were made" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **LIVE RUN** - State was restored" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Restore Details" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Snapshot | ${{ inputs.snapshot_id }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mode | ${{ env.RESTORE_MODE }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Target Version | \`${{ env.VERSION_ID }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | ${{ steps.restore_state.outputs.restore_status || 'unknown' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ env.DRY_RUN }}" == "true" ]; then
+            echo "## Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "To apply this restore, run the workflow again with \`dry_run=false\`:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "gh workflow run restore-tenant-state.yml \\\\" >> $GITHUB_STEP_SUMMARY
+            echo "  -f environment=${{ inputs.environment }} \\\\" >> $GITHUB_STEP_SUMMARY
+            echo "  -f snapshot_id=${{ inputs.snapshot_id }} \\\\" >> $GITHUB_STEP_SUMMARY
+            echo "  -f restore_mode=${{ env.RESTORE_MODE }} \\\\" >> $GITHUB_STEP_SUMMARY
+            echo "  -f dry_run=false" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Verification" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "1. Check current state version:" >> $GITHUB_STEP_SUMMARY
+            echo "   \`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "   aws s3api head-object --bucket ${{ env.STATE_BUCKET }} --key ${{ env.STATE_KEY }} --query 'VersionId'" >> $GITHUB_STEP_SUMMARY
+            echo "   \`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "2. Run Terraform plan to verify state:" >> $GITHUB_STEP_SUMMARY
+            echo "   \`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "   cd environments/${{ inputs.environment }}/terraform && terraform plan" >> $GITHUB_STEP_SUMMARY
+            echo "   \`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "3. Check Okta Admin Console to verify resources" >> $GITHUB_STEP_SUMMARY
+          fi

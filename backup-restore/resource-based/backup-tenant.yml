@@ -1,4 +1,4 @@
-name: Backup Tenant
+name: Backup Tenant (Resource-Based)
 
 on:
   workflow_dispatch:
@@ -128,7 +128,7 @@ jobs:
         id: export_users
         run: |
           echo "📤 Exporting users..."
-          python scripts/export_users_to_csv.py \
+          python backup-restore/resource-based/scripts/export_users_to_csv.py \
             --output "${{ env.LATEST_DIR }}/users.csv" \
             --no-groups
 
@@ -169,7 +169,7 @@ jobs:
         id: export_apps
         run: |
           echo "📤 Exporting app assignments..."
-          python scripts/export_app_assignments.py \
+          python backup-restore/resource-based/scripts/export_app_assignments.py \
             --output "${{ env.LATEST_DIR }}/app_assignments.json" \
             --exclude-system
 
@@ -263,7 +263,7 @@ jobs:
       - name: Create Backup Manifest
         run: |
           echo "📋 Creating backup manifest..."
-          python scripts/create_backup_manifest.py \
+          python backup-restore/resource-based/scripts/create_backup_manifest.py \
             --backup-dir "${{ env.LATEST_DIR }}" \
             --output "${{ env.LATEST_DIR }}/MANIFEST.json" \
             --org-name "${OKTA_ORG_NAME}" \

@@ -68,7 +68,9 @@ This folder contains advanced reference documentation for specific topics.
 
 | Document | Purpose |
 |----------|---------|
-| [BACKUP_RESTORE.md](BACKUP_RESTORE.md) | Complete backup and restore guide |
+| [backup-restore/](../backup-restore/) | **Main backup guide** - Choose your approach |
+| [backup-restore/resource-based/](../backup-restore/resource-based/) | Resource export/import approach |
+| [backup-restore/state-based/](../backup-restore/state-based/) | S3 state versioning approach |
 | [ROLLBACK_GUIDE.md](ROLLBACK_GUIDE.md) | Git and state rollback procedures |
 
 ### Import & Migration
@@ -120,7 +122,7 @@ This folder contains advanced reference documentation for specific topics.
 | **Set up Okta Privileged Access** | [OPA_SETUP.md](OPA_SETUP.md) |
 | **Import from Okta** | [03-WORKFLOWS-GUIDE.md](03-WORKFLOWS-GUIDE.md) |
 | **Copy resources between orgs** | [CROSS_ORG_MIGRATION.md](CROSS_ORG_MIGRATION.md) |
-| **Backup and restore tenant** | [BACKUP_RESTORE.md](BACKUP_RESTORE.md) |
+| **Backup and restore tenant** | [backup-restore/](../backup-restore/) |
 | **Troubleshoot issues** | [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) |
 | **Use AI to generate code** | [ai-assisted/README.md](../ai-assisted/README.md) |
 | **Understand provider coverage** | [PROVIDER_COVERAGE_MATRIX.md](PROVIDER_COVERAGE_MATRIX.md) |
