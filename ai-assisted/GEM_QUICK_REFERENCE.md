@@ -748,4 +748,216 @@ resource "oktapam_secret" "password" {
 
 ---
 
+## Backup and Restore Quick Reference
+
+### Two Approaches
+
+| Feature | Resource-Based | State-Based |
+|---------|----------------|-------------|
+| **Use Case** | Disaster recovery, audit, cloning | Quick rollback |
+| **Backup Size** | Large (MB - full resource export) | Small (~1KB manifest) |
+| **Restore Speed** | Slow (API calls per resource) | Fast (S3 copy) |
+| **Portability** | Yes (works across orgs) | No (S3-tied) |
+| **Preserves IDs** | No (new IDs on restore) | Yes (same state) |
+| **Selective Restore** | Yes (choose resources) | No (all-or-nothing) |
+
+### Resource-Based Backup Commands
+
+```bash
+# Create backup (exports to files)
+gh workflow run backup-tenant.yml \
+  -f environment=mycompany \
+  -f commit_changes=true
+
+# Restore from backup
+gh workflow run restore-tenant.yml \
+  -f environment=mycompany \
+  -f snapshot_id=latest \
+  -f resources=all \
+  -f dry_run=true
+```
+
+### State-Based Backup Commands
+
+```bash
+# Create backup (captures S3 state version)
+gh workflow run backup-tenant-state.yml \
+  -f environment=mycompany \
+  -f commit_changes=true
+
+# Quick rollback (state only)
+gh workflow run restore-tenant-state.yml \
+  -f environment=mycompany \
+  -f snapshot_id=latest \
+  -f restore_mode=state-only \
+  -f dry_run=true
+
+# Full restore (state + terraform apply)
+gh workflow run restore-tenant-state.yml \
+  -f environment=mycompany \
+  -f snapshot_id=latest \
+  -f restore_mode=full-restore \
+  -f dry_run=false
+```
+
+### Recommended Strategy
+
+- **Daily**: State-based for quick rollbacks
+- **Weekly**: Resource-based for full DR and audit
+
+---
+
+## Cross-Org Migration Quick Reference
+
+### Migration Order (Dependencies)
+
+```
+1. Groups      → No dependencies
+2. Memberships → Requires groups to exist
+3. Grants      → Requires bundles and principals to exist
+```
+
+### Migration Commands
+
+```bash
+# Step 1: Copy groups
+gh workflow run migrate-cross-org.yml \
+  -f resource_type=groups \
+  -f source_environment=SourceEnv \
+  -f target_environment=TargetEnv \
+  -f dry_run=true
+
+# Step 2: Copy memberships
+gh workflow run migrate-cross-org.yml \
+  -f resource_type=memberships \
+  -f source_environment=SourceEnv \
+  -f target_environment=TargetEnv \
+  -f dry_run=true
+
+# Step 3: Copy grants
+gh workflow run migrate-cross-org.yml \
+  -f resource_type=grants \
+  -f source_environment=SourceEnv \
+  -f target_environment=TargetEnv \
+  -f dry_run=true
+```
+
+### CLI Scripts
+
+```bash
+# Export groups to Terraform
+python scripts/export_groups_to_terraform.py \
+  --output environments/target/terraform/groups_imported.tf
+
+# Export/import group memberships
+python scripts/copy_group_memberships.py export --output memberships.json
+python scripts/copy_group_memberships.py import --input memberships.json --dry-run
+
+# Export/import entitlement grants
+python scripts/copy_grants_between_orgs.py export --output grants.json
+python scripts/copy_grants_between_orgs.py import --input grants.json --dry-run
+```
+
+---
+
+## Entitlement Settings API Quick Reference (Beta - December 2025)
+
+### Purpose
+
+Enable or disable entitlement management on Okta applications via API.
+
+### CLI Commands
+
+```bash
+# List all apps and their entitlement management status
+python scripts/manage_entitlement_settings.py --action list
+
+# Check status for specific app
+python scripts/manage_entitlement_settings.py \
+  --action status \
+  --app-id 0oaXXXXXXXX
+
+# Enable entitlement management
+python scripts/manage_entitlement_settings.py \
+  --action enable \
+  --app-id 0oaXXXXXXXX \
+  --dry-run
+
+# Disable entitlement management
+python scripts/manage_entitlement_settings.py \
+  --action disable \
+  --app-id 0oaXXXXXXXX \
+  --dry-run
+```
+
+### Workflow Commands
+
+```bash
+# Manual mode: list, enable, disable
+gh workflow run oig-manage-entitlements.yml \
+  -f mode=manual \
+  -f environment=mycompany \
+  -f action=list
+
+# Auto mode: detect apps from Terraform and enable
+gh workflow run oig-manage-entitlements.yml \
+  -f mode=auto \
+  -f environment=mycompany \
+  -f dry_run=true
+```
+
+### Auto-Enable Feature
+
+Set repository variable `AUTO_ENABLE_ENTITLEMENTS=true` to automatically enable entitlement management on apps when entitlement resources are merged to main.
+
+---
+
+## CSV Bulk User Management Quick Reference
+
+### CSV Format
+
+```csv
+email,first_name,last_name,login,status,department,title,manager_email,groups,custom_profile_attributes
+john@example.com,John,Doe,john@example.com,ACTIVE,Engineering,Developer,alice@example.com,"Engineering,Developers","{""employeeId"":""E001""}"
+```
+
+### Terraform Pattern
+
+```hcl
+# Load users from CSV
+locals {
+  csv_users = csvdecode(file("${path.module}/users.csv"))
+  users_map = { for user in local.csv_users : user.email => user }
+}
+
+# Create users
+resource "okta_user" "csv_users" {
+  for_each   = local.users_map
+  email      = each.value.email
+  first_name = each.value.first_name
+  last_name  = each.value.last_name
+  login      = each.value.login
+  status     = "ACTIVE"
+
+  lifecycle { ignore_changes = [manager_id] }
+}
+
+# Manager relationships (after users exist)
+resource "okta_link_value" "managers" {
+  for_each        = local.users_by_manager
+  primary_user_id = local.user_email_to_id[each.key]
+  primary_name    = "manager"
+  associated_user_ids = [for email in each.value : local.user_email_to_id[email]]
+  depends_on      = [okta_user.csv_users]
+}
+```
+
+**Key Points:**
+- Manager relationships use `okta_link_value` (not `manager_id` directly)
+- Group memberships via comma-separated column with `split()`
+- Custom attributes as JSON with escaped quotes
+- Use `terraform apply -parallelism=10` for 1000+ users
+
+---
+
 This quick reference covers 95% of common Okta Terraform patterns. For edge cases, refer to full documentation or ask for clarification.
