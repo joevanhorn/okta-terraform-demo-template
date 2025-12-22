@@ -70,6 +70,7 @@ This folder contains advanced reference documentation for specific topics.
 | Document | Purpose |
 |----------|---------|
 | [TERRAFORMER.md](TERRAFORMER.md) | Terraformer import tool - complete guide |
+| [CROSS_ORG_MIGRATION.md](CROSS_ORG_MIGRATION.md) | Cross-org migration workflows and scripts |
 
 ### Okta Terraform Provider Analysis
 
@@ -112,6 +113,7 @@ This folder contains advanced reference documentation for specific topics.
 | **Enable entitlement management on apps** | [ENTITLEMENT_SETTINGS.md](ENTITLEMENT_SETTINGS.md) |
 | **Set up Okta Privileged Access** | [OPA_SETUP.md](OPA_SETUP.md) |
 | **Import from Okta** | [03-WORKFLOWS-GUIDE.md](03-WORKFLOWS-GUIDE.md) |
+| **Copy resources between orgs** | [CROSS_ORG_MIGRATION.md](CROSS_ORG_MIGRATION.md) |
 | **Troubleshoot issues** | [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) |
 | **Use AI to generate code** | [ai-assisted/README.md](../ai-assisted/README.md) |
 | **Understand provider coverage** | [PROVIDER_COVERAGE_MATRIX.md](PROVIDER_COVERAGE_MATRIX.md) |

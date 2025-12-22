@@ -1,0 +1,147 @@
+name: Copy Group Memberships Between Orgs
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_environment:
+        description: 'Source environment (to export memberships from)'
+        required: true
+        type: string
+      target_environment:
+        description: 'Target environment (to import memberships to)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (preview only, no changes)'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  export-memberships:
+    name: Export Memberships from Source
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.source_environment }}
+
+    steps:
+      - name: Validate Inputs
+        run: |
+          if [ "${{ inputs.source_environment }}" == "${{ inputs.target_environment }}" ]; then
+            echo "❌ Source and target environments must be different"
+            exit 1
+          fi
+          echo "✅ Will copy group memberships from ${{ inputs.source_environment }} to ${{ inputs.target_environment }}"
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install requests
+
+      - name: Export Group Memberships
+        env:
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+        run: |
+          echo "Exporting group memberships from ${{ inputs.source_environment }}..."
+          python3 scripts/copy_group_memberships.py export \
+            --output memberships.json \
+            --exclude-system
+
+          echo ""
+          echo "Export complete. Preview:"
+          head -50 memberships.json
+
+      - name: Upload Memberships File
+        uses: actions/upload-artifact@v4
+        with:
+          name: group-memberships
+          path: memberships.json
+          retention-days: 1
+
+  import-memberships:
+    name: Import Memberships to Target
+    needs: export-memberships
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.target_environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install requests
+
+      - name: Download Memberships File
+        uses: actions/download-artifact@v4
+        with:
+          name: group-memberships
+          path: .
+
+      - name: Show Memberships File
+        run: |
+          echo "Downloaded memberships file:"
+          cat memberships.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Groups: {d[\"group_count\"]}, Members: {d[\"total_members\"]}')"
+
+      - name: Import Group Memberships (Dry Run)
+        if: inputs.dry_run == true
+        env:
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+        run: |
+          echo "Importing group memberships to ${{ inputs.target_environment }} (DRY RUN)..."
+          python3 scripts/copy_group_memberships.py import \
+            --input memberships.json \
+            --dry-run
+
+      - name: Import Group Memberships (Apply)
+        if: inputs.dry_run == false
+        env:
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+        run: |
+          echo "Importing group memberships to ${{ inputs.target_environment }}..."
+          python3 scripts/copy_group_memberships.py import \
+            --input memberships.json
+
+      - name: Summary
+        run: |
+          echo ""
+          echo "=================================================================="
+          echo "  COPY GROUP MEMBERSHIPS SUMMARY"
+          echo "=================================================================="
+          echo ""
+          echo "Source: ${{ inputs.source_environment }}"
+          echo "Target: ${{ inputs.target_environment }}"
+          echo "Mode: ${{ inputs.dry_run == true && 'Dry Run (preview only)' || 'Applied' }}"
+          echo ""
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
+            echo "To apply changes, run this workflow again with dry_run=false"
+          else
+            echo "✅ Group memberships have been copied to ${{ inputs.target_environment }}"
+          fi
+          echo "=================================================================="
+
+          # GitHub Step Summary
+          echo "## Copy Group Memberships Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Source | ${{ inputs.source_environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Target | ${{ inputs.target_environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Mode | ${{ inputs.dry_run == true && 'Dry Run' || 'Applied' }} |" >> $GITHUB_STEP_SUMMARY
