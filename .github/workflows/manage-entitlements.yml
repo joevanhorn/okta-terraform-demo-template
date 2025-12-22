@@ -1,16 +1,10 @@
-name: Auto-Enable Entitlement Management
+name: Manage Entitlements
 
-# This workflow automatically enables entitlement management on apps when
-# Terraform files containing okta_entitlement or okta_entitlement_bundle
-# resources are merged to main.
-#
-# SETUP REQUIRED:
-# 1. Create a repository variable named AUTO_ENABLE_ENTITLEMENTS
-# 2. Set it to "true" to enable this feature (default: disabled)
-#
-# To enable: Settings > Secrets and variables > Actions > Variables > New
-# Name: AUTO_ENABLE_ENTITLEMENTS
-# Value: true
+# Consolidated workflow for managing entitlement settings on apps.
+# Two modes:
+#   - auto: Automatically detects and enables entitlement management on apps
+#           when Terraform files with entitlement resources are merged to main
+#   - manual: Manually list, enable, or disable entitlement management on specific apps
 
 on:
   push:
@@ -22,15 +16,36 @@ on:
 
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Environment to check'
+      mode:
+        description: 'Operation mode'
         required: true
         type: choice
         options:
-          - myorg
-          - production
-          - staging
-          - development
+          - manual
+          - auto
+        default: manual
+      environment:
+        description: 'Target environment'
+        required: true
+        type: string
+      action:
+        description: 'Action (for manual mode: list, status, enable, disable)'
+        required: false
+        type: choice
+        options:
+          - list
+          - status
+          - enable
+          - disable
+        default: list
+      app_id:
+        description: 'App ID (for manual mode)'
+        required: false
+        type: string
+      app_label:
+        description: 'App label pattern (for manual mode, supports wildcards)'
+        required: false
+        type: string
       dry_run:
         description: 'Dry run (preview only)'
         required: true
@@ -42,9 +57,14 @@ on:
         type: boolean
         default: false
 
+# ============================================================================
+# AUTO MODE - Detect and enable entitlements on push to main
+# ============================================================================
 jobs:
+  # Check if auto-enable feature is enabled
   check-feature-flag:
     name: Check Feature Flag
+    if: github.event_name == 'push' || inputs.mode == 'auto'
     runs-on: ubuntu-latest
     outputs:
       enabled: ${{ steps.check.outputs.enabled }}
@@ -53,7 +73,6 @@ jobs:
       - name: Check if feature is enabled
         id: check
         run: |
-          # Check if AUTO_ENABLE_ENTITLEMENTS is set to "true"
           if [ "${{ vars.AUTO_ENABLE_ENTITLEMENTS }}" == "true" ]; then
             echo "Feature is enabled via repository variable"
             echo "enabled=true" >> $GITHUB_OUTPUT
@@ -69,6 +88,7 @@ jobs:
             echo "2. Create variable: AUTO_ENABLE_ENTITLEMENTS = true"
           fi
 
+  # Detect which environment changed
   detect-environment:
     name: Detect Environment
     needs: check-feature-flag
@@ -91,10 +111,7 @@ jobs:
             echo "environment=${{ inputs.environment }}" >> $GITHUB_OUTPUT
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
-            # Get changed files
             CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
-
-            # Find entitlement-related TF files
             ENTITLEMENT_FILES=$(echo "$CHANGED_FILES" | grep -E "environments/.*/terraform/.*entitlement.*\.tf$" || true)
 
             if [ -z "$ENTITLEMENT_FILES" ]; then
@@ -104,8 +121,6 @@ jobs:
             else
               echo "Found entitlement TF files:"
               echo "$ENTITLEMENT_FILES"
-
-              # Extract environment from first matched file
               ENV_NAME=$(echo "$ENTITLEMENT_FILES" | head -1 | sed 's|environments/\([^/]*\)/terraform/.*|\1|')
               echo "Detected environment: $ENV_NAME"
               echo "environment=$ENV_NAME" >> $GITHUB_OUTPUT
@@ -113,13 +128,13 @@ jobs:
             fi
           fi
 
+  # Detect which apps have entitlement resources
   detect-apps:
     name: Detect Apps with Entitlements
     needs: [check-feature-flag, detect-environment]
     if: needs.check-feature-flag.outputs.enabled == 'true' && needs.detect-environment.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     outputs:
-      app_labels: ${{ steps.detect.outputs.app_labels }}
       has_apps: ${{ steps.detect.outputs.has_apps }}
 
     steps:
@@ -135,8 +150,6 @@ jobs:
         id: detect
         run: |
           ENV="${{ needs.detect-environment.outputs.environment }}"
-
-          # Run detection script
           python scripts/detect_entitlement_apps.py \
             --environment "$ENV" \
             --resolve-labels \
@@ -144,19 +157,13 @@ jobs:
 
           cat detection_output.json
 
-          # Extract app labels for API lookup
-          APP_LABELS=$(jq -r '.resolved_labels | values | @json' detection_output.json)
           REF_COUNT=$(jq '.terraform_references | length' detection_output.json)
           ID_COUNT=$(jq '.app_ids | length' detection_output.json)
 
-          echo "Found $REF_COUNT Terraform references, $ID_COUNT literal IDs"
-
           if [ "$REF_COUNT" -gt 0 ] || [ "$ID_COUNT" -gt 0 ]; then
             echo "has_apps=true" >> $GITHUB_OUTPUT
-            echo "app_labels=$APP_LABELS" >> $GITHUB_OUTPUT
           else
             echo "has_apps=false" >> $GITHUB_OUTPUT
-            echo "app_labels=[]" >> $GITHUB_OUTPUT
           fi
 
       - name: Upload detection results
@@ -166,8 +173,9 @@ jobs:
           path: detection_output.json
           retention-days: 7
 
-  enable-entitlements:
-    name: Enable Entitlement Management
+  # Enable entitlement management on detected apps
+  auto-enable-entitlements:
+    name: Auto-Enable Entitlement Management
     needs: [check-feature-flag, detect-environment, detect-apps]
     if: needs.check-feature-flag.outputs.enabled == 'true' && needs.detect-apps.outputs.has_apps == 'true'
     runs-on: ubuntu-latest
@@ -197,35 +205,22 @@ jobs:
           OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
           OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
         run: |
-          ENV="${{ needs.detect-environment.outputs.environment }}"
           DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
-
           echo "=== Auto-Enable Entitlement Management ==="
-          echo "Environment: $ENV"
+          echo "Environment: ${{ needs.detect-environment.outputs.environment }}"
           echo "Dry Run: $DRY_RUN"
-          echo ""
 
-          # Get app labels from detection
           APP_LABELS=$(jq -r '.resolved_labels | to_entries[] | .value' detection_output.json 2>/dev/null || echo "")
 
           if [ -z "$APP_LABELS" ]; then
-            echo "No app labels resolved - checking for literal app IDs"
             APP_IDS=$(jq -r '.app_ids[]' detection_output.json 2>/dev/null || echo "")
-
             if [ -n "$APP_IDS" ]; then
               for APP_ID in $APP_IDS; do
                 echo "Processing app ID: $APP_ID"
-
                 if [ "$DRY_RUN" == "true" ]; then
-                  echo "  [DRY RUN] Would enable entitlement management"
-                  python scripts/manage_entitlement_settings.py \
-                    --action enable \
-                    --app-id "$APP_ID" \
-                    --dry-run || true
+                  python scripts/manage_entitlement_settings.py --action enable --app-id "$APP_ID" --dry-run || true
                 else
-                  python scripts/manage_entitlement_settings.py \
-                    --action enable \
-                    --app-id "$APP_ID" || true
+                  python scripts/manage_entitlement_settings.py --action enable --app-id "$APP_ID" || true
                 fi
               done
             else
@@ -234,17 +229,10 @@ jobs:
           else
             for LABEL in $APP_LABELS; do
               echo "Processing app: $LABEL"
-
               if [ "$DRY_RUN" == "true" ]; then
-                echo "  [DRY RUN] Would enable entitlement management"
-                python scripts/manage_entitlement_settings.py \
-                  --action enable \
-                  --app-label "$LABEL" \
-                  --dry-run || true
+                python scripts/manage_entitlement_settings.py --action enable --app-label "$LABEL" --dry-run || true
               else
-                python scripts/manage_entitlement_settings.py \
-                  --action enable \
-                  --app-label "$LABEL" || true
+                python scripts/manage_entitlement_settings.py --action enable --app-label "$LABEL" || true
               fi
             done
           fi
@@ -255,32 +243,17 @@ jobs:
           echo "## Auto-Enable Entitlement Management Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** ${{ needs.detect-environment.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
-            echo "**Mode:** DRY RUN (no changes made)" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "**Mode:** APPLY" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Detection Results" >> $GITHUB_STEP_SUMMARY
+          echo "**Mode:** ${{ github.event.inputs.dry_run == 'true' && 'DRY RUN' || 'APPLY' }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo '```json' >> $GITHUB_STEP_SUMMARY
           cat detection_output.json >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
 
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "This workflow was triggered because entitlement Terraform files were detected." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Feature controlled by:** \`AUTO_ENABLE_ENTITLEMENTS\` repository variable" >> $GITHUB_STEP_SUMMARY
-
+  # Notification when feature is disabled
   skip-notification:
     name: Feature Disabled
     needs: check-feature-flag
-    if: needs.check-feature-flag.outputs.enabled != 'true'
+    if: (github.event_name == 'push' || inputs.mode == 'auto') && needs.check-feature-flag.outputs.enabled != 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -290,13 +263,104 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "The auto-enable entitlements feature is **disabled**." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### How to Enable" >> $GITHUB_STEP_SUMMARY
+          echo "To enable: Set repository variable \`AUTO_ENABLE_ENTITLEMENTS = true\`" >> $GITHUB_STEP_SUMMARY
+
+# ============================================================================
+# MANUAL MODE - Directly manage entitlement settings
+# ============================================================================
+  manual-manage-settings:
+    name: Manual Entitlement Management
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'manual'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Workflow Overview
+        run: |
+          echo "=================================================="
+          echo "  MANAGE ENTITLEMENT SETTINGS"
+          echo "=================================================="
+          echo ""
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Action: ${{ inputs.action }}"
+          echo "App ID: ${{ inputs.app_id || 'Not specified' }}"
+          echo "App Label: ${{ inputs.app_label || 'Not specified' }}"
+          echo "Dry Run: ${{ inputs.dry_run }}"
+          echo "=================================================="
+
+      - name: Validate inputs
+        if: inputs.action != 'list' && inputs.app_id == '' && inputs.app_label == ''
+        run: |
+          echo "Error: For ${{ inputs.action }} action, either app_id or app_label is required"
+          exit 1
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Run entitlement settings management
+        id: manage
+        env:
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+        run: |
+          ARGS="--action ${{ inputs.action }}"
+
+          if [ -n "${{ inputs.app_id }}" ]; then
+            ARGS="$ARGS --app-id ${{ inputs.app_id }}"
+          fi
+
+          if [ -n "${{ inputs.app_label }}" ]; then
+            ARGS="$ARGS --app-label '${{ inputs.app_label }}'"
+          fi
+
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          echo "Running: python scripts/manage_entitlement_settings.py $ARGS"
+          eval "python scripts/manage_entitlement_settings.py $ARGS" 2>&1 | tee output.log
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: entitlement-settings-${{ inputs.environment }}-${{ inputs.action }}-${{ github.run_number }}
+          path: output.log
+          retention-days: 30
+
+      - name: Post summary
+        if: always()
+        run: |
+          echo "## Entitlement Settings Management Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "1. Go to **Settings** > **Secrets and variables** > **Actions** > **Variables**" >> $GITHUB_STEP_SUMMARY
-          echo "2. Click **New repository variable**" >> $GITHUB_STEP_SUMMARY
-          echo "3. Name: \`AUTO_ENABLE_ENTITLEMENTS\`" >> $GITHUB_STEP_SUMMARY
-          echo "4. Value: \`true\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Action:** ${{ inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          if [ -n "${{ inputs.app_id }}" ]; then
+            echo "**App ID:** ${{ inputs.app_id }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ -n "${{ inputs.app_label }}" ]; then
+            echo "**App Label:** ${{ inputs.app_label }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "${{ inputs.action }}" != "list" ] && [ "${{ inputs.action }}" != "status" ]; then
+            echo "**Mode:** ${{ inputs.dry_run == true && 'DRY RUN' || 'APPLY' }}" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Once enabled, this workflow will automatically enable entitlement management" >> $GITHUB_STEP_SUMMARY
-          echo "on apps when Terraform files containing \`okta_entitlement\` or \`okta_entitlement_bundle\`" >> $GITHUB_STEP_SUMMARY
-          echo "resources are merged to main." >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat output.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

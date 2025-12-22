@@ -162,33 +162,26 @@ gh workflow run apply-admin-labels.yml \
   -f environment=mycompany \
   -f dry_run=false
 
-# Manage entitlement settings on apps (requires environment secrets)
-gh workflow run manage-entitlement-settings.yml \
+# Manage entitlements (manual mode: list, enable, disable)
+gh workflow run manage-entitlements.yml \
+  -f mode=manual \
   -f environment=mycompany \
   -f action=list
 
-# Auto-enable entitlements (opt-in feature, requires AUTO_ENABLE_ENTITLEMENTS=true variable)
-gh workflow run auto-enable-entitlements.yml \
+# Manage entitlements (auto mode: detect and enable on apps)
+gh workflow run manage-entitlements.yml \
+  -f mode=auto \
   -f environment=mycompany \
   -f dry_run=true
 
-# Cross-org migration: Copy groups between orgs
-gh workflow run copy-groups-between-orgs.yml \
+# Cross-org migration: Copy groups, memberships, or grants between orgs
+gh workflow run cross-org-migrate.yml \
+  -f resource_type=groups \
   -f source_environment=SourceEnv \
   -f target_environment=TargetEnv \
   -f dry_run=true
 
-# Cross-org migration: Copy group memberships between orgs
-gh workflow run copy-group-memberships.yml \
-  -f source_environment=SourceEnv \
-  -f target_environment=TargetEnv \
-  -f dry_run=true
-
-# Cross-org migration: Copy entitlement bundle grants between orgs
-gh workflow run copy-grants-between-orgs.yml \
-  -f source_environment=SourceEnv \
-  -f target_environment=TargetEnv \
-  -f dry_run=true
+# Also supports: resource_type=memberships or resource_type=grants
 ```
 
 ### Python Scripts (API Management)
