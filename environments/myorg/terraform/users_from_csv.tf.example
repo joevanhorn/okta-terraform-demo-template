@@ -1,0 +1,264 @@
+# ==============================================================================
+# CSV-BASED USER MANAGEMENT FOR OKTA
+# ==============================================================================
+#
+# This file demonstrates how to manage 1000+ users via CSV import.
+# Supports comprehensive user attributes, manager relationships, and group memberships.
+#
+# FEATURES:
+# - Load users from CSV file with csvdecode()
+# - Create okta_user resources with for_each
+# - Handle manager_email lookups to establish manager_id relationships
+# - Process comma-separated groups column into group memberships
+# - Support custom_profile_attributes as JSON
+#
+# USAGE:
+#   1. Copy this file: cp users_from_csv.tf.example users_from_csv.tf
+#   2. Copy CSV template: cp users.csv.example users.csv
+#   3. Edit users.csv with your user data
+#   4. Run: terraform init && terraform plan
+#   5. Review the plan carefully before applying
+#
+# PERFORMANCE NOTES:
+#   - For 1000+ users, use: terraform apply -parallelism=10
+#   - Expect 10-15 minutes for 1000 users
+#   - Consider splitting into multiple CSVs for 5000+ users
+#
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# STEP 1: Load and Transform CSV Data
+# ------------------------------------------------------------------------------
+
+locals {
+  # Load users from CSV file
+  # The CSV must have a header row with column names
+  csv_users_raw = csvdecode(file("${path.module}/users.csv"))
+
+  # Filter out comment rows (rows starting with #)
+  csv_users_filtered = [
+    for user in local.csv_users_raw : user
+    if !startswith(user.email, "#")
+  ]
+
+  # Transform CSV data into a map keyed by email for for_each
+  # This also normalizes optional fields with defaults
+  csv_users = {
+    for user in local.csv_users_filtered : user.email => {
+      email                     = user.email
+      first_name                = user.first_name
+      last_name                 = user.last_name
+      login                     = user.login
+      status                    = coalesce(trimspace(user.status), "ACTIVE")
+      department                = trimspace(try(user.department, ""))
+      title                     = trimspace(try(user.title, ""))
+      manager_email             = trimspace(try(user.manager_email, ""))
+      groups                    = trimspace(try(user.groups, ""))
+      custom_profile_attributes = trimspace(try(user.custom_profile_attributes, "{}"))
+    }
+  }
+
+  # Build lookup map: email -> user_id (populated after users are created)
+  user_email_to_id = {
+    for email, user in okta_user.csv_users : email => user.id
+  }
+
+  # Parse group memberships: email -> list of group names
+  user_groups = {
+    for email, user in local.csv_users : email => (
+      user.groups != "" ? [for g in split(",", user.groups) : trimspace(g)] : []
+    )
+  }
+
+  # Extract unique group names for group creation
+  unique_groups = toset(flatten([
+    for groups in local.user_groups : groups
+  ]))
+
+  # Identify users with managers for relationship creation
+  users_with_managers = {
+    for email, user in local.csv_users : email => user
+    if user.manager_email != ""
+  }
+
+  # Group subordinates by manager email for efficient relationship creation
+  users_by_manager = {
+    for email, user in local.users_with_managers : user.manager_email => email...
+  }
+}
+
+# ------------------------------------------------------------------------------
+# STEP 2: Create Groups from CSV
+# ------------------------------------------------------------------------------
+# Groups referenced in the CSV are automatically created.
+# Comment out this resource if using pre-existing groups.
+
+resource "okta_group" "csv_groups" {
+  for_each = local.unique_groups
+
+  name        = each.value
+  description = "Group created from CSV user import"
+}
+
+# ------------------------------------------------------------------------------
+# ALTERNATIVE: Use Existing Groups (uncomment if needed)
+# ------------------------------------------------------------------------------
+# If your groups already exist, use data sources instead:
+#
+# data "okta_group" "existing_groups" {
+#   for_each = local.unique_groups
+#   name     = each.value
+# }
+#
+# Then reference: data.okta_group.existing_groups[group_name].id
+
+# ------------------------------------------------------------------------------
+# STEP 3: Create Users
+# ------------------------------------------------------------------------------
+# Users are created without manager_id initially.
+# Manager relationships are established in Step 4 using okta_link_value.
+
+resource "okta_user" "csv_users" {
+  for_each = local.csv_users
+
+  # Required attributes
+  email      = each.value.email
+  first_name = each.value.first_name
+  last_name  = each.value.last_name
+  login      = each.value.login
+
+  # Optional attributes (only set if provided)
+  status     = each.value.status
+  department = each.value.department != "" ? each.value.department : null
+  title      = each.value.title != "" ? each.value.title : null
+
+  # Custom profile attributes (must be valid JSON)
+  # Example: {"employeeNumber":"E001","costCenter":"CC-100"}
+  custom_profile_attributes = (
+    each.value.custom_profile_attributes != "" &&
+    each.value.custom_profile_attributes != "{}"
+    ? each.value.custom_profile_attributes
+    : null
+  )
+
+  # Ignore manager_id changes - we set this via okta_link_value
+  lifecycle {
+    ignore_changes = [manager_id]
+  }
+}
+
+# ------------------------------------------------------------------------------
+# STEP 4: Establish Manager Relationships
+# ------------------------------------------------------------------------------
+# Uses okta_link_value to create manager-subordinate relationships.
+# This runs after all users are created, avoiding circular dependencies.
+
+resource "okta_link_value" "manager_subordinates" {
+  for_each = local.users_by_manager
+
+  # The manager's user ID (looked up by email)
+  primary_user_id = lookup(local.user_email_to_id, each.key, null)
+
+  # Link type name - "manager" is a built-in Okta linked object type
+  primary_name = "manager"
+
+  # List of subordinate user IDs
+  associated_user_ids = [
+    for subordinate_email in each.value :
+    lookup(local.user_email_to_id, subordinate_email, null)
+    if lookup(local.user_email_to_id, subordinate_email, null) != null
+  ]
+
+  depends_on = [okta_user.csv_users]
+}
+
+# ------------------------------------------------------------------------------
+# STEP 5: Create Group Memberships
+# ------------------------------------------------------------------------------
+# Assigns users to groups based on the groups column in CSV.
+# Uses user-centric approach (one resource per user with all their groups).
+
+resource "okta_user_group_memberships" "csv_memberships" {
+  for_each = {
+    for email, groups in local.user_groups : email => groups
+    if length(groups) > 0
+  }
+
+  user_id = okta_user.csv_users[each.key].id
+
+  groups = [
+    for group_name in each.value :
+    okta_group.csv_groups[group_name].id
+  ]
+
+  depends_on = [
+    okta_user.csv_users,
+    okta_group.csv_groups
+  ]
+}
+
+# ------------------------------------------------------------------------------
+# STEP 6: Outputs for Verification
+# ------------------------------------------------------------------------------
+
+output "csv_users_created_count" {
+  description = "Number of users created from CSV"
+  value       = length(okta_user.csv_users)
+}
+
+output "csv_groups_created" {
+  description = "Groups created from CSV"
+  value       = [for g in okta_group.csv_groups : g.name]
+}
+
+output "csv_user_emails" {
+  description = "List of user emails created"
+  value       = [for email, user in okta_user.csv_users : email]
+}
+
+output "csv_manager_relationships" {
+  description = "Manager relationships established (manager_email -> subordinate_emails)"
+  value = {
+    for manager_email, subordinates in local.users_by_manager :
+    manager_email => subordinates
+  }
+}
+
+# ==============================================================================
+# USAGE EXAMPLES & TIPS
+# ==============================================================================
+#
+# BASIC USAGE:
+#   cp users.csv.example users.csv
+#   # Edit users.csv with your data
+#   terraform plan
+#   terraform apply
+#
+# LARGE SCALE (1000+ users):
+#   terraform plan -parallelism=10
+#   terraform apply -parallelism=10
+#
+# USING EXISTING GROUPS:
+#   1. Comment out the okta_group.csv_groups resource
+#   2. Uncomment the data.okta_group.existing_groups data source
+#   3. Update okta_user_group_memberships to reference data.okta_group
+#
+# INCREMENTAL UPDATES:
+#   - Add new rows to CSV -> terraform plan shows additions
+#   - Modify existing rows -> terraform plan shows changes
+#   - Remove rows -> terraform plan shows destructions
+#   - Consider setting status="DEPROVISIONED" instead of deleting
+#
+# TROUBLESHOOTING:
+#   - "Invalid JSON" -> Check custom_profile_attributes escaping
+#   - "User not found" for manager -> Ensure manager is in same CSV
+#   - "Group not found" -> Check group name spelling matches exactly
+#   - Rate limit errors -> Reduce parallelism or add delays
+#
+# CSV FORMAT TIPS:
+#   - No spaces after commas in the groups column
+#   - Use double quotes for JSON: "{""key"":""value""}"
+#   - Empty optional fields can be left blank
+#   - Comment rows start with # in the email column
+#
+# ==============================================================================

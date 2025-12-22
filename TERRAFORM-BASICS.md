@@ -57,6 +57,30 @@ resource "okta_user" "detailed" {
 }
 ```
 
+### Bulk User Management with CSV
+
+For managing 1000+ users, use CSV-based import. See `environments/myorg/terraform/users_from_csv.tf.example` for complete implementation.
+
+**Quick Start:**
+```bash
+cp environments/myorg/terraform/users.csv.example users.csv
+cp environments/myorg/terraform/users_from_csv.tf.example users_from_csv.tf
+# Edit users.csv with your data
+terraform apply -parallelism=10
+```
+
+**CSV Format:**
+```csv
+email,first_name,last_name,login,status,department,title,manager_email,groups,custom_profile_attributes
+john@example.com,John,Doe,john@example.com,ACTIVE,Engineering,Developer,alice@example.com,"Engineering,Developers","{""employeeId"":""E001""}"
+```
+
+**Key Points:**
+- Manager relationships use `manager_email` column, resolved via `okta_link_value`
+- Groups are comma-separated, auto-created if they don't exist
+- Custom attributes as JSON with escaped quotes
+- Use `-parallelism=10` for faster execution
+
 ### Groups
 
 ```hcl
