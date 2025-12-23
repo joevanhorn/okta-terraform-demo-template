@@ -29,8 +29,8 @@
         },
         "email_domain": {
           "type": "string",
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9-]*\\.[a-zA-Z]{2,}$",
-          "description": "Email domain for auto-generated users"
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9.-]*\\.[a-zA-Z]{2,}$",
+          "description": "Email domain for auto-generated users (supports subdomains)"
         }
       }
     },

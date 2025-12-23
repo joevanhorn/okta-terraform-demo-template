@@ -53,9 +53,10 @@ Best for: Quick demos, industry-specific scenarios
 
 ```yaml
 environment:
-  name: "myorg"              # Directory name (environments/myorg/terraform)
-  description: "My Demo"     # Human-readable description
-  email_domain: "example.com" # Domain for auto-generated emails
+  name: "myorg"                        # Directory name (environments/myorg/terraform)
+  description: "My Demo"               # Human-readable description
+  email_domain: "example.com"          # Domain for auto-generated emails
+  # email_domain: "dept.company.com"   # Subdomains are supported
 ```
 
 ### Departments and Users
@@ -75,10 +76,18 @@ departments:
         last_name: "Developer"
         title: "Senior Engineer"
 
-      # Option B: Auto-generate
-      # count: 10
-      # title_pattern: "Software Engineer"
+  - name: "Sales"
+    manager:
+      first_name: "Pat"
+      last_name: "Director"
+      title: "Sales Director"
+    employees:
+      # Option B: Auto-generate (creates Sal01_Employee, Sal02_Employee, etc.)
+      count: 5
+      title_pattern: "Sales Representative"  # Becomes "Sales Representative 1", etc.
 ```
+
+**Note:** At least one department with a manager is required.
 
 ### Additional Users
 
@@ -179,6 +188,17 @@ python scripts/build_demo.py --config my-demo.yaml --schema-check
 python scripts/build_demo.py --config my-demo.yaml --no-backup
 ```
 
+### Backup Behavior
+
+When overwriting existing files, the generator creates backups with timestamps:
+
+```
+users.tf                        # Current file
+users.tf.bak.20251222190443     # Backup from Dec 22, 2024 at 19:04:43
+```
+
+Use `--no-backup` to skip creating backup files.
+
 ## Generated Files
 
 When `separate_files: true`:
@@ -270,12 +290,39 @@ python scripts/build_demo.py --config demo-builder/my-demo.yaml
 python scripts/build_demo.py --config /path/to/my-demo.yaml
 ```
 
-### "Validation error"
+### "Validation error: 'departments' is too short"
+
+You must have at least one department with a manager. Empty departments arrays are not allowed:
+
+```yaml
+# ❌ Invalid
+departments: []
+
+# ✅ Valid - at least one department required
+departments:
+  - name: "General"
+    manager:
+      first_name: "Admin"
+      last_name: "User"
+      title: "Administrator"
+    employees: []  # Empty employees is OK
+```
+
+### "Validation error" for YAML syntax
 
 Check your YAML syntax. Common issues:
 - Indentation must be consistent (2 spaces recommended)
 - Strings with special characters need quotes
 - Dates must be ISO 8601 format: `2025-01-15T00:00:00Z`
+
+### "Invalid application type"
+
+Application type must be one of:
+- `oauth_web` - Server-side web applications
+- `oauth_spa` - Single page applications
+- `oauth_service` - Machine-to-machine / API
+- `oauth_native` - Mobile / desktop apps
+- `saml` - SAML enterprise SSO
 
 ### "Group not found for app"
 
