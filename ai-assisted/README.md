@@ -205,6 +205,8 @@ Use pre-written prompts and context files with any AI assistant. No installation
 | **Add Users** | `prompts/add_users.md` | Adding users to existing setup |
 | **Create Application** | `prompts/create_app.md` | OAuth/OIDC app configuration |
 | **OIG Setup** | `prompts/oig_setup.md` | Identity Governance features |
+| **SAML Application** | `prompts/create_saml_app.md` | Enterprise SAML 2.0 apps |
+| **Active Directory** | `prompts/active_directory_integration.md` | AD infrastructure and Okta agent |
 | **Backup & Restore** | `prompts/backup_restore.md` | Disaster recovery, snapshots, rollback |
 | **Cross-Org Migration** | `prompts/cross_org_migration.md` | Copy groups/memberships between orgs |
 | **Risk Rules** | `prompts/manage_risk_rules.md` | SOD policies and compliance controls |
@@ -665,6 +667,7 @@ Create 3 users. Output only code, no explanations.
 ```
 ai-assisted/
 ├── README.md                          # This file
+├── PROVIDER_COMPARISON.md             # AI provider comparison guide
 ├── requirements.txt                   # Python dependencies
 ├── generate.py                        # CLI tool (Tier 2)
 │
@@ -675,8 +678,10 @@ ai-assisted/
 ├── prompts/                           # Prompt templates (Tier 1)
 │   ├── create_demo_environment.md     # Full demo environment
 │   ├── deploy_infrastructure.md       # AWS infrastructure for Active Directory
+│   ├── active_directory_integration.md # AD module-based infrastructure
 │   ├── add_users.md                   # Add users to existing setup
 │   ├── create_app.md                  # Create OAuth applications
+│   ├── create_saml_app.md             # Create SAML 2.0 applications
 │   ├── oig_setup.md                   # OIG features (entitlements, reviews)
 │   ├── backup_restore.md              # Backup and restore operations
 │   ├── cross_org_migration.md         # Cross-org migration workflows
@@ -686,7 +691,7 @@ ai-assisted/
 ├── context/                           # Context files for AI
 │   ├── repository_structure.md        # How the repo is organized
 │   ├── terraform_examples.md          # Example Terraform patterns
-│   └── okta_resource_guide.md         # Quick reference for resources
+│   └── okta_resource_guide.md         # Comprehensive resource reference (80+ resources)
 │
 ├── examples/                          # Real session examples
 │   └── example_session_gemini.md      # Complete Gemini session
@@ -695,8 +700,8 @@ ai-assisted/
     ├── __init__.py                    # Provider registry
     ├── base.py                        # Base provider class
     ├── gemini.py                      # Google Gemini provider
-    ├── openai.py                      # OpenAI provider
-    └── anthropic.py                   # Anthropic/Claude provider
+    ├── openai.py                      # OpenAI (GPT-4o) provider
+    └── anthropic.py                   # Anthropic (Claude Sonnet 4) provider
 ```
 
 ---
@@ -767,7 +772,55 @@ ai-assisted/
 
 **Requirements:** Okta Identity Governance license
 
-### 6. Manage Risk Rules (SOD Policies)
+### 5. SAML Application
+**File:** `prompts/create_saml_app.md`
+
+**Use for:**
+- Enterprise SAML 2.0 integrations
+- ServiceNow, Workday, Salesforce SAML
+- Custom SP integrations
+
+**Generates:**
+- okta_app_saml resources
+- Attribute statements
+- Group attribute statements
+- okta_app_group_assignments
+- SP configuration outputs (metadata URL, SSO URL, certificate)
+
+**Key features:**
+- Name ID configuration
+- Signature and encryption settings
+- Custom attribute mapping
+
+**Time to generate:** 2-3 minutes (Tier 1) or 1 minute (Tier 2)
+
+### 6. Active Directory Integration
+**File:** `prompts/active_directory_integration.md`
+
+**Use for:**
+- AD Domain Controller on AWS
+- Okta AD Agent infrastructure
+- AD structure setup (OUs, groups, users)
+- Multi-region deployments
+
+**Uses:** `modules/ad-domain-controller` module
+
+**Generates:**
+- Terraform configuration using AD module
+- Variables for customization
+- Outputs for connection and credentials
+
+**Features:**
+- VPC and networking (new or existing)
+- Windows Server 2022 Domain Controller
+- Automated OU and group structure
+- Sample user creation
+- SSM for management (no RDP required)
+- Okta AD Agent pre-installation
+
+**Time to generate:** 3-5 minutes (Tier 1) or 1-2 minutes (Tier 2)
+
+### 7. Manage Risk Rules (SOD Policies)
 **File:** `prompts/manage_risk_rules.md`
 
 **Use for:**
@@ -785,7 +838,7 @@ ai-assisted/
 
 **Note:** Risk rules are managed via Python scripts, not Terraform
 
-### 5. Deploy Infrastructure
+### 8. Deploy Infrastructure
 **File:** `prompts/deploy_infrastructure.md`
 
 **Use for:**
@@ -824,7 +877,7 @@ ai-assisted/
 
 **Important:** Infrastructure goes in `environments/{env}/infrastructure/`, NOT `terraform/` directory
 
-### 7. Backup and Restore
+### 9. Backup and Restore
 **File:** `prompts/backup_restore.md`
 
 **Use for:**
@@ -842,7 +895,7 @@ ai-assisted/
 
 **Time to generate:** 2-3 minutes (Tier 1) or 1 minute (Tier 2)
 
-### 8. Cross-Org Migration
+### 10. Cross-Org Migration
 **File:** `prompts/cross_org_migration.md`
 
 **Use for:**
@@ -1130,15 +1183,36 @@ Filename: complete_demo.tf
 
 ---
 
+## Choosing an AI Provider
+
+See **[PROVIDER_COMPARISON.md](PROVIDER_COMPARISON.md)** for detailed guidance on:
+- Provider strengths and weaknesses
+- Cost comparison and estimates
+- Best use cases for each provider
+- Model selection and configuration
+- Troubleshooting by provider
+
+**Quick Decision:**
+| Need | Recommended |
+|------|-------------|
+| Cost-effective bulk generation | Gemini |
+| Balanced performance | OpenAI GPT-4o |
+| Complex reasoning/OIG | Claude Sonnet 4 |
+| Largest context window | Gemini (1M tokens) |
+
+---
+
 ## Related Documentation
 
 - **📖 Documentation Index:** `../docs/00-INDEX.md` - **Start here! Master index to all 52+ documentation files**
+- **Provider Comparison:** `PROVIDER_COMPARISON.md` - AI provider selection guide
 - **Demo Build Guide:** `../testing/DETAILED_DEMO_BUILD_GUIDE.md`
 - **Resource Reference:** `../docs/TERRAFORM_RESOURCES.md`
 - **Manual Validation:** `../testing/MANUAL_VALIDATION_PLAN.md`
 - **Main README:** `../README.md`
 - **API Management:** `../docs/API_MANAGEMENT.md` - Risk rules, owners, labels
 - **OIG Prerequisites:** `../OIG_PREREQUISITES.md`
+- **AD Infrastructure:** `../docs/AD_INFRASTRUCTURE.md` - AD Domain Controller guide
 
 ---
 
@@ -1157,6 +1231,6 @@ Filename: complete_demo.tf
 
 ---
 
-**Last Updated:** 2025-12-22
+**Last Updated:** 2026-01-06
 
-**Happy Generating! 🚀**
+**Happy Generating!**

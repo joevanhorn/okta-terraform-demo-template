@@ -11,7 +11,7 @@ class AnthropicProvider(AIProvider):
 
     def get_default_model(self) -> str:
         """Get default Claude model."""
-        return "claude-3-5-sonnet-20241022"
+        return "claude-sonnet-4-20250514"
 
     def generate_terraform(self, prompt: str, context: Dict[str, str]) -> str:
         """

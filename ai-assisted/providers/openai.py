@@ -11,7 +11,7 @@ class OpenAIProvider(AIProvider):
 
     def get_default_model(self) -> str:
         """Get default OpenAI model."""
-        return "gpt-4-turbo-preview"
+        return "gpt-4o"
 
     def generate_terraform(self, prompt: str, context: Dict[str, str]) -> str:
         """

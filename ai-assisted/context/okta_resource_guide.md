@@ -1,6 +1,27 @@
 # Okta Resource Quick Reference
 
-Quick reference for common Okta Terraform resources.
+Comprehensive reference for Okta Terraform resources. This guide covers 80+ resources commonly used in demo environments and production deployments.
+
+**Provider Version:** Okta Terraform Provider 6.4.0+ (OIG support requires 6.4.0+)
+
+## Table of Contents
+
+- [Core Resources](#core-resources) - Users, Groups, Applications
+- [OIG (Identity Governance) Resources](#oig-identity-governance-resources) - Entitlements, Bundles, Reviews
+- [Authorization & Security](#authorization--security) - Auth Servers, Policies
+- [Sign-On and Access Policies](#sign-on-and-access-policies) - Authentication flows
+- [Network and Security](#network-and-security) - Zones, Trusted Origins
+- [Identity Providers](#identity-providers) - Social, SAML, OIDC IdPs
+- [User Schema and Profiles](#user-schema-and-profiles) - Custom attributes
+- [Authenticators and Factors](#authenticators-and-factors) - MFA configuration
+- [Hooks and Automation](#hooks-and-automation) - Event and Inline hooks
+- [Admin Roles](#admin-roles) - Custom admin roles
+- [Email and Branding](#email-and-branding) - Email templates, domains
+- [Common Data Sources](#common-data-sources) - Lookups
+- [Infrastructure Resources (AWS)](#infrastructure-resources-aws) - VPC, EC2
+- [Okta Privileged Access (OPA)](#okta-privileged-access-opa-resources) - Server access
+
+---
 
 ## Core Resources
 
@@ -29,11 +50,78 @@ Creates OAuth 2.0 / OIDC applications
 Creates SAML applications
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_saml
 - **Use for:** Enterprise app integrations (Salesforce, Workday, etc.)
+- **Key attributes:** `sso_url`, `audience`, `subject_name_id_template`, `attribute_statements`
+
+### okta_app_bookmark
+Creates bookmark (chiclet) applications
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_bookmark
+- **Use for:** Simple link apps in the Okta dashboard
+- **Key attributes:** `url`, `label`
+
+### okta_app_secure_password_store
+Creates Secure Web Authentication (SWA) apps
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_secure_password_store
+- **Use for:** Apps that require username/password fill
+
+### okta_app_basic_auth
+Creates basic auth applications
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_basic_auth
+- **Use for:** Legacy apps requiring HTTP basic auth
+
+### okta_app_auto_login
+Creates auto-login (SWA) applications
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_auto_login
+- **Use for:** Apps with form-based login that Okta can auto-fill
 
 ### okta_app_group_assignment
-Assigns groups to applications
+Assigns a single group to an application
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_group_assignment
 - **Use for:** Controlling which groups can access which apps
+- **Note:** Use `okta_app_group_assignments` (plural) to assign multiple groups in one resource
+
+### okta_app_group_assignments
+Assigns multiple groups to an application
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_group_assignments
+- **Use for:** Bulk group assignments to apps
+- **Preferred over:** Multiple `okta_app_group_assignment` resources
+
+### okta_app_user
+Assigns a user directly to an application
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_user
+- **Use for:** Direct user-to-app assignments (prefer group assignments when possible)
+
+### okta_app_oauth_api_scope
+Grants OAuth scopes to an OAuth app
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_oauth_api_scope
+- **Use for:** Granting Okta API scopes to service apps
+
+### okta_app_oauth_post_logout_redirect_uri
+Manages post-logout redirect URIs
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_oauth_post_logout_redirect_uri
+- **Use for:** Adding logout redirect URIs to OAuth apps
+
+### okta_app_oauth_redirect_uri
+Manages redirect URIs for OAuth apps
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_oauth_redirect_uri
+- **Use for:** Dynamically managing redirect URIs
+
+### okta_app_saml_app_settings
+Manages SAML app settings separately
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_saml_app_settings
+- **Use for:** Managing SAML settings independently from the app
+
+### okta_app_signon_policy
+Application sign-on policies
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_signon_policy
+- **Use for:** App-specific authentication requirements
+- **Note:** Different from global sign-on policies
+
+### okta_app_signon_policy_rule
+Rules within app sign-on policies
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_signon_policy_rule
+- **Use for:** Defining conditions and actions for app authentication
+
+---
 
 ## OIG (Identity Governance) Resources
 
@@ -88,6 +176,277 @@ Password policies
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_password
 - **Use for:** Setting password complexity, expiration, history rules
 
+### okta_policy_password_rule
+Password policy rules
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_password_rule
+- **Use for:** Defining password policy rule conditions
+
+### okta_policy_mfa_rule
+MFA policy rules
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_mfa_rule
+- **Use for:** Defining MFA enrollment conditions and requirements
+
+### okta_auth_server_policy
+Authorization server access policies
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/auth_server_policy
+- **Use for:** Defining token issuance policies for custom auth servers
+
+### okta_auth_server_policy_rule
+Authorization server policy rules
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/auth_server_policy_rule
+- **Use for:** Defining conditions for token grants (scopes, grant types, users)
+
+---
+
+## Sign-On and Access Policies
+
+### okta_policy_signon
+Global session policies (formerly sign-on policies)
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_signon
+- **Use for:** Controlling session behavior, device trust, location-based access
+
+### okta_policy_signon_rule
+Sign-on policy rules
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_signon_rule
+- **Use for:** Defining conditions for session creation
+
+### okta_policy_rule_idp_discovery
+Identity Provider discovery rules
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_rule_idp_discovery
+- **Use for:** Routing users to different IdPs based on conditions
+
+### okta_policy_profile_enrollment
+Profile enrollment policies
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_profile_enrollment
+- **Use for:** Self-service registration policies
+
+### okta_policy_profile_enrollment_apps
+Apps assigned to profile enrollment policies
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_profile_enrollment_apps
+- **Use for:** Assigning apps to enrollment policies
+
+### okta_policy_access
+Access policies for resource access
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_access
+- **Use for:** Defining access policies for protected resources
+
+---
+
+## Network and Security
+
+### okta_network_zone
+Network zones for location-based policies
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/network_zone
+- **Use for:** Defining trusted networks, blocklists, geolocation zones
+- **Types:** IP (CIDRs), DYNAMIC (geolocation)
+- **Example use:** Block access from certain countries, allow only corporate IPs
+
+### okta_trusted_origin
+Trusted origins for CORS and redirect
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/trusted_origin
+- **Use for:** Allowing cross-origin requests from your applications
+- **Scopes:** CORS, REDIRECT, or both
+
+### okta_threat_insight_settings
+ThreatInsight configuration
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/threat_insight_settings
+- **Use for:** Enabling and configuring Okta ThreatInsight
+
+### okta_security_notification_emails
+Security notification settings
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/security_notification_emails
+- **Use for:** Configuring security email notifications
+
+---
+
+## Identity Providers
+
+### okta_idp_oidc
+OpenID Connect Identity Providers
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/idp_oidc
+- **Use for:** Federating with external OIDC providers
+
+### okta_idp_saml
+SAML Identity Providers
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/idp_saml
+- **Use for:** Federating with external SAML IdPs (Azure AD, other Okta orgs)
+
+### okta_idp_social
+Social Identity Providers
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/idp_social
+- **Use for:** Google, Facebook, Microsoft, LinkedIn, etc.
+- **Types:** GOOGLE, FACEBOOK, MICROSOFT, LINKEDIN, APPLE
+
+### okta_idp_saml_key
+SAML IdP signing keys
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/idp_saml_key
+- **Use for:** Managing SAML signing certificates
+
+### okta_profile_mapping
+Attribute mappings between IdP and Okta profiles
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/profile_mapping
+- **Use for:** Mapping attributes from IdP to Okta user profile
+- **Note:** Also used for app-to-user profile mappings
+
+---
+
+## User Schema and Profiles
+
+### okta_user_schema_property
+Custom user profile attributes
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/user_schema_property
+- **Use for:** Adding custom attributes to user profiles
+- **Types:** string, boolean, number, integer, array, object
+
+### okta_user_base_schema_property
+Base schema property overrides
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/user_base_schema_property
+- **Use for:** Modifying base profile attributes (firstName, lastName, etc.)
+
+### okta_user_type
+Custom user types
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/user_type
+- **Use for:** Creating different user types (Employee, Contractor, Partner)
+
+### okta_group_schema_property
+Custom group profile attributes
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/group_schema_property
+- **Use for:** Adding custom attributes to group profiles
+
+### okta_app_user_schema_property
+Application user profile attributes
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_user_schema_property
+- **Use for:** Custom attributes in app user profiles
+
+### okta_app_user_base_schema_property
+Application base schema overrides
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_user_base_schema_property
+- **Use for:** Modifying base app user attributes
+
+### okta_link_definition
+Custom relationship definitions
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/link_definition
+- **Use for:** Creating custom relationships between users (e.g., manager-report)
+
+### okta_link_value
+User relationship assignments
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/link_value
+- **Use for:** Setting manager relationships, custom links between users
+- **Example:** Assigning managers to employees
+
+---
+
+## Authenticators and Factors
+
+### okta_authenticator
+Authenticator configuration
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/authenticator
+- **Use for:** Enabling and configuring authenticators (email, phone, security key)
+- **Types:** email, phone, password, security_question, app (Okta Verify), webauthn
+
+### okta_factor
+Factor configuration (deprecated, use authenticator)
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/factor
+- **Use for:** Legacy factor management
+- **Note:** Prefer `okta_authenticator` for new implementations
+
+### okta_factor_totp
+TOTP factor settings
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/factor_totp
+- **Use for:** Configuring time-based OTP settings
+
+---
+
+## Hooks and Automation
+
+### okta_event_hook
+Event hooks for external integrations
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/event_hook
+- **Use for:** Sending events to external services (user creation, login, etc.)
+- **Events:** user.lifecycle.create, user.session.start, etc.
+
+### okta_inline_hook
+Inline hooks for customization
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/inline_hook
+- **Use for:** Customizing registration, import, SAML assertions, token claims
+- **Types:** com.okta.user.pre-registration, com.okta.tokens.transform, etc.
+
+### okta_event_hook_verification
+Event hook verification
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/event_hook_verification
+- **Use for:** Triggering verification of event hook endpoints
+
+---
+
+## Admin Roles
+
+### okta_admin_role_custom
+Custom admin roles
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/admin_role_custom
+- **Use for:** Creating custom admin roles with specific permissions
+- **Example:** Help desk role with limited user management
+
+### okta_admin_role_custom_assignments
+Custom role assignments
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/admin_role_custom_assignments
+- **Use for:** Assigning custom roles to users or groups
+
+### okta_admin_role_targets
+Admin role target restrictions
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/admin_role_targets
+- **Use for:** Limiting admin role scope to specific apps or groups
+
+### okta_user_admin_roles
+User admin role assignments
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/user_admin_roles
+- **Use for:** Assigning built-in admin roles to users
+
+### okta_group_role
+Group admin role assignments
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/group_role
+- **Use for:** Assigning admin roles to groups
+
+---
+
+## Email and Branding
+
+### okta_email_customization
+Email template customization
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/email_customization
+- **Use for:** Customizing Okta email templates (welcome, password reset, etc.)
+
+### okta_email_domain
+Custom email domain
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/email_domain
+- **Use for:** Sending Okta emails from your domain
+
+### okta_email_sender
+Email sender configuration
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/email_sender
+- **Use for:** Configuring email sender addresses
+
+### okta_domain
+Custom domain for Okta org
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/domain
+- **Use for:** Custom domain (login.yourcompany.com)
+
+### okta_domain_certificate
+SSL certificate for custom domain
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/domain_certificate
+- **Use for:** Managing SSL certificates for custom domains
+
+### okta_brand
+Branding configuration
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/brand
+- **Use for:** Configuring org branding settings
+
+### okta_theme
+UI theme configuration
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/theme
+- **Use for:** Customizing sign-in page appearance
+
+---
+
 ## Common Data Sources
 
 ### data "okta_user"
@@ -104,6 +463,68 @@ Look up existing groups
 Look up existing applications
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/data-sources/app
 - **Use for:** Referencing Okta system apps
+
+### data "okta_app_oauth"
+Look up OAuth applications
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/data-sources/app_oauth
+- **Use for:** Getting OAuth app details (client_id, etc.)
+
+### data "okta_app_saml"
+Look up SAML applications
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/data-sources/app_saml
+- **Use for:** Getting SAML app metadata
+
+### data "okta_users"
+Look up multiple users
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/data-sources/users
+- **Use for:** Searching users by filter expression
+
+### data "okta_groups"
+Look up multiple groups
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/data-sources/groups
+- **Use for:** Searching groups by filter
+
+### data "okta_auth_server"
+Look up authorization server
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/data-sources/auth_server
+- **Use for:** Getting auth server details
+
+### data "okta_auth_server_scopes"
+Look up auth server scopes
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/data-sources/auth_server_scopes
+- **Use for:** Listing available scopes on auth server
+
+### data "okta_authenticator"
+Look up authenticator
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/data-sources/authenticator
+- **Use for:** Getting authenticator configuration
+
+### data "okta_network_zone"
+Look up network zone
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/data-sources/network_zone
+- **Use for:** Referencing existing network zones
+
+### data "okta_idp_social"
+Look up social IdP
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/data-sources/idp_social
+- **Use for:** Getting social IdP configuration
+
+### data "okta_policy"
+Look up policy by type and name
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/data-sources/policy
+- **Use for:** Referencing default policies
+
+### data "okta_brands"
+List all brands
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/data-sources/brands
+- **Use for:** Getting brand IDs for customization
+
+### data "okta_default_signin_page"
+Get default sign-in page
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/data-sources/default_signin_page
+- **Use for:** Referencing default sign-in page settings
+
+---
 
 ## Resource Relationships
 
