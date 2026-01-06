@@ -1,0 +1,139 @@
+# ==============================================================================
+# AD DOMAIN CONTROLLER DEPLOYMENT WORKFLOW
+# ==============================================================================
+# Deploys AD Domain Controller infrastructure to one or more AWS regions.
+# Supports multi-region deployment via matrix strategy.
+#
+# Usage:
+#   gh workflow run ad-deploy.yml \
+#     -f environment=myorg \
+#     -f regions='["us-east-1"]' \
+#     -f action=apply
+# ==============================================================================
+
+name: AD - Deploy Domain Controller
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (e.g., myorg, staging)'
+        required: true
+        type: string
+        default: 'myorg'
+      regions:
+        description: 'AWS regions as JSON array (e.g., ["us-east-1", "us-west-2"])'
+        required: true
+        type: string
+        default: '["us-east-1"]'
+      action:
+        description: 'Terraform action'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+        default: 'plan'
+      ad_domain_name:
+        description: 'AD Domain Name (e.g., corp.demo.local)'
+        required: false
+        type: string
+        default: 'corp.demo.local'
+      ad_netbios_name:
+        description: 'AD NetBIOS Name (e.g., CORP)'
+        required: false
+        type: string
+        default: 'CORP'
+      instance_type:
+        description: 'EC2 Instance Type'
+        required: false
+        type: string
+        default: 't3.medium'
+      create_sample_users:
+        description: 'Create sample users and groups'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy AD to ${{ matrix.region }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        region: ${{ fromJson(inputs.regions) }}
+
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-AD-Deploy
+          aws-region: ${{ matrix.region }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Terraform Init
+        working-directory: environments/${{ inputs.environment }}/ad-infrastructure
+        run: |
+          terraform init \
+            -backend-config="key=Okta-GitOps/${{ inputs.environment }}/ad-infrastructure/${{ matrix.region }}/terraform.tfstate"
+
+      - name: Terraform Plan
+        if: inputs.action == 'plan' || inputs.action == 'apply'
+        working-directory: environments/${{ inputs.environment }}/ad-infrastructure
+        run: |
+          terraform plan \
+            -var="aws_region=${{ matrix.region }}" \
+            -var="ad_domain_name=${{ inputs.ad_domain_name }}" \
+            -var="ad_netbios_name=${{ inputs.ad_netbios_name }}" \
+            -var="instance_type=${{ inputs.instance_type }}" \
+            -var="create_sample_users=${{ inputs.create_sample_users }}" \
+            -var="environment=${{ inputs.environment }}" \
+            -out=tfplan
+
+      - name: Terraform Apply
+        if: inputs.action == 'apply'
+        working-directory: environments/${{ inputs.environment }}/ad-infrastructure
+        run: |
+          terraform apply -auto-approve tfplan
+
+      - name: Terraform Destroy
+        if: inputs.action == 'destroy'
+        working-directory: environments/${{ inputs.environment }}/ad-infrastructure
+        run: |
+          terraform destroy -auto-approve \
+            -var="aws_region=${{ matrix.region }}" \
+            -var="ad_domain_name=${{ inputs.ad_domain_name }}" \
+            -var="ad_netbios_name=${{ inputs.ad_netbios_name }}" \
+            -var="instance_type=${{ inputs.instance_type }}" \
+            -var="create_sample_users=${{ inputs.create_sample_users }}" \
+            -var="environment=${{ inputs.environment }}"
+
+      - name: Get Outputs
+        if: inputs.action == 'apply'
+        working-directory: environments/${{ inputs.environment }}/ad-infrastructure
+        run: |
+          echo "## AD Deployment Results for ${{ matrix.region }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Output | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Instance ID | $(terraform output -raw instance_id) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Private IP | $(terraform output -raw private_ip) |" >> $GITHUB_STEP_SUMMARY
+          echo "| Domain Name | $(terraform output -raw domain_name) |" >> $GITHUB_STEP_SUMMARY
+          echo "| SSM Command | \`$(terraform output -raw ssm_session_command)\` |" >> $GITHUB_STEP_SUMMARY

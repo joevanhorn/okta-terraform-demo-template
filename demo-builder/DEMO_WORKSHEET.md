@@ -13,10 +13,11 @@ Fill out this worksheet to define your Okta demo environment. You can then:
 _______________________
 ```
 
-**Email domain** (for auto-generated user emails, e.g., "example.com"):
+**Email domain** (for auto-generated user emails, e.g., "example.com" or "dept.company.com"):
 ```
 _______________________
 ```
+*Note: Subdomains are supported (e.g., "healthcare.example.com")*
 
 **Company/Demo name**:
 ```
@@ -62,6 +63,8 @@ List your departments. Each department will have a manager and employees.
 | 1 | Engineering | Jane Smith | VP of Engineering | 5 | Software Engineer |
 | 2 | Marketing | Mike Jones | Marketing Director | 3 | Marketing Specialist |
 | 3 | Finance | Carol CFO | Chief Financial Officer | 2 | Financial Analyst |
+
+*Note: At least one department is required. Auto-generated employees will be named like "Eng01_Employee", "Eng02_Employee" with titles like "Software Engineer 1", "Software Engineer 2".*
 
 ### Specific Employees (Optional)
 
