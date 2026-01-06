@@ -311,7 +311,7 @@ Review Changes → Manual Apply → Okta Updated
 - ✅ Complete audit trail in Git
 - ✅ Drift detection via scheduled imports
 
-See **[docs/GITOPS_WORKFLOW.md](./docs/GITOPS_WORKFLOW.md)** for detailed workflow documentation.
+See **[docs/03-WORKFLOWS-GUIDE.md](./docs/03-WORKFLOWS-GUIDE.md)** for detailed workflow documentation.
 
 ## 📦 Repository Components
 
@@ -590,14 +590,15 @@ Comprehensive guides are available in the `docs/` directory:
 - **[DIRECTORY_GUIDE.md](./DIRECTORY_GUIDE.md)** - Repository structure explained
 
 ### Workflows and Operations
-- **[docs/GITOPS_WORKFLOW.md](./docs/GITOPS_WORKFLOW.md)** - GitOps patterns and best practices
-- **[docs/WORKFLOWS.md](./docs/WORKFLOWS.md)** - GitHub Actions workflow reference
+- **[docs/03-WORKFLOWS-GUIDE.md](./docs/03-WORKFLOWS-GUIDE.md)** - GitHub Actions workflow reference
+- **[docs/GITOPS_VALUE.md](./docs/GITOPS_VALUE.md)** - GitOps patterns and business value
 - **[docs/API_MANAGEMENT.md](./docs/API_MANAGEMENT.md)** - Python scripts guide (1190+ lines)
 - **[docs/AWS_BACKEND_SETUP.md](./docs/AWS_BACKEND_SETUP.md)** - S3 state backend setup
+- **[docs/AD_INFRASTRUCTURE.md](./docs/AD_INFRASTRUCTURE.md)** - Active Directory on AWS
 
 ### Troubleshooting and Reference
 - **[docs/LESSONS_LEARNED.md](./docs/LESSONS_LEARNED.md)** - Common issues and solutions
-- **[docs/TERRAFORMER_OIG_FAQ.md](./docs/TERRAFORMER_OIG_FAQ.md)** - Terraformer limitations
+- **[docs/TERRAFORMER.md](./docs/TERRAFORMER.md)** - Terraformer import guide
 - **[docs/TROUBLESHOOTING_ENTITLEMENT_BUNDLES.md](./docs/TROUBLESHOOTING_ENTITLEMENT_BUNDLES.md)** - Bundle-specific issues
 
 ### Demo Building

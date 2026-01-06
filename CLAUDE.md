@@ -183,6 +183,23 @@ gh workflow run migrate-cross-org.yml \
   -f dry_run=true
 
 # Also supports: resource_type=memberships or resource_type=grants
+
+# AD Infrastructure: Deploy domain controller
+gh workflow run ad-deploy.yml \
+  -f environment=myorg \
+  -f regions='["us-east-1"]' \
+  -f action=plan  # or apply, destroy
+
+# AD Infrastructure: Install Okta AD Agent
+gh workflow run ad-install-okta-agent.yml \
+  -f environment=myorg \
+  -f region=us-east-1
+
+# AD Infrastructure: Manage instance (diagnose, reboot, reset-password, etc.)
+gh workflow run ad-manage-instance.yml \
+  -f environment=myorg \
+  -f region=us-east-1 \
+  -f action=diagnose  # or reboot, reset-password, check-services, get-users, get-groups
 ```
 
 ### Python Scripts (API Management)
@@ -536,9 +553,15 @@ Workflows are named with category prefixes for easy searchability:
   - `backup-restore/state-based/backup-tenant.yml` - Capture S3 state version
   - `backup-restore/state-based/restore-tenant.yml` - Rollback S3 state version
 
+**AD Infrastructure Workflows (`ad-*`):**
+- `ad-deploy.yml` - Deploy AD Domain Controller (multi-region)
+- `ad-install-okta-agent.yml` - Install Okta AD Agent via SSM
+- `ad-manage-instance.yml` - Manage instances (diagnose, reboot, reset-password, etc.)
+
 **Other Workflows:**
 - `import-all-resources.yml` - Import entire tenant to code
 - `export-oig.yml` - Export OIG configs to JSON
+- `build-demo.yml` - Build demo environment from YAML config
 - `opa-plan.yml` - Plan OPA resources
 - `deploy-oag-app.yml` - Deploy OAG applications
 - `deploy-scim-server.yml` - Deploy SCIM server
@@ -942,6 +965,8 @@ john@example.com,John,Doe,john@example.com,ACTIVE,Engineering,Developer,alice@ex
 │   │   └── create_demo_environment.md
 │   ├── context/              # Context for AI
 │   └── providers/            # AI provider integrations
+├── modules/                   # Reusable Terraform modules
+│   └── ad-domain-controller/ # AD Domain Controller on AWS
 ├── backup-restore/            # Backup and disaster recovery
 │   ├── resource-based/       # Export resources to files
 │   └── state-based/          # S3 state version rollback
@@ -959,10 +984,12 @@ john@example.com,John,Doe,john@example.com,ACTIVE,Engineering,Developer,alice@ex
 - `OIG_PREREQUISITES.md` - OIG setup requirements
 - `demo-builder/README.md` - Demo builder documentation
 - `demo-builder/DEMO_WORKSHEET.md` - Fill-in-the-blanks questionnaire for demos
-- `docs/GITOPS_WORKFLOW.md` - GitOps patterns
+- `docs/03-WORKFLOWS-GUIDE.md` - GitHub Actions workflow reference
 - `docs/API_MANAGEMENT.md` - Python scripts reference (1190+ lines)
+- `docs/AD_INFRASTRUCTURE.md` - Active Directory Domain Controller setup
 - `docs/LESSONS_LEARNED.md` - Critical troubleshooting insights
-- `docs/TERRAFORMER_OIG_FAQ.md` - Terraformer + OIG limitations
+- `docs/TERRAFORMER.md` - Terraformer import guide
+- `scripts/README.md` - Python scripts overview and quick reference
 
 ### Terraform Provider Versions
 

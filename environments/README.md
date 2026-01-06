@@ -212,6 +212,6 @@ The workflow automatically:
 
 ## Related Documentation
 
-- [GitOps Workflow Guide](../docs/GITOPS_WORKFLOW.md)
-- [Workflow Migration Summary](../.github/workflows/MIGRATION_SUMMARY.md)
-- [Adding New Environments](../docs/GITOPS_WORKFLOW.md#adding-environments)
+- [Workflows Guide](../docs/03-WORKFLOWS-GUIDE.md)
+- [Directory Guide](../DIRECTORY_GUIDE.md)
+- [GitOps Value](../docs/GITOPS_VALUE.md)

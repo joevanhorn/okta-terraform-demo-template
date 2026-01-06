@@ -53,6 +53,7 @@ This folder contains advanced reference documentation for specific topics.
 |----------|---------|
 | [AWS_BACKEND_SETUP.md](AWS_BACKEND_SETUP.md) | S3/DynamoDB state backend setup |
 | [BACKEND_SETUP_WIZARD.md](BACKEND_SETUP_WIZARD.md) | Choose the right backend for your needs |
+| [AD_INFRASTRUCTURE.md](AD_INFRASTRUCTURE.md) | Active Directory Domain Controller on AWS |
 | [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) | Repository layout and file organization |
 | [DIRECTORY_GUIDE.md](DIRECTORY_GUIDE.md) | Environment-based directory structure |
 
@@ -60,6 +61,7 @@ This folder contains advanced reference documentation for specific topics.
 
 | Document | Purpose |
 |----------|---------|
+| [../scripts/README.md](../scripts/README.md) | Scripts directory overview and quick reference |
 | [API_MANAGEMENT.md](API_MANAGEMENT.md) | **Main API guide** - Owners, Labels, Risk Rules (1190+ lines) |
 | [LABELS_API_VALIDATION.md](LABELS_API_VALIDATION.md) | Labels API investigation and findings |
 | [LESSONS_LEARNED.md](LESSONS_LEARNED.md) | Troubleshooting insights and workarounds |
@@ -127,6 +129,7 @@ This folder contains advanced reference documentation for specific topics.
 | **Build a demo (easiest)** | [demo-builder/README.md](../demo-builder/README.md) |
 | **Build a demo (manual)** | [DEMO_GUIDE.md](../DEMO_GUIDE.md) |
 | **Set up AWS backend** | [AWS_BACKEND_SETUP.md](AWS_BACKEND_SETUP.md) |
+| **Deploy AD Domain Controller** | [AD_INFRASTRUCTURE.md](AD_INFRASTRUCTURE.md) |
 | **Manage governance labels** | [LABEL_WORKFLOW_GUIDE.md](LABEL_WORKFLOW_GUIDE.md) |
 | **Manage resource owners** | [API_MANAGEMENT.md](API_MANAGEMENT.md) |
 | **Enable entitlement management on apps** | [ENTITLEMENT_SETTINGS.md](ENTITLEMENT_SETTINGS.md) |
@@ -156,4 +159,4 @@ Older documentation that has been superseded is available in [archive/](archive/
 
 ---
 
-**Last Updated:** 2025-12-22
+**Last Updated:** 2026-01-06

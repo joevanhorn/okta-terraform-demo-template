@@ -456,7 +456,7 @@ See `.github/workflows/` for available automation:
 
 ### Advanced Documentation
 - [TEMPLATE_SETUP.md](./TEMPLATE_SETUP.md) - Complete setup reference
-- [docs/GITOPS_WORKFLOW.md](./docs/GITOPS_WORKFLOW.md) - Workflow patterns
+- [docs/03-WORKFLOWS-GUIDE.md](./docs/03-WORKFLOWS-GUIDE.md) - Workflow patterns
 - [docs/AWS_BACKEND_SETUP.md](./docs/AWS_BACKEND_SETUP.md) - S3 backend details
 
 ### OIG Features
