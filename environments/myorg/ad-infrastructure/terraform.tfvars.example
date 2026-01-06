@@ -1,0 +1,52 @@
+# ==============================================================================
+# AD INFRASTRUCTURE - EXAMPLE CONFIGURATION
+# ==============================================================================
+# Copy this file to terraform.tfvars and customize for your deployment.
+# Or pass values via -var flags or environment variables.
+# ==============================================================================
+
+# Project Settings
+project_name = "okta-gitops-demo"
+environment  = "myorg"
+
+# AWS Settings (can be overridden per deployment)
+aws_region = "us-east-1"
+
+# Network Settings
+create_vpc         = true
+vpc_cidr           = "10.0.0.0/16"
+public_subnet_cidr = "10.0.1.0/24"
+
+# Use existing VPC instead:
+# create_vpc         = false
+# existing_vpc_id    = "vpc-xxxxxxxxx"
+# existing_subnet_id = "subnet-xxxxxxxxx"
+
+# EC2 Instance Settings
+instance_type     = "t3.medium"
+root_volume_size  = 100
+assign_elastic_ip = false
+
+# Security Settings
+enable_rdp        = false
+rdp_allowed_cidrs = []  # e.g., ["10.0.0.0/8", "192.168.1.0/24"]
+
+# Active Directory Settings
+ad_domain_name      = "corp.demo.local"
+ad_netbios_name     = "CORP"
+ad_admin_username   = "Administrator"
+create_sample_users = true
+
+# S3 Scripts (optional - for custom setup script)
+# scripts_bucket_name = "my-scripts-bucket"
+# setup_script_s3_key = "ad/userdata.ps1"
+
+# Okta AD Agent (optional - for automatic agent installation)
+# okta_org_url     = "https://myorg.okta.com"
+# okta_agent_token = "your-agent-registration-token"
+
+# Additional Tags
+tags = {
+  Owner   = "admin@example.com"
+  Project = "OktaDemo"
+}
