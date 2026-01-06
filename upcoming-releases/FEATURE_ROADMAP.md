@@ -16,6 +16,7 @@ This document outlines potential features for the Okta Terraform Demo Template. 
 | AD Domain Controller Module | ✅ Complete | 2026-01-05 |
 | AI-Assisted Tools (Enhanced) | ✅ Complete | 2026-01-06 |
 | SAML/AD Prompt Templates | ✅ Complete | 2026-01-06 |
+| SAML Federation Module | ✅ Complete | 2026-01-06 |
 
 ### In Progress
 | Feature | Status | Plan Document |
@@ -29,33 +30,36 @@ This document outlines potential features for the Okta Terraform Demo Template. 
 ### Priority 1: High Value / Near Term
 
 #### 1. SAML Federation Module
-**Status:** ⚪ Proposed
+**Status:** ✅ Complete
 **Complexity:** Medium
-**Estimated Effort:** 2-3 days
+**Completed:** 2026-01-06
 
 **Description:**
-Create a reusable module for org-to-org SAML federation, enabling hub-and-spoke identity architectures.
+Reusable module for org-to-org SAML federation, enabling hub-and-spoke identity architectures.
 
 **Use Cases:**
 - Partner organization federation
 - Multi-tenant SaaS with customer IdPs
 - M&A scenarios (linking Okta orgs)
 - Development org federation with production
+- External IdP integration (Azure AD, Google Workspace)
 
 **Deliverables:**
-- [ ] `modules/saml-federation/` - Reusable Terraform module
-- [ ] IdP configuration (upstream org)
-- [ ] SP configuration (downstream org)
-- [ ] Routing rules automation
-- [ ] User attribute mapping templates
-- [ ] Documentation and examples
-- [ ] AI prompt template
+- [x] `modules/saml-federation/` - Reusable Terraform module
+- [x] IdP mode (send assertions) with `okta_app_saml`
+- [x] SP mode (receive assertions) with `okta_idp_saml`
+- [x] Remote state coordination via `terraform_remote_state`
+- [x] JIT provisioning and account linking
+- [x] IdP discovery routing rules
+- [x] User attribute mapping templates
+- [x] Documentation: `docs/SAML_FEDERATION.md`
+- [x] AI prompt: `ai-assisted/prompts/setup_saml_federation.md`
 
-**Technical Approach:**
-- Uses `okta_idp_saml` for IdP configuration
-- Uses `okta_app_saml` for SP/app configuration
-- Routing rules via `okta_policy_rule_idp_discovery`
-- Profile mapping via `okta_profile_mapping`
+**Technical Implementation:**
+- Dual-mode module (`federation_mode = "sp"` or `"idp"`)
+- `coalesce()` pattern for remote state fallback
+- Conditional resource creation with `count`
+- Cross-org outputs for automatic configuration exchange
 
 ---
 

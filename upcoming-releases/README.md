@@ -18,7 +18,7 @@ This directory contains release plans and roadmaps for features currently in dev
 Comprehensive list of proposed features with priorities and estimates:
 
 ### Priority 1 (High Value)
-- SAML Federation Module
+- ~~SAML Federation Module~~ ✅ Complete
 - Lifecycle Management Patterns
 - App Integration Templates Library
 - Compliance Reporting Tools
@@ -54,6 +54,20 @@ A 4-phase release plan for integrating custom SCIM server infrastructure:
 ---
 
 ## Recently Completed
+
+### SAML Federation Module
+**Status:** ✅ Complete
+
+Reusable Terraform module for SAML federation:
+- ✅ Dual-mode operation (SP and IdP modes)
+- ✅ Okta-to-Okta federation with `terraform_remote_state`
+- ✅ External IdP support (Azure AD, Google Workspace)
+- ✅ JIT provisioning and account linking
+- ✅ IdP discovery routing rules
+- ✅ Comprehensive documentation (`docs/SAML_FEDERATION.md`)
+- ✅ AI prompt template (`ai-assisted/prompts/setup_saml_federation.md`)
+
+**Completed:** 2026-01-06
 
 ### AD Domain Controller Module
 **Status:** ✅ Complete

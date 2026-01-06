@@ -282,6 +282,14 @@ SAML IdP signing keys
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/idp_saml_key
 - **Use for:** Managing SAML signing certificates
 
+### SAML Federation Module
+**Recommended:** Use `modules/saml-federation/` for SAML federation scenarios:
+- **Module:** `modules/saml-federation/`
+- **Docs:** `docs/SAML_FEDERATION.md`
+- **AI Prompt:** `ai-assisted/prompts/setup_saml_federation.md`
+- **Use for:** Okta-to-Okta federation, external IdP integration (Azure AD, Google)
+- **Features:** Dual-mode (SP/IdP), remote state coordination, JIT provisioning
+
 ### okta_profile_mapping
 Attribute mappings between IdP and Okta profiles
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/profile_mapping
