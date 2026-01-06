@@ -11,23 +11,76 @@ This directory contains release plans and roadmaps for features currently in dev
 - 📊 Provide visibility into development plans
 - 💾 Preserve planning context if sessions end unexpectedly
 
+## Feature Roadmap
+
+**Document:** [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md)
+
+Comprehensive list of proposed features with priorities and estimates:
+
+### Priority 1 (High Value)
+- SAML Federation Module
+- Lifecycle Management Patterns
+- App Integration Templates Library
+- Compliance Reporting Tools
+
+### Priority 2 (Medium Value)
+- Event Hook Templates
+- Custom Admin Role Templates
+- Network Zone Templates
+- MFA Policy Templates
+
+### Priority 3 (Long Term)
+- Multi-Cloud AD Deployment
+- Okta Workflows Integration
+- Identity Provider Hub
+- Demo Environment Snapshots
+
+---
+
 ## Active Release Plans
 
 ### SCIM Server Integration
-**Status:** 🟡 Phase 1 In Progress
+**Status:** 🟡 Release 1 Complete
 **Document:** [SCIM_SERVER_INTEGRATION_PLAN.md](SCIM_SERVER_INTEGRATION_PLAN.md)
 
 A 4-phase release plan for integrating custom SCIM server infrastructure:
-- **Release 1:** Core Infrastructure (MVP) - *In Progress*
-- **Release 2:** GitHub Actions Automation - *Planned*
-- **Release 3:** AI-Assisted Generation - *Planned*
-- **Release 4:** Documentation & Examples - *Planned*
+- **Release 1:** Core Infrastructure (MVP) - *Complete*
+- **Release 2:** Okta Terraform Integration - *Planned*
+- **Release 3:** GitHub Actions Automation - *Planned*
+- **Release 4:** AI-Assisted Generation & Docs - *Planned*
 
 **Estimated Completion:** 2-3 weeks
 
 ---
 
 ## Recently Completed
+
+### AD Domain Controller Module
+**Status:** ✅ Complete
+**PR:** [#38](https://github.com/joevanhorn/okta-terraform-demo-template/pull/38)
+
+Consolidated AD infrastructure module:
+- ✅ Reusable Terraform module (`modules/ad-domain-controller/`)
+- ✅ Multi-region deployment support
+- ✅ GitHub Actions workflows (deploy, manage, install agent)
+- ✅ SSM-based management (no RDP required)
+- ✅ Comprehensive documentation
+
+**Completed:** 2026-01-05
+
+### AI-Assisted Tools Enhancement
+**Status:** ✅ Complete
+
+Updates to AI-assisted code generation:
+- ✅ Updated provider models (Claude Sonnet 4, GPT-4o)
+- ✅ Created PROVIDER_COMPARISON.md
+- ✅ Added SAML app prompt template
+- ✅ Added AD integration prompt template
+- ✅ Expanded resource guide (80+ resources)
+
+**Completed:** 2026-01-06
+
+---
 
 ### Okta Privileged Access (OPA) Integration
 **Status:** ✅ Complete
@@ -195,5 +248,5 @@ See **[SCIM_SERVER_INTEGRATION_PLAN.md](SCIM_SERVER_INTEGRATION_PLAN.md)** for a
 
 ---
 
-**Last Updated:** 2025-12-14
+**Last Updated:** 2026-01-06
 **Maintained By:** Template Maintainers
