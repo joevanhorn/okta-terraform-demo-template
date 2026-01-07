@@ -342,6 +342,14 @@ User relationship assignments
 - **Use for:** Setting manager relationships, custom links between users
 - **Example:** Assigning managers to employees
 
+### Lifecycle Management Module
+**Recommended:** Use `modules/lifecycle-management/` for JML patterns:
+- **Module:** `modules/lifecycle-management/`
+- **Docs:** `docs/LIFECYCLE_MANAGEMENT.md`
+- **AI Prompt:** `ai-assisted/prompts/setup_lifecycle_management.md`
+- **Use for:** Joiner/Mover/Leaver lifecycle automation
+- **Features:** User types, group rules, contractor lifecycle, OIG bundles, event hooks
+
 ---
 
 ## Authenticators and Factors

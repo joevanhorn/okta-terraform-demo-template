@@ -17,6 +17,7 @@ This document outlines potential features for the Okta Terraform Demo Template. 
 | AI-Assisted Tools (Enhanced) | ✅ Complete | 2026-01-06 |
 | SAML/AD Prompt Templates | ✅ Complete | 2026-01-06 |
 | SAML Federation Module | ✅ Complete | 2026-01-06 |
+| Lifecycle Management Module | ✅ Complete | 2026-01-06 |
 
 ### In Progress
 | Feature | Status | Plan Document |
@@ -64,33 +65,34 @@ Reusable module for org-to-org SAML federation, enabling hub-and-spoke identity 
 ---
 
 #### 2. Lifecycle Management Patterns
-**Status:** ⚪ Proposed
+**Status:** ✅ Complete
 **Complexity:** Medium
-**Estimated Effort:** 2-3 days
+**Completed:** 2026-01-06
 
 **Description:**
-Pre-built Terraform patterns for common Joiner-Mover-Leaver (JML) scenarios.
+Reusable Terraform module for comprehensive JML (Joiner/Mover/Leaver) lifecycle management.
 
 **Use Cases:**
 - New hire onboarding automation
 - Department transfer access updates
 - Termination and access revocation
-- Contractor lifecycle management
+- Contractor lifecycle management with end-date tracking
 
 **Deliverables:**
-- [ ] `examples/lifecycle/joiner/` - New hire patterns
-- [ ] `examples/lifecycle/mover/` - Transfer patterns
-- [ ] `examples/lifecycle/leaver/` - Offboarding patterns
-- [ ] Group-based access templates
-- [ ] App assignment automation
-- [ ] Documentation with HR integration patterns
-- [ ] AI prompt template
+- [x] `modules/lifecycle-management/` - Reusable Terraform module
+- [x] Joiner patterns: staged users, auto-assignment, manager links
+- [x] Mover patterns: transfer tracking, event hooks
+- [x] Leaver patterns: deprovisioned/suspended groups, webhooks
+- [x] Contractor lifecycle: end-date tracking, expiration groups, access tiers
+- [x] OIG integration: entitlement bundles, review campaigns
+- [x] Documentation: `docs/LIFECYCLE_MANAGEMENT.md`
+- [x] AI prompt: `ai-assisted/prompts/setup_lifecycle_management.md`
 
-**Technical Approach:**
-- Group rules for automatic assignment
-- Profile-based app assignments
-- Lifecycle hooks integration
-- Deprovisioning policies
+**Technical Implementation:**
+- Group rules for automatic assignment (`okta_group_rule`)
+- Custom schema properties for lifecycle tracking
+- Event hooks for external system notifications
+- Conditional resource creation with enable flags
 
 ---
 

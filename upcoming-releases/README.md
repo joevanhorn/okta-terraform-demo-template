@@ -19,7 +19,7 @@ Comprehensive list of proposed features with priorities and estimates:
 
 ### Priority 1 (High Value)
 - ~~SAML Federation Module~~ ✅ Complete
-- Lifecycle Management Patterns
+- ~~Lifecycle Management Patterns~~ ✅ Complete
 - App Integration Templates Library
 - Compliance Reporting Tools
 
@@ -54,6 +54,21 @@ A 4-phase release plan for integrating custom SCIM server infrastructure:
 ---
 
 ## Recently Completed
+
+### Lifecycle Management Module
+**Status:** ✅ Complete
+
+Reusable Terraform module for JML (Joiner/Mover/Leaver) lifecycle management:
+- ✅ Joiner patterns: staged users, auto-assignment, manager links
+- ✅ Mover patterns: transfer tracking, event hooks
+- ✅ Leaver patterns: deprovisioned/suspended groups, webhooks
+- ✅ Contractor lifecycle: end-date tracking, expiration groups, access tiers
+- ✅ OIG integration: entitlement bundles, review campaigns
+- ✅ Group rules for automatic assignment
+- ✅ Comprehensive documentation (`docs/LIFECYCLE_MANAGEMENT.md`)
+- ✅ AI prompt template (`ai-assisted/prompts/setup_lifecycle_management.md`)
+
+**Completed:** 2026-01-06
 
 ### SAML Federation Module
 **Status:** ✅ Complete
