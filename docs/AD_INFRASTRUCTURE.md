@@ -129,23 +129,17 @@ Deploys AD infrastructure to one or more AWS regions.
 | `instance_type` | EC2 instance type | `t3.medium` |
 | `create_sample_users` | Create demo users | `true` |
 
-### AD - Install Okta Agent (`ad-install-okta-agent.yml`)
-
-Installs Okta AD Agent on deployed domain controllers.
-
-**Prerequisites:**
-1. Add `OKTA_AD_AGENT_TOKEN` secret to your GitHub Environment
-2. Ensure `OKTA_ORG_URL` secret is set
-
-```bash
-gh workflow run ad-install-okta-agent.yml \
-  -f environment=myorg \
-  -f region=us-east-1
-```
-
 ### AD - Manage Instance (`ad-manage-instance.yml`)
 
 Manage running AD instances via SSM.
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `environment` | Target environment | `myorg` |
+| `domain` | Domain identifier (e.g., use1, use1-emea) | `use1` |
+| `region` | AWS region | `us-east-1` |
+| `action` | Management action | `diagnose` |
+| `instance_id` | EC2 Instance ID (optional - auto-detects from SSM) | |
 
 | Action | Description |
 |--------|-------------|
@@ -157,17 +151,37 @@ Manage running AD instances via SSM.
 | `get-groups` | List all AD groups |
 
 ```bash
-# Run diagnostics
+# Run diagnostics on AMER domain
 gh workflow run ad-manage-instance.yml \
-  -f environment=myorg \
-  -f region=us-east-1 \
+  -f environment=taskvantage-prod \
+  -f domain=use1 \
+  -f action=diagnose
+
+# Run diagnostics on EMEA domain (same region, different domain)
+gh workflow run ad-manage-instance.yml \
+  -f environment=taskvantage-prod \
+  -f domain=use1-emea \
   -f action=diagnose
 
 # Reset password
 gh workflow run ad-manage-instance.yml \
   -f environment=myorg \
-  -f region=us-east-1 \
+  -f domain=use1 \
   -f action=reset-password
+```
+
+### AD - Register Instance (`ad-register-instance.yml`)
+
+Register an existing AD instance in SSM Parameter Store. Use this when:
+- Terraform deployment was interrupted
+- Instance was created outside of Terraform
+- SSM parameters need to be recreated
+
+```bash
+gh workflow run ad-register-instance.yml \
+  -f environment=taskvantage-prod \
+  -f domain=use1-emea \
+  -f instance_id=i-0bdd4a4684c4a8622
 ```
 
 ## Module Reference
@@ -192,8 +206,6 @@ gh workflow run ad-manage-instance.yml \
 | `root_volume_size` | `100` | Root volume size in GB |
 | `enable_rdp` | `false` | Enable RDP access |
 | `create_sample_users` | `true` | Create demo users/groups |
-| `okta_agent_token` | `""` | Okta AD Agent token |
-| `okta_org_url` | `""` | Okta org URL |
 
 ### Outputs
 
@@ -239,41 +251,46 @@ When `create_sample_users = true`, the following structure is created:
 
 ## Okta AD Agent Integration
 
-### Manual Installation
+The Okta AD Agent requires **manual, interactive installation** with web-based activation. There is no silent/unattended installation option.
 
-1. Get agent token from Okta Admin Console:
-   - Go to **Directory > Directory Integrations**
-   - Click **Add Active Directory**
-   - Download agent or copy registration token
+### Installation Steps
 
-2. Add secrets to GitHub:
-   - `OKTA_AD_AGENT_TOKEN`: Registration token
-   - `OKTA_ORG_URL`: Your Okta org URL (e.g., https://myorg.okta.com)
-
-3. Run installation workflow:
+1. **Deploy AD infrastructure:**
    ```bash
-   gh workflow run ad-install-okta-agent.yml \
+   gh workflow run ad-deploy.yml \
      -f environment=myorg \
-     -f region=us-east-1
+     -f regions='["us-east-1"]' \
+     -f action=apply
    ```
 
-### Automatic Installation (during deployment)
+2. **Verify AD services are running:**
+   ```bash
+   gh workflow run ad-manage-instance.yml \
+     -f environment=myorg \
+     -f region=us-east-1 \
+     -f action=check-services
+   ```
 
-Set the variables in your terraform.tfvars:
-```hcl
-okta_org_url     = "https://myorg.okta.com"
-okta_agent_token = "your-agent-registration-token"
-```
+3. **Connect to the Domain Controller** via SSM Session Manager:
+   ```bash
+   aws ssm start-session --target <instance-id> --region us-east-1
+   ```
+   Or enable RDP and connect via Remote Desktop.
 
-Or pass them to the deployment workflow:
-```bash
-gh workflow run ad-deploy.yml \
-  -f environment=myorg \
-  -f regions='["us-east-1"]' \
-  -f action=apply \
-  -f okta_org_url="https://myorg.okta.com"
-# Note: Token should be stored in GitHub Secrets
-```
+4. **Run the Okta AD Agent installer:**
+   - The installer is pre-downloaded to `C:\OktaADAgentSetup.exe`
+   - Double-click to launch, or run from PowerShell:
+     ```powershell
+     Start-Process C:\OktaADAgentSetup.exe
+     ```
+
+5. **Complete the installation wizard:**
+   - Select the AD domain to manage
+   - Configure the service account
+   - Enter your Okta org URL
+   - Complete web-based activation (requires browser authentication)
+
+> **Note:** The agent installer is automatically downloaded during AD deployment for convenience. If needed, you can also download the latest version from **Okta Admin Console > Directory > Directory Integrations > Add Active Directory**.
 
 ## Troubleshooting
 

@@ -190,16 +190,17 @@ gh workflow run ad-deploy.yml \
   -f regions='["us-east-1"]' \
   -f action=plan  # or apply, destroy
 
-# AD Infrastructure: Install Okta AD Agent
-gh workflow run ad-install-okta-agent.yml \
-  -f environment=myorg \
-  -f region=us-east-1
-
 # AD Infrastructure: Manage instance (diagnose, reboot, reset-password, etc.)
 gh workflow run ad-manage-instance.yml \
   -f environment=myorg \
-  -f region=us-east-1 \
+  -f domain=use1 \
   -f action=diagnose  # or reboot, reset-password, check-services, get-users, get-groups
+
+# AD Infrastructure: Register an orphaned instance in SSM Parameter Store
+gh workflow run ad-register-instance.yml \
+  -f environment=myorg \
+  -f domain=use1 \
+  -f instance_id=i-0123456789abcdef0
 ```
 
 ### Python Scripts (API Management)
@@ -554,9 +555,10 @@ Workflows are named with category prefixes for easy searchability:
   - `backup-restore/state-based/restore-tenant.yml` - Rollback S3 state version
 
 **AD Infrastructure Workflows (`ad-*`):**
-- `ad-deploy.yml` - Deploy AD Domain Controller (multi-region)
-- `ad-install-okta-agent.yml` - Install Okta AD Agent via SSM
+- `ad-deploy.yml` - Deploy AD Domain Controller (multi-region, multi-domain)
 - `ad-manage-instance.yml` - Manage instances (diagnose, reboot, reset-password, etc.)
+- `ad-register-instance.yml` - Register orphaned instances in SSM Parameter Store
+- `ad-install-okta-agent.yml` - Install Okta AD Agent via SSM
 
 **Other Workflows:**
 - `import-all-resources.yml` - Import entire tenant to code

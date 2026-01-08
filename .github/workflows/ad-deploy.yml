@@ -3,10 +3,26 @@
 # ==============================================================================
 # Deploys AD Domain Controller infrastructure to one or more AWS regions.
 # Supports multi-region deployment via matrix strategy.
+# Supports multi-domain deployment via infrastructure_dir parameter.
 #
-# Usage:
+# Usage (single domain):
 #   gh workflow run ad-deploy.yml \
 #     -f environment=myorg \
+#     -f regions='["us-east-1"]' \
+#     -f action=apply
+#
+# Usage (multi-domain - TaskVantage example):
+#   # Deploy AMER domain
+#   gh workflow run ad-deploy.yml \
+#     -f environment=taskvantage-prod \
+#     -f infrastructure_dir=ad-infrastructure-amer \
+#     -f regions='["us-east-1"]' \
+#     -f action=apply
+#
+#   # Deploy EMEA domain
+#   gh workflow run ad-deploy.yml \
+#     -f environment=taskvantage-prod \
+#     -f infrastructure_dir=ad-infrastructure-emea \
 #     -f regions='["us-east-1"]' \
 #     -f action=apply
 # ==============================================================================
@@ -17,10 +33,15 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Target environment (e.g., myorg, staging)'
+        description: 'Target environment (e.g., myorg, taskvantage-prod)'
         required: true
         type: string
         default: 'myorg'
+      infrastructure_dir:
+        description: 'Infrastructure directory (e.g., ad-infrastructure, ad-infrastructure-amer)'
+        required: false
+        type: string
+        default: 'ad-infrastructure'
       regions:
         description: 'AWS regions as JSON array (e.g., ["us-east-1", "us-west-2"])'
         required: true
@@ -36,15 +57,15 @@ on:
           - destroy
         default: 'plan'
       ad_domain_name:
-        description: 'AD Domain Name (e.g., corp.demo.local)'
+        description: 'AD Domain Name (optional - uses config default if not set)'
         required: false
         type: string
-        default: 'corp.demo.local'
+        default: ''
       ad_netbios_name:
-        description: 'AD NetBIOS Name (e.g., CORP)'
+        description: 'AD NetBIOS Name (optional - uses config default if not set)'
         required: false
         type: string
-        default: 'CORP'
+        default: ''
       instance_type:
         description: 'EC2 Instance Type'
         required: false
@@ -89,47 +110,60 @@ jobs:
           terraform_version: "1.9.0"
 
       - name: Terraform Init
-        working-directory: environments/${{ inputs.environment }}/ad-infrastructure
+        working-directory: environments/${{ inputs.environment }}/${{ inputs.infrastructure_dir }}
         run: |
           terraform init \
-            -backend-config="key=Okta-GitOps/${{ inputs.environment }}/ad-infrastructure/${{ matrix.region }}/terraform.tfstate"
+            -backend-config="key=Okta-GitOps/${{ inputs.environment }}/${{ inputs.infrastructure_dir }}/${{ matrix.region }}/terraform.tfstate"
 
       - name: Terraform Plan
         if: inputs.action == 'plan' || inputs.action == 'apply'
-        working-directory: environments/${{ inputs.environment }}/ad-infrastructure
+        working-directory: environments/${{ inputs.environment }}/${{ inputs.infrastructure_dir }}
         run: |
-          terraform plan \
-            -var="aws_region=${{ matrix.region }}" \
-            -var="ad_domain_name=${{ inputs.ad_domain_name }}" \
-            -var="ad_netbios_name=${{ inputs.ad_netbios_name }}" \
-            -var="instance_type=${{ inputs.instance_type }}" \
-            -var="create_sample_users=${{ inputs.create_sample_users }}" \
-            -var="environment=${{ inputs.environment }}" \
-            -out=tfplan
+          # Build variable arguments
+          VAR_ARGS="-var=aws_region=${{ matrix.region }}"
+          VAR_ARGS="$VAR_ARGS -var=instance_type=${{ inputs.instance_type }}"
+          VAR_ARGS="$VAR_ARGS -var=environment=${{ inputs.environment }}"
+
+          # Only add domain vars if explicitly provided (allows config defaults)
+          if [ -n "${{ inputs.ad_domain_name }}" ]; then
+            VAR_ARGS="$VAR_ARGS -var=ad_domain_name=${{ inputs.ad_domain_name }}"
+          fi
+          if [ -n "${{ inputs.ad_netbios_name }}" ]; then
+            VAR_ARGS="$VAR_ARGS -var=ad_netbios_name=${{ inputs.ad_netbios_name }}"
+          fi
+
+          terraform plan $VAR_ARGS -out=tfplan
 
       - name: Terraform Apply
         if: inputs.action == 'apply'
-        working-directory: environments/${{ inputs.environment }}/ad-infrastructure
+        working-directory: environments/${{ inputs.environment }}/${{ inputs.infrastructure_dir }}
         run: |
           terraform apply -auto-approve tfplan
 
       - name: Terraform Destroy
         if: inputs.action == 'destroy'
-        working-directory: environments/${{ inputs.environment }}/ad-infrastructure
+        working-directory: environments/${{ inputs.environment }}/${{ inputs.infrastructure_dir }}
         run: |
-          terraform destroy -auto-approve \
-            -var="aws_region=${{ matrix.region }}" \
-            -var="ad_domain_name=${{ inputs.ad_domain_name }}" \
-            -var="ad_netbios_name=${{ inputs.ad_netbios_name }}" \
-            -var="instance_type=${{ inputs.instance_type }}" \
-            -var="create_sample_users=${{ inputs.create_sample_users }}" \
-            -var="environment=${{ inputs.environment }}"
+          # Build variable arguments
+          VAR_ARGS="-var=aws_region=${{ matrix.region }}"
+          VAR_ARGS="$VAR_ARGS -var=instance_type=${{ inputs.instance_type }}"
+          VAR_ARGS="$VAR_ARGS -var=environment=${{ inputs.environment }}"
+
+          # Only add domain vars if explicitly provided
+          if [ -n "${{ inputs.ad_domain_name }}" ]; then
+            VAR_ARGS="$VAR_ARGS -var=ad_domain_name=${{ inputs.ad_domain_name }}"
+          fi
+          if [ -n "${{ inputs.ad_netbios_name }}" ]; then
+            VAR_ARGS="$VAR_ARGS -var=ad_netbios_name=${{ inputs.ad_netbios_name }}"
+          fi
+
+          terraform destroy -auto-approve $VAR_ARGS
 
       - name: Get Outputs
         if: inputs.action == 'apply'
-        working-directory: environments/${{ inputs.environment }}/ad-infrastructure
+        working-directory: environments/${{ inputs.environment }}/${{ inputs.infrastructure_dir }}
         run: |
-          echo "## AD Deployment Results for ${{ matrix.region }}" >> $GITHUB_STEP_SUMMARY
+          echo "## AD Deployment Results for ${{ inputs.infrastructure_dir }} in ${{ matrix.region }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Output | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY

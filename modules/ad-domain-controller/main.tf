@@ -405,8 +405,6 @@ resource "aws_instance" "ad_dc" {
     domain_name        = var.ad_domain_name
     netbios_name       = var.ad_netbios_name
     create_sample_data = var.create_sample_users
-    okta_agent_token   = var.okta_agent_token
-    okta_org_url       = var.okta_org_url
   }))
 
   metadata_options {
@@ -446,8 +444,8 @@ resource "aws_eip" "ad_dc" {
 # ==============================================================================
 
 resource "aws_ssm_parameter" "ad_instance_id" {
-  name        = "/${var.environment}/ad/instance-id"
-  description = "AD Domain Controller Instance ID"
+  name        = "/${var.environment}/${var.region_short}/ad/instance-id"
+  description = "AD Domain Controller Instance ID for ${var.region_short}"
   type        = "String"
   value       = aws_instance.ad_dc.id
 
@@ -455,8 +453,8 @@ resource "aws_ssm_parameter" "ad_instance_id" {
 }
 
 resource "aws_ssm_parameter" "ad_private_ip" {
-  name        = "/${var.environment}/ad/private-ip"
-  description = "AD Domain Controller Private IP"
+  name        = "/${var.environment}/${var.region_short}/ad/private-ip"
+  description = "AD Domain Controller Private IP for ${var.region_short}"
   type        = "String"
   value       = aws_instance.ad_dc.private_ip
 

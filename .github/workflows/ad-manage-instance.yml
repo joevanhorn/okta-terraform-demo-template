@@ -6,9 +6,13 @@
 #
 # Usage:
 #   gh workflow run ad-manage-instance.yml \
-#     -f environment=myorg \
-#     -f region=us-east-1 \
+#     -f environment=taskvantage-prod \
+#     -f domain=use1 \
 #     -f action=diagnose
+#
+# For multi-domain environments (e.g., AMER and EMEA in same region):
+#   -f domain=use1        # AMER domain
+#   -f domain=use1-emea   # EMEA domain
 # ==============================================================================
 
 name: AD - Manage Instance
@@ -21,6 +25,11 @@ on:
         required: true
         type: string
         default: 'myorg'
+      domain:
+        description: 'Domain identifier (e.g., use1, use1-emea)'
+        required: true
+        type: string
+        default: 'use1'
       region:
         description: 'AWS region'
         required: true
@@ -74,7 +83,7 @@ jobs:
             INSTANCE_ID="${{ inputs.instance_id }}"
           else
             INSTANCE_ID=$(aws ssm get-parameter \
-              --name "/${{ inputs.environment }}/ad/instance-id" \
+              --name "/${{ inputs.environment }}/${{ inputs.domain }}/ad/instance-id" \
               --query "Parameter.Value" \
               --output text \
               --region ${{ inputs.region }} 2>/dev/null || echo "")
@@ -109,7 +118,8 @@ jobs:
         if: inputs.action == 'diagnose'
         id: diagnose
         run: |
-          SCRIPT=$(cat <<'PWSH'
+          # Write PowerShell script to temp file for proper JSON escaping
+          cat > /tmp/diagnose.ps1 <<'PWSH'
           Write-Output "=========================================="
           Write-Output "AD DOMAIN CONTROLLER DIAGNOSTICS"
           Write-Output "$(Get-Date)"
@@ -166,12 +176,14 @@ jobs:
           Write-Output ""
           Write-Output "Diagnostics complete"
           PWSH
-          )
+
+          # Create properly escaped JSON parameters using jq
+          PARAMS=$(jq -n --rawfile script /tmp/diagnose.ps1 '{"commands": [$script]}')
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ steps.get-instance.outputs.instance_id }}" \
             --document-name "AWS-RunPowerShellScript" \
-            --parameters "commands=[$SCRIPT]" \
+            --parameters "$PARAMS" \
             --timeout-seconds 300 \
             --region ${{ inputs.region }} \
             --query "Command.CommandId" \
@@ -203,7 +215,7 @@ jobs:
         run: |
           # Get secret ARN
           SECRET_ARN=$(aws ssm get-parameter \
-            --name "/${{ inputs.environment }}/ad/credentials-secret-arn" \
+            --name "/${{ inputs.environment }}/${{ inputs.domain }}/ad/credentials-secret-arn" \
             --query "Parameter.Value" \
             --output text \
             --region ${{ inputs.region }} 2>/dev/null || echo "")
@@ -236,10 +248,13 @@ jobs:
           # Reset password on instance
           SCRIPT="Set-LocalUser -Name Administrator -Password (ConvertTo-SecureString '$NEW_PASSWORD' -AsPlainText -Force); Write-Output 'Password reset successful'"
 
+          # Create properly escaped JSON parameters using jq
+          PARAMS=$(echo "$SCRIPT" | jq -Rs '{"commands": [.]}')
+
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ steps.get-instance.outputs.instance_id }}" \
             --document-name "AWS-RunPowerShellScript" \
-            --parameters "commands=[$SCRIPT]" \
+            --parameters "$PARAMS" \
             --timeout-seconds 60 \
             --region ${{ inputs.region }} \
             --query "Command.CommandId" \
@@ -261,10 +276,13 @@ jobs:
         run: |
           SCRIPT='Get-Service | Where-Object {$_.Status -eq "Running" -or $_.Name -match "Okta|NTDS|DNS|SSM"} | Sort-Object Status, Name | Format-Table Name, Status, DisplayName -AutoSize'
 
+          # Create properly escaped JSON parameters using jq
+          PARAMS=$(echo "$SCRIPT" | jq -Rs '{"commands": [.]}')
+
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ steps.get-instance.outputs.instance_id }}" \
             --document-name "AWS-RunPowerShellScript" \
-            --parameters "commands=[$SCRIPT]" \
+            --parameters "$PARAMS" \
             --timeout-seconds 60 \
             --region ${{ inputs.region }} \
             --query "Command.CommandId" \
@@ -281,10 +299,13 @@ jobs:
         run: |
           SCRIPT='Get-ADUser -Filter * -Properties Department, Title, Enabled | Select-Object SamAccountName, Name, Department, Title, Enabled | Format-Table -AutoSize'
 
+          # Create properly escaped JSON parameters using jq
+          PARAMS=$(echo "$SCRIPT" | jq -Rs '{"commands": [.]}')
+
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ steps.get-instance.outputs.instance_id }}" \
             --document-name "AWS-RunPowerShellScript" \
-            --parameters "commands=[$SCRIPT]" \
+            --parameters "$PARAMS" \
             --timeout-seconds 120 \
             --region ${{ inputs.region }} \
             --query "Command.CommandId" \
@@ -301,10 +322,13 @@ jobs:
         run: |
           SCRIPT='Get-ADGroup -Filter * | Select-Object Name, GroupCategory, GroupScope | Sort-Object Name | Format-Table -AutoSize'
 
+          # Create properly escaped JSON parameters using jq
+          PARAMS=$(echo "$SCRIPT" | jq -Rs '{"commands": [.]}')
+
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ steps.get-instance.outputs.instance_id }}" \
             --document-name "AWS-RunPowerShellScript" \
-            --parameters "commands=[$SCRIPT]" \
+            --parameters "$PARAMS" \
             --timeout-seconds 120 \
             --region ${{ inputs.region }} \
             --query "Command.CommandId" \
@@ -373,15 +397,23 @@ jobs:
             exit 0
           fi
 
-          echo "## ${{ inputs.action }} Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-
-          aws ssm get-command-invocation \
+          # Get and display results (both in log and summary)
+          OUTPUT=$(aws ssm get-command-invocation \
             --command-id "$COMMAND_ID" \
             --instance-id "${{ steps.get-instance.outputs.instance_id }}" \
             --query "StandardOutputContent" \
             --output text \
-            --region ${{ inputs.region }} >> $GITHUB_STEP_SUMMARY
+            --region ${{ inputs.region }})
 
+          # Output to log
+          echo "=========================================="
+          echo "${{ inputs.action }} Results"
+          echo "=========================================="
+          echo "$OUTPUT"
+
+          # Output to job summary
+          echo "## ${{ inputs.action }} Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "$OUTPUT" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

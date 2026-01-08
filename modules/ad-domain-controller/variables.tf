@@ -148,23 +148,6 @@ variable "setup_script_s3_key" {
 }
 
 # ==============================================================================
-# OKTA AD AGENT CONFIGURATION
-# ==============================================================================
-
-variable "okta_agent_token" {
-  description = "Okta AD Agent installation token (optional)"
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
-variable "okta_org_url" {
-  description = "Okta organization URL for AD Agent (e.g., https://myorg.okta.com)"
-  type        = string
-  default     = ""
-}
-
-# ==============================================================================
 # TAGS
 # ==============================================================================
 

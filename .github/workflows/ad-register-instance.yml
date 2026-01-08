@@ -1,0 +1,154 @@
+# ==============================================================================
+# AD INSTANCE REGISTRATION WORKFLOW
+# ==============================================================================
+# Registers an existing AD instance in SSM Parameter Store.
+# Use this for instances created outside of Terraform or when Terraform
+# deployment was interrupted.
+#
+# Usage:
+#   gh workflow run ad-register-instance.yml \
+#     -f environment=taskvantage-prod \
+#     -f domain=use1-emea \
+#     -f instance_id=i-0bdd4a4684c4a8622
+# ==============================================================================
+
+name: AD - Register Instance
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: string
+        default: 'taskvantage-prod'
+      domain:
+        description: 'Domain identifier (e.g., use1, use1-emea)'
+        required: true
+        type: string
+      region:
+        description: 'AWS region'
+        required: true
+        type: string
+        default: 'us-east-1'
+      instance_id:
+        description: 'EC2 Instance ID to register'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  register:
+    name: "Register AD Instance"
+    runs-on: ubuntu-latest
+
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-AD-Register
+          aws-region: ${{ inputs.region }}
+
+      - name: Verify Instance Exists
+        run: |
+          INSTANCE_STATE=$(aws ec2 describe-instances \
+            --instance-ids ${{ inputs.instance_id }} \
+            --query "Reservations[0].Instances[0].State.Name" \
+            --output text \
+            --region ${{ inputs.region }} 2>&1) || {
+            echo "Error: Instance ${{ inputs.instance_id }} not found"
+            exit 1
+          }
+
+          if [ "$INSTANCE_STATE" != "running" ]; then
+            echo "Warning: Instance state is '$INSTANCE_STATE', not 'running'"
+          fi
+
+          PRIVATE_IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ inputs.instance_id }} \
+            --query "Reservations[0].Instances[0].PrivateIpAddress" \
+            --output text \
+            --region ${{ inputs.region }})
+
+          echo "Instance ID: ${{ inputs.instance_id }}"
+          echo "Instance State: $INSTANCE_STATE"
+          echo "Private IP: $PRIVATE_IP"
+          echo "private_ip=$PRIVATE_IP" >> $GITHUB_OUTPUT
+        id: verify
+
+      - name: Create SSM Parameters
+        run: |
+          PARAM_PREFIX="/${{ inputs.environment }}/${{ inputs.domain }}/ad"
+
+          # Create instance-id parameter
+          aws ssm put-parameter \
+            --name "${PARAM_PREFIX}/instance-id" \
+            --description "AD Domain Controller Instance ID for ${{ inputs.domain }}" \
+            --type "String" \
+            --value "${{ inputs.instance_id }}" \
+            --overwrite \
+            --region ${{ inputs.region }}
+
+          echo "Created: ${PARAM_PREFIX}/instance-id = ${{ inputs.instance_id }}"
+
+          # Create private-ip parameter
+          aws ssm put-parameter \
+            --name "${PARAM_PREFIX}/private-ip" \
+            --description "AD Domain Controller Private IP for ${{ inputs.domain }}" \
+            --type "String" \
+            --value "${{ steps.verify.outputs.private_ip }}" \
+            --overwrite \
+            --region ${{ inputs.region }}
+
+          echo "Created: ${PARAM_PREFIX}/private-ip = ${{ steps.verify.outputs.private_ip }}"
+
+      - name: Verify Registration
+        run: |
+          PARAM_PREFIX="/${{ inputs.environment }}/${{ inputs.domain }}/ad"
+
+          echo "Verifying SSM parameters..."
+
+          STORED_ID=$(aws ssm get-parameter \
+            --name "${PARAM_PREFIX}/instance-id" \
+            --query "Parameter.Value" \
+            --output text \
+            --region ${{ inputs.region }})
+
+          STORED_IP=$(aws ssm get-parameter \
+            --name "${PARAM_PREFIX}/private-ip" \
+            --query "Parameter.Value" \
+            --output text \
+            --region ${{ inputs.region }})
+
+          echo "Stored Instance ID: $STORED_ID"
+          echo "Stored Private IP: $STORED_IP"
+
+          if [ "$STORED_ID" = "${{ inputs.instance_id }}" ]; then
+            echo "Registration successful!"
+          else
+            echo "Error: Registration verification failed"
+            exit 1
+          fi
+
+      - name: Summary
+        run: |
+          echo "## AD Instance Registration" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | \`${{ inputs.environment }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Domain | \`${{ inputs.domain }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Instance ID | \`${{ inputs.instance_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Private IP | \`${{ steps.verify.outputs.private_ip }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The instance is now registered and can be managed via \`ad-manage-instance.yml\`" >> $GITHUB_STEP_SUMMARY
