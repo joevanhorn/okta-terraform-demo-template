@@ -35,9 +35,26 @@ Before starting, ensure you have:
 
 ## Step-by-Step Setup
 
+> **CRITICAL: S3 Bucket Names Must Be Globally Unique**
+>
+> S3 bucket names are **globally unique across ALL AWS accounts worldwide**. The default bucket name `okta-terraform-demo` in this template is almost certainly already taken by someone else.
+>
+> **You MUST update the bucket name before deploying.** Edit `aws-backend/variables.tf`:
+> ```hcl
+> variable "state_bucket_name" {
+>   default = "okta-terraform-<your-org-name>"  # e.g., "okta-terraform-acme-corp"
+> }
+> ```
+>
+> If you see `BucketAlreadyExists` error, choose a different, more unique name.
+
 ### Step 1: Deploy AWS Backend Infrastructure
 
 The `aws-backend/` directory contains Terraform configuration to create all necessary AWS resources.
+
+**First, update the bucket name** in `aws-backend/variables.tf` to something unique to your organization.
+
+Then deploy:
 
 ```bash
 # Navigate to aws-backend directory

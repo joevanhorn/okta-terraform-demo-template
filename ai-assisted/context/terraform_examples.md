@@ -770,6 +770,11 @@ output "next_steps" {
 ```
 
 ### AWS Provider Configuration
+
+> **IMPORTANT: S3 Bucket Names Must Be Globally Unique**
+>
+> S3 bucket names are globally unique across ALL AWS accounts worldwide. Replace the example bucket name below with your organization's unique bucket name.
+
 ```hcl
 terraform {
   required_version = ">= 1.9.0"
@@ -782,8 +787,9 @@ terraform {
   }
 
   # S3 backend for state storage
+  # NOTE: Replace bucket name with your own globally unique name!
   backend "s3" {
-    bucket         = "okta-terraform-demo"
+    bucket         = "okta-terraform-<your-org-name>"  # MUST be globally unique!
     key            = "Okta-GitOps/production/infrastructure/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true

@@ -567,6 +567,10 @@ environments/{env}/infrastructure/
 
 **Always use S3 backend with per-environment state:**
 
+> **IMPORTANT: S3 Bucket Names Must Be Globally Unique**
+>
+> S3 bucket names are globally unique across ALL AWS accounts. Replace `okta-terraform-demo` with your organization's unique bucket name (e.g., `okta-terraform-acme-corp`).
+
 ```hcl
 # provider.tf
 terraform {
@@ -580,7 +584,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "okta-terraform-demo"
+    bucket         = "okta-terraform-<your-org-name>"  # MUST be globally unique!
     key            = "Okta-GitOps/{environment}/infrastructure/terraform.tfstate"
     region         = "us-east-1"
     encrypt        = true

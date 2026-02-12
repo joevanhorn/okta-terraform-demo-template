@@ -2,6 +2,17 @@
 
 This directory contains Terraform configuration for setting up the AWS backend infrastructure used by all Okta environments.
 
+> **IMPORTANT: S3 Bucket Names Must Be Globally Unique**
+>
+> S3 bucket names are **globally unique across ALL AWS accounts worldwide**. The default bucket name `okta-terraform-demo` is likely already taken. You **MUST** choose a unique name before running `terraform apply`.
+>
+> **Update `variables.tf` before deploying:**
+> ```hcl
+> variable "state_bucket_name" {
+>   default = "okta-terraform-demo-<your-unique-suffix>"  # e.g., "okta-terraform-demo-acme-corp-2025"
+> }
+> ```
+
 ## What This Creates
 
 1. **S3 Bucket** (`okta-terraform-demo`)
@@ -60,6 +71,16 @@ okta-terraform-demo/
 - Access to create IAM roles and S3 buckets
 
 ### Step 1: Deploy Backend Infrastructure
+
+**Before you start:** Update the S3 bucket name in `variables.tf` to something unique:
+
+```hcl
+variable "state_bucket_name" {
+  default = "okta-terraform-<your-org-name>"  # Must be globally unique!
+}
+```
+
+Then deploy:
 
 ```bash
 # Navigate to aws-backend directory
