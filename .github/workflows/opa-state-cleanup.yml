@@ -1,0 +1,91 @@
+name: "OPA: State Cleanup"
+
+# Removes all OPA (oktapam) resource entries from the Terraform state.
+# Does NOT destroy any actual infrastructure — only removes state tracking.
+# Useful for resetting OPA state or debugging state issues.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to clean up'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  cleanup:
+    name: Remove OPA state entries
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    defaults:
+      run:
+        working-directory: environments/${{ inputs.environment }}/terraform
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-OPAStateCleanup
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Configure Terraform variables
+        run: |
+          cat > terraform.tfvars << EOF
+          okta_api_token = "${{ secrets.OKTA_API_TOKEN }}"
+          okta_org_name  = "${{ secrets.OKTA_ORG_NAME }}"
+          okta_base_url  = "${{ secrets.OKTA_BASE_URL }}"
+          EOF
+
+      - name: Terraform Init
+        run: terraform init -upgrade
+
+      - name: List OPA state entries
+        run: |
+          echo "Current OPA state entries:"
+          terraform state list | grep -i oktapam || echo "No oktapam entries found"
+
+      - name: Remove OPA entries
+        run: |
+          ENTRIES=$(terraform state list | grep -i oktapam || true)
+          if [ -z "$ENTRIES" ]; then
+            echo "No OPA entries to remove"
+            exit 0
+          fi
+
+          echo "Removing OPA entries from state..."
+          for resource in $ENTRIES; do
+            echo "Removing: $resource"
+            terraform state rm "$resource" || true
+          done
+
+          echo ""
+          echo "Remaining OPA state entries:"
+          terraform state list | grep -i oktapam || echo "No oktapam entries found (cleanup complete)"
+
+      - name: Summary
+        run: |
+          echo "## OPA State Cleanup" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All oktapam resources have been removed from the Terraform state." >> $GITHUB_STEP_SUMMARY
+          echo "The actual OPA resources still exist and can be re-imported or recreated." >> $GITHUB_STEP_SUMMARY
+
+      - name: Cleanup
+        if: always()
+        run: rm -f terraform.tfvars

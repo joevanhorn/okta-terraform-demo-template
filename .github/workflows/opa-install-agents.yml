@@ -1,0 +1,322 @@
+name: "OPA: Install Server Agents"
+
+# Installs the Okta Privileged Access (OPA) server agent (sftd)
+# on existing EC2 instances via AWS Systems Manager (SSM).
+# Supports both Windows (AD DC) and Linux (SCIM, OPC) servers.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment name'
+        required: true
+        type: string
+      target:
+        description: 'Target server(s) to install OPA agent'
+        required: true
+        type: choice
+        options:
+          - all
+          - ad-dc
+          - scim-server
+          - opc-agents
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  install-ad-dc:
+    name: Install OPA on AD Domain Controller
+    if: inputs.target == 'all' || inputs.target == 'ad-dc'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-OPAAgents-ADDC
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+          terraform_wrapper: false
+
+      - name: Get OPA Enrollment Token
+        id: get-token
+        working-directory: environments/${{ inputs.environment }}/terraform
+        run: |
+          cat > terraform.tfvars << EOF
+          okta_api_token = "${{ secrets.OKTA_API_TOKEN }}"
+          okta_org_name  = "${{ secrets.OKTA_ORG_NAME }}"
+          okta_base_url  = "${{ secrets.OKTA_BASE_URL }}"
+          oktapam_key    = "${{ secrets.OKTAPAM_KEY }}"
+          oktapam_secret = "${{ secrets.OKTAPAM_SECRET }}"
+          oktapam_team   = "${{ secrets.OKTAPAM_TEAM }}"
+          EOF
+          if [ -n "${{ secrets.OKTAPAM_API_HOST }}" ]; then
+            echo 'oktapam_api_host = "${{ secrets.OKTAPAM_API_HOST }}"' >> terraform.tfvars
+          fi
+
+          terraform init -backend=true > /dev/null 2>&1
+          TOKEN=$(terraform output -raw opa_enrollment_token 2>/dev/null || echo "")
+          rm -f terraform.tfvars
+
+          if [ -z "$TOKEN" ]; then
+            echo "::error::OPA enrollment token not found. Run the opa-apply workflow first."
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "enrollment_token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Get AD DC Instance ID
+        id: get-instance
+        run: |
+          # Try Terraform state first
+          if [ -d "environments/${{ inputs.environment }}/infrastructure" ]; then
+            cd "environments/${{ inputs.environment }}/infrastructure"
+            terraform init -backend=true > /dev/null 2>&1
+            INSTANCE_ID=$(terraform output -raw dc_instance_id 2>/dev/null || echo "")
+          fi
+
+          # Fall back to tag-based discovery
+          if [ -z "$INSTANCE_ID" ]; then
+            INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters \
+                "Name=tag:Role,Values=DomainController,AD-DC" \
+                "Name=tag:Environment,Values=${{ inputs.environment }}" \
+                "Name=instance-state-name,Values=running" \
+              --query 'Reservations[].Instances[].InstanceId' \
+              --output text | head -1)
+          fi
+
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "::error::AD DC instance not found. Deploy infrastructure first."
+            exit 1
+          fi
+
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+          echo "Target AD DC Instance: $INSTANCE_ID"
+
+      - name: Install OPA Agent on AD DC via SSM
+        env:
+          ENROLLMENT_TOKEN: ${{ steps.get-token.outputs.enrollment_token }}
+        run: |
+          INSTANCE_ID="${{ steps.get-instance.outputs.instance_id }}"
+          echo "Installing OPA agent on AD DC: $INSTANCE_ID"
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunPowerShellScript" \
+            --parameters "commands=[
+              'Set-Variable -Name ErrorActionPreference -Value Continue',
+              'Write-Host \"=== Installing OPA Server Agent ===\"',
+              'if (Get-Service -Name \"ScaleFT Server Agent\" -ErrorAction SilentlyContinue) { Write-Host \"Already installed\"; exit 0 }',
+              'New-Item -ItemType Directory -Path \"C:\\Program Files\\ScaleFT\" -Force | Out-Null',
+              'Write-Host \"Downloading OPA Windows Server Agent...\"',
+              '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12',
+              'Invoke-WebRequest -Uri \"https://dist.scaleft.com/repos/windows/stable/amd64/server-tools/v1.99.5/ScaleFT-Server-Tools-1.99.5.msi\" -OutFile \"C:\\Terraform\\ScaleFT-Server-Tools.msi\" -UseBasicParsing',
+              'Start-Process msiexec.exe -ArgumentList \"/i C:\\Terraform\\ScaleFT-Server-Tools.msi /quiet /norestart\" -Wait -NoNewWindow',
+              'Start-Sleep -Seconds 10',
+              'New-Item -ItemType Directory -Path \"C:\\Windows\\System32\\config\\systemprofile\\AppData\\Local\\scaleft\" -Force | Out-Null',
+              'Set-Content -Path \"C:\\Windows\\System32\\config\\systemprofile\\AppData\\Local\\scaleft\\enrollment.token\" -Value \"$ENROLLMENT_TOKEN\"',
+              'Get-Service | Where-Object { \$_.Name -like \"*sft*\" -or \$_.DisplayName -like \"*ScaleFT*\" } | Start-Service',
+              'Write-Host \"=== OPA Installation Complete ===\"'
+            ]" \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" || true
+
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query '[Status, StandardOutputContent]' \
+            --output text
+
+  install-scim:
+    name: Install OPA on SCIM Server
+    if: inputs.target == 'all' || inputs.target == 'scim-server'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-OPAAgents-SCIM
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+          terraform_wrapper: false
+
+      - name: Get OPA Enrollment Token
+        id: get-token
+        working-directory: environments/${{ inputs.environment }}/terraform
+        run: |
+          cat > terraform.tfvars << EOF
+          okta_api_token = "${{ secrets.OKTA_API_TOKEN }}"
+          okta_org_name  = "${{ secrets.OKTA_ORG_NAME }}"
+          okta_base_url  = "${{ secrets.OKTA_BASE_URL }}"
+          oktapam_key    = "${{ secrets.OKTAPAM_KEY }}"
+          oktapam_secret = "${{ secrets.OKTAPAM_SECRET }}"
+          oktapam_team   = "${{ secrets.OKTAPAM_TEAM }}"
+          EOF
+          if [ -n "${{ secrets.OKTAPAM_API_HOST }}" ]; then
+            echo 'oktapam_api_host = "${{ secrets.OKTAPAM_API_HOST }}"' >> terraform.tfvars
+          fi
+
+          terraform init -backend=true > /dev/null 2>&1
+          TOKEN=$(terraform output -raw opa_enrollment_token 2>/dev/null || echo "")
+          rm -f terraform.tfvars
+
+          if [ -z "$TOKEN" ]; then
+            echo "::error::OPA enrollment token not found. Run the opa-apply workflow first."
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "enrollment_token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Get SCIM Server Instance ID
+        id: get-instance
+        run: |
+          # Try Terraform state first
+          if [ -d "environments/${{ inputs.environment }}/infrastructure/scim-server" ]; then
+            cd "environments/${{ inputs.environment }}/infrastructure/scim-server"
+            terraform init -backend=true > /dev/null 2>&1
+            INSTANCE_ID=$(terraform output -raw ec2_instance_id 2>/dev/null || terraform output -raw instance_id 2>/dev/null || echo "")
+          fi
+
+          # Fall back to tag-based discovery
+          if [ -z "$INSTANCE_ID" ]; then
+            INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters \
+                "Name=tag:Role,Values=SCIM-Server,scim-server" \
+                "Name=tag:Environment,Values=${{ inputs.environment }}" \
+                "Name=instance-state-name,Values=running" \
+              --query 'Reservations[].Instances[].InstanceId' \
+              --output text | head -1)
+          fi
+
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "::error::SCIM server instance not found. Deploy infrastructure first."
+            exit 1
+          fi
+
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+          echo "Target SCIM Server Instance: $INSTANCE_ID"
+
+      - name: Install OPA Agent on SCIM Server via SSM
+        env:
+          ENROLLMENT_TOKEN: ${{ steps.get-token.outputs.enrollment_token }}
+        run: |
+          INSTANCE_ID="${{ steps.get-instance.outputs.instance_id }}"
+          echo "Installing OPA agent on SCIM server: $INSTANCE_ID"
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "commands=[
+              'set -e',
+              'echo \"=== Installing OPA Server Agent ===\"',
+              'if systemctl is-active --quiet sftd 2>/dev/null; then echo \"OPA agent already running\"; exit 0; fi',
+              'echo \"Adding Okta PAM repository...\"',
+              'curl -fsSL https://dist.scaleft.com/GPG-KEY-OktaPAM-2023 | gpg --dearmor | tee /usr/share/keyrings/oktapam-2023-archive-keyring.gpg > /dev/null',
+              'if command -v apt-get &>/dev/null; then',
+              '  CODENAME=\$(lsb_release -cs 2>/dev/null || echo jammy)',
+              '  echo \"deb [signed-by=/usr/share/keyrings/oktapam-2023-archive-keyring.gpg] https://dist.scaleft.com/repos/deb \$CODENAME okta\" | tee /etc/apt/sources.list.d/oktapam-stable.list',
+              '  apt-get update -y && apt-get install -y scaleft-server-tools',
+              'elif command -v dnf &>/dev/null; then',
+              '  rpm --import https://dist.scaleft.com/GPG-KEY-OktaPAM-2023 || true',
+              '  echo -e \"[oktapam-stable]\\nname=Okta PAM Stable\\nbaseurl=https://dist.scaleft.com/repos/rpm/stable/rhel/8/\\\$basearch\\ngpgcheck=1\\nrepo_gpgcheck=1\\nenabled=1\\ngpgkey=https://dist.scaleft.com/GPG-KEY-OktaPAM-2023\" > /etc/yum.repos.d/oktapam-stable.repo',
+              '  dnf makecache -y && dnf install -y scaleft-server-tools',
+              'fi',
+              'mkdir -p /var/lib/sftd',
+              'echo \"${ENROLLMENT_TOKEN}\" > /var/lib/sftd/enrollment.token',
+              'chmod 600 /var/lib/sftd/enrollment.token',
+              'systemctl enable --now sftd',
+              'sleep 5',
+              'systemctl status sftd --no-pager || true',
+              'echo \"=== OPA Installation Complete ===\"'
+            ]" \
+            --timeout-seconds 300 \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          for i in $(seq 1 60); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --query 'Status' \
+              --output text 2>/dev/null || echo "Pending")
+            if [ "$STATUS" = "Success" ] || [ "$STATUS" = "Failed" ] || [ "$STATUS" = "TimedOut" ]; then
+              break
+            fi
+            echo "Status: $STATUS (waiting...)"
+            sleep 5
+          done
+
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --query '[Status, StandardOutputContent]' \
+            --output text
+
+  summary:
+    name: Installation Summary
+    needs: [install-ad-dc, install-scim]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "## OPA Agent Installation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Server | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ inputs.target }}" == "all" ] || [ "${{ inputs.target }}" == "ad-dc" ]; then
+            if [ "${{ needs.install-ad-dc.result }}" == "success" ]; then
+              echo "| AD Domain Controller | Success |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| AD Domain Controller | Failed |" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          if [ "${{ inputs.target }}" == "all" ] || [ "${{ inputs.target }}" == "scim-server" ]; then
+            if [ "${{ needs.install-scim.result }}" == "success" ]; then
+              echo "| SCIM Server | Success |" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "| SCIM Server | Failed |" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check the OPA Admin Console to verify servers appear" >> $GITHUB_STEP_SUMMARY
+          echo "2. Assign groups to the servers for access control" >> $GITHUB_STEP_SUMMARY
+          echo "3. Configure security policies as needed" >> $GITHUB_STEP_SUMMARY

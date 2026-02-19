@@ -1,0 +1,92 @@
+name: "OPA: Terraform Apply"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to apply'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  opa-apply:
+    name: OPA Terraform Apply
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-OPAApply-${{ inputs.environment }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Configure Terraform variables
+        working-directory: environments/${{ inputs.environment }}/terraform
+        run: |
+          cat > terraform.tfvars << EOF
+          # Okta Provider
+          okta_org_name  = "${{ secrets.OKTA_ORG_NAME }}"
+          okta_base_url  = "${{ secrets.OKTA_BASE_URL }}"
+          okta_api_token = "${{ secrets.OKTA_API_TOKEN }}"
+
+          # OPA Provider
+          oktapam_key    = "${{ secrets.OKTAPAM_KEY }}"
+          oktapam_secret = "${{ secrets.OKTAPAM_SECRET }}"
+          oktapam_team   = "${{ secrets.OKTAPAM_TEAM }}"
+          EOF
+
+          # Only set oktapam_api_host if the secret has a value
+          if [ -n "${{ secrets.OKTAPAM_API_HOST }}" ]; then
+            echo 'oktapam_api_host = "${{ secrets.OKTAPAM_API_HOST }}"' >> terraform.tfvars
+          fi
+
+      - name: Terraform Init
+        working-directory: environments/${{ inputs.environment }}/terraform
+        run: terraform init -upgrade
+
+      - name: Terraform Apply (OPA Resources Only)
+        working-directory: environments/${{ inputs.environment }}/terraform
+        run: |
+          OPA_TARGETS=""
+          for resource in $(grep -h "^resource \"oktapam_" opa_*.tf 2>/dev/null | sed 's/resource "\([^"]*\)" "\([^"]*\)".*/\1.\2/'); do
+            OPA_TARGETS="$OPA_TARGETS -target=$resource"
+          done
+
+          if [ -n "$OPA_TARGETS" ]; then
+            echo "Applying OPA resources: $OPA_TARGETS"
+            terraform apply -auto-approve -no-color $OPA_TARGETS
+          else
+            echo "No OPA resources found to apply"
+          fi
+
+      - name: Display Outputs
+        working-directory: environments/${{ inputs.environment }}/terraform
+        run: |
+          echo "## OPA Terraform Apply Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Resource IDs" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          terraform output -json | jq -r 'to_entries[] | select(.key | startswith("opa_")) | "\(.key): \(.value.value)"' 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "No OPA outputs found" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cleanup
+        if: always()
+        working-directory: environments/${{ inputs.environment }}/terraform
+        run: rm -f terraform.tfvars

@@ -1,0 +1,153 @@
+name: "OPA: Deploy Gateway"
+
+# Deploys an OPA gateway EC2 instance for accessing private resources.
+# The gateway setup token is retrieved from the OPA Terraform state.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+      environment:
+        description: 'Environment name'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-gateway:
+    name: OPA Gateway - ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-OPAGateway-${{ inputs.action }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+          terraform_wrapper: false
+
+      - name: Get OPA Gateway Setup Token
+        id: get-token
+        working-directory: environments/${{ inputs.environment }}/terraform
+        run: |
+          echo "Getting OPA gateway setup token from Terraform state..."
+
+          cat > terraform.tfvars << EOF
+          okta_api_token = "${{ secrets.OKTA_API_TOKEN }}"
+          okta_org_name  = "${{ secrets.OKTA_ORG_NAME }}"
+          okta_base_url  = "${{ secrets.OKTA_BASE_URL }}"
+          oktapam_key    = "${{ secrets.OKTAPAM_KEY }}"
+          oktapam_secret = "${{ secrets.OKTAPAM_SECRET }}"
+          oktapam_team   = "${{ secrets.OKTAPAM_TEAM }}"
+          EOF
+
+          if [ -n "${{ secrets.OKTAPAM_API_HOST }}" ]; then
+            echo 'oktapam_api_host = "${{ secrets.OKTAPAM_API_HOST }}"' >> terraform.tfvars
+          fi
+
+          terraform init -backend=true > /dev/null 2>&1
+
+          TOKEN=$(terraform output -raw opa_gateway_token 2>/dev/null || echo "")
+          if [ -z "$TOKEN" ]; then
+            echo "::error::OPA gateway token not found. Run the opa-apply workflow first."
+            exit 1
+          fi
+
+          echo "::add-mask::$TOKEN"
+          echo "gateway_token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "OPA gateway token retrieved successfully"
+          rm -f terraform.tfvars
+
+      - name: Terraform Init (Infrastructure)
+        working-directory: environments/${{ inputs.environment }}/infrastructure
+        run: terraform init -upgrade
+
+      - name: Terraform Validate
+        working-directory: environments/${{ inputs.environment }}/infrastructure
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: environments/${{ inputs.environment }}/infrastructure
+        env:
+          TF_VAR_opa_gateway_setup_token: ${{ steps.get-token.outputs.gateway_token }}
+        run: |
+          terraform plan -no-color -out=tfplan 2>&1 | tee plan_output.txt
+
+          echo ""
+          echo "=========================================="
+          echo "PLAN SUMMARY"
+          echo "=========================================="
+          if grep -q "No changes" plan_output.txt; then
+            echo "No changes needed - infrastructure is up to date"
+          else
+            grep -E "Plan:|to add|to change|to destroy" plan_output.txt || true
+          fi
+
+      - name: Terraform Apply
+        if: inputs.action == 'apply'
+        working-directory: environments/${{ inputs.environment }}/infrastructure
+        env:
+          TF_VAR_opa_gateway_setup_token: ${{ steps.get-token.outputs.gateway_token }}
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Destroy Gateway
+        if: inputs.action == 'destroy'
+        working-directory: environments/${{ inputs.environment }}/infrastructure
+        env:
+          TF_VAR_opa_gateway_setup_token: ${{ steps.get-token.outputs.gateway_token }}
+        run: |
+          echo "Destroying OPA gateway resources..."
+          terraform destroy -auto-approve \
+            -target=aws_eip_association.opa_gateway \
+            -target=aws_eip.opa_gateway \
+            -target=aws_instance.opa_gateway \
+            -target=aws_security_group.opa_gateway \
+            -target=aws_iam_instance_profile.opa_gateway \
+            -target=aws_iam_role_policy_attachment.opa_gateway_ssm \
+            -target=aws_iam_role.opa_gateway_ssm
+
+      - name: Get Outputs
+        if: inputs.action == 'apply'
+        working-directory: environments/${{ inputs.environment }}/infrastructure
+        run: |
+          echo "Gateway Instance ID:"
+          terraform output opa_gateway_instance_id || echo "N/A"
+          echo ""
+          echo "Gateway Public IP:"
+          terraform output opa_gateway_public_ip || echo "N/A"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## OPA Gateway - ${{ inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Action:** ${{ inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ inputs.action }}" == "apply" ]; then
+            echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "1. Check the OPA console to verify the gateway appears" >> $GITHUB_STEP_SUMMARY
+            echo "2. Test RDP connection: \`sft rdp --via gateway <server-name>\`" >> $GITHUB_STEP_SUMMARY
+          fi

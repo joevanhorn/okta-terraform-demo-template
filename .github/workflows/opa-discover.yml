@@ -1,0 +1,137 @@
+name: "OPA: Discover Resources"
+
+# Lists all existing OPA resources via API (diagnostic/inventory tool)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'GitHub Environment for OPA secrets'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  discover:
+    name: List OPA Resources
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Discover OPA Resources
+        env:
+          OKTAPAM_KEY: ${{ secrets.OKTAPAM_KEY }}
+          OKTAPAM_SECRET: ${{ secrets.OKTAPAM_SECRET }}
+          OKTAPAM_TEAM: ${{ secrets.OKTAPAM_TEAM }}
+        run: |
+          python3 << 'EOF'
+          import os
+          import requests
+          import sys
+
+          team = os.environ.get('OKTAPAM_TEAM', '')
+          key = os.environ.get('OKTAPAM_KEY', '')
+          secret = os.environ.get('OKTAPAM_SECRET', '')
+
+          if not all([team, key, secret]):
+              print("ERROR: Missing OPA credentials. Set OKTAPAM_KEY, OKTAPAM_SECRET, OKTAPAM_TEAM in GitHub Environment secrets.")
+              sys.exit(1)
+
+          # Step 1: Get bearer token
+          print("Authenticating with OPA API...")
+          token_url = "https://app.scaleft.com/v1/teams/{}/service_token".format(team)
+          token_payload = {"key_id": key, "key_secret": secret}
+
+          try:
+              req_headers = {
+                  "Content-Type": "application/json",
+                  "User-Agent": "terraform-provider-oktapam/0.6.2"
+              }
+              token_resp = requests.post(token_url, json=token_payload, headers=req_headers)
+              if token_resp.status_code != 200:
+                  print(f"Authentication failed: {token_resp.status_code}")
+                  print(f"Response: {token_resp.text}")
+                  sys.exit(1)
+
+              token_data = token_resp.json()
+              bearer_token = token_data.get('bearer_token')
+              print(f"Authentication successful! Token expires at: {token_data.get('expires_at')}")
+          except Exception as e:
+              print(f"Authentication error: {e}")
+              sys.exit(1)
+
+          # Step 2: Discover resources
+          base_url = f"https://app.scaleft.com/v1/teams/{team}"
+          headers = {
+              "Authorization": f"Bearer {bearer_token}",
+              "Content-Type": "application/json"
+          }
+
+          def get_resources(endpoint, name):
+              try:
+                  resp = requests.get(f"{base_url}/{endpoint}", headers=headers)
+                  if resp.status_code == 200:
+                      data = resp.json()
+                      items = data.get('list', data) if isinstance(data, dict) else data
+                      if isinstance(items, list):
+                          print(f"\n## {name}: {len(items)} found")
+                          for item in items[:20]:
+                              if isinstance(item, dict):
+                                  item_id = item.get('id', item.get('name', 'unknown'))
+                                  item_name = item.get('name', item.get('project_name', item_id))
+                                  print(f"  - {item_name} (ID: {item_id})")
+                      else:
+                          print(f"\n## {name}: Response format unexpected")
+                  else:
+                      print(f"\n## {name}: {resp.status_code} - {resp.text[:100]}")
+              except Exception as e:
+                  print(f"\n## {name}: Error - {e}")
+
+          print("=" * 60)
+          print(f"OPA Team: {team}")
+          print("=" * 60)
+
+          get_resources("projects", "Projects")
+          get_resources("resource_groups", "Resource Groups")
+          get_resources("gateways", "Gateways")
+          get_resources("secret_folders", "Secret Folders")
+          get_resources("security_policies", "Security Policies")
+          get_resources("groups", "Groups")
+          get_resources("service_users", "Service Users")
+
+          # Get servers across all projects
+          print("\n## Servers (checking projects)...")
+          try:
+              resp = requests.get(f"{base_url}/projects", headers=headers)
+              if resp.status_code == 200:
+                  projects = resp.json().get('list', [])
+                  for proj in projects[:10]:
+                      proj_id = proj.get('id')
+                      proj_name = proj.get('name')
+                      srv_resp = requests.get(f"{base_url}/projects/{proj_id}/servers", headers=headers)
+                      if srv_resp.status_code == 200:
+                          servers = srv_resp.json().get('list', [])
+                          print(f"  Project '{proj_name}': {len(servers)} servers")
+                          for srv in servers[:10]:
+                              print(f"    - {srv.get('hostname', srv.get('id'))}")
+          except Exception as e:
+              print(f"  Error listing servers: {e}")
+
+          print("\n" + "=" * 60)
+          print("Discovery complete!")
+          EOF
