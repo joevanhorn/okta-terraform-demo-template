@@ -1,0 +1,154 @@
+name: "Diagnose: EC2 Instance"
+
+# Comprehensive EC2 instance diagnostics: status, SSM, networking, console output.
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance_id:
+        description: 'EC2 Instance ID'
+        required: true
+        type: string
+      environment:
+        description: 'Environment name (for AWS credentials)'
+        required: true
+        type: string
+      region:
+        description: 'AWS region'
+        required: true
+        default: 'us-east-1'
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  diagnose:
+    name: Diagnose Instance
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-Diagnose
+          aws-region: ${{ inputs.region }}
+
+      - name: Get Instance Details
+        run: |
+          echo "=========================================="
+          echo "INSTANCE DETAILS"
+          echo "=========================================="
+          aws ec2 describe-instances \
+            --instance-ids ${{ inputs.instance_id }} \
+            --query 'Reservations[0].Instances[0].{
+              State:State.Name,
+              InstanceType:InstanceType,
+              PublicIp:PublicIpAddress,
+              PrivateIp:PrivateIpAddress,
+              LaunchTime:LaunchTime,
+              Platform:Platform,
+              KeyName:KeyName,
+              IamProfile:IamInstanceProfile.Arn,
+              SecurityGroups:SecurityGroups[*].{Id:GroupId,Name:GroupName},
+              SubnetId:SubnetId,
+              VpcId:VpcId
+            }' \
+            --output yaml \
+            --region ${{ inputs.region }}
+
+      - name: Get Instance Status Checks
+        run: |
+          echo "=========================================="
+          echo "STATUS CHECKS"
+          echo "=========================================="
+          aws ec2 describe-instance-status \
+            --instance-ids ${{ inputs.instance_id }} \
+            --query 'InstanceStatuses[0].{
+              SystemStatus:SystemStatus.Status,
+              InstanceStatus:InstanceStatus.Status,
+              Events:Events
+            }' \
+            --output yaml \
+            --region ${{ inputs.region }}
+
+      - name: Check SSM Agent
+        run: |
+          echo "=========================================="
+          echo "SSM AGENT STATUS"
+          echo "=========================================="
+          aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=${{ inputs.instance_id }}" \
+            --query 'InstanceInformationList[0].{
+              PingStatus:PingStatus,
+              LastPingTime:LastPingDateTime,
+              AgentVersion:AgentVersion,
+              PlatformType:PlatformType,
+              PlatformName:PlatformName,
+              ComputerName:ComputerName
+            }' \
+            --output yaml \
+            --region ${{ inputs.region }} || echo "SSM Agent not registered"
+
+      - name: Check Security Group Rules
+        run: |
+          echo "=========================================="
+          echo "SECURITY GROUP RULES"
+          echo "=========================================="
+          SG_IDS=$(aws ec2 describe-instances \
+            --instance-ids ${{ inputs.instance_id }} \
+            --query 'Reservations[0].Instances[0].SecurityGroups[*].GroupId' \
+            --output text \
+            --region ${{ inputs.region }})
+
+          for SG_ID in $SG_IDS; do
+            echo "--- $SG_ID ---"
+            aws ec2 describe-security-groups \
+              --group-ids "$SG_ID" \
+              --query 'SecurityGroups[0].{
+                Name:GroupName,
+                IngressRules:IpPermissions[*].{
+                  Protocol:IpProtocol,
+                  FromPort:FromPort,
+                  ToPort:ToPort,
+                  Sources:IpRanges[*].CidrIp
+                }
+              }' \
+              --output yaml \
+              --region ${{ inputs.region }}
+            echo ""
+          done
+
+      - name: Get Console Output (last 100 lines)
+        run: |
+          echo "=========================================="
+          echo "CONSOLE OUTPUT (recent)"
+          echo "=========================================="
+          OUTPUT=$(aws ec2 get-console-output \
+            --instance-id ${{ inputs.instance_id }} \
+            --latest \
+            --query 'Output' \
+            --output text \
+            --region ${{ inputs.region }} 2>/dev/null || echo "")
+
+          if [ -n "$OUTPUT" ]; then
+            echo "$OUTPUT" | tail -100
+          else
+            echo "Console output not available"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Instance Diagnostics" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Instance** | \`${{ inputs.instance_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Region** | ${{ inputs.region }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See job logs for full details." >> $GITHUB_STEP_SUMMARY
