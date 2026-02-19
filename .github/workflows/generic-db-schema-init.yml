@@ -1,0 +1,167 @@
+name: "Generic DB: Schema Init"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment name (must match GitHub Environment and directory)'
+        required: true
+        type: string
+      action:
+        description: 'Schema action'
+        required: true
+        type: choice
+        options:
+          - verify
+          - initialize
+          - reset
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  schema:
+    name: "Schema - ${{ inputs.action }}"
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-GenericDB-Schema
+          aws-region: us-east-2
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Fetch credentials from Secrets Manager
+        id: creds
+        run: |
+          # Derive secret name from environment (convention: {name_prefix}-generic-db-credentials)
+          # The secret name is stored as an output of the generic-db-deploy workflow
+          # Try common patterns
+          for PATTERN in \
+            "${{ inputs.environment }}-generic-db-credentials" \
+            "${{ inputs.environment }}-use2-generic-db-credentials"; do
+            if aws secretsmanager describe-secret --secret-id "$PATTERN" --region us-east-2 2>/dev/null; then
+              SECRET_NAME="$PATTERN"
+              break
+            fi
+          done
+
+          if [ -z "$SECRET_NAME" ]; then
+            echo "ERROR: Could not find generic-db credentials secret for environment ${{ inputs.environment }}"
+            exit 1
+          fi
+
+          CREDS=$(aws secretsmanager get-secret-value \
+            --secret-id "$SECRET_NAME" \
+            --region us-east-2 \
+            --query SecretString \
+            --output text)
+
+          echo "::add-mask::$(echo "$CREDS" | jq -r '.password')"
+
+          echo "db_host=$(echo "$CREDS" | jq -r '.host')" >> "$GITHUB_OUTPUT"
+          echo "db_port=$(echo "$CREDS" | jq -r '.port')" >> "$GITHUB_OUTPUT"
+          echo "db_name=$(echo "$CREDS" | jq -r '.database')" >> "$GITHUB_OUTPUT"
+          echo "db_user=$(echo "$CREDS" | jq -r '.username')" >> "$GITHUB_OUTPUT"
+          DB_PASS=$(echo "$CREDS" | jq -r '.password')
+          echo "db_pass=$DB_PASS" >> "$GITHUB_OUTPUT"
+
+      - name: Verify schema
+        if: inputs.action == 'verify'
+        env:
+          PGPASSWORD: ${{ steps.creds.outputs.db_pass }}
+        run: |
+          DB_ARGS="-h ${{ steps.creds.outputs.db_host }} -p ${{ steps.creds.outputs.db_port }} -U ${{ steps.creds.outputs.db_user }} -d ${{ steps.creds.outputs.db_name }}"
+
+          echo "=== Database Tables ==="
+          psql $DB_ARGS -c "\dt"
+
+          echo ""
+          echo "=== User Count ==="
+          psql $DB_ARGS -c "SELECT COUNT(*) as user_count FROM users;" 2>/dev/null || echo "Table 'users' does not exist"
+
+          echo ""
+          echo "=== Entitlement Count ==="
+          psql $DB_ARGS -c "SELECT COUNT(*) as entitlement_count FROM entitlements;" 2>/dev/null || echo "Table 'entitlements' does not exist"
+
+      - name: Initialize schema
+        if: inputs.action == 'initialize'
+        env:
+          PGPASSWORD: ${{ steps.creds.outputs.db_pass }}
+        run: |
+          DB_ARGS="-h ${{ steps.creds.outputs.db_host }} -p ${{ steps.creds.outputs.db_port }} -U ${{ steps.creds.outputs.db_user }} -d ${{ steps.creds.outputs.db_name }}"
+
+          # Find schema file
+          SCHEMA_FILE="modules/generic-db-connector/scripts/schema.sql"
+          if [ ! -f "$SCHEMA_FILE" ]; then
+            SCHEMA_FILE="environments/${{ inputs.environment }}/generic-db-infrastructure/scripts/schema.sql"
+          fi
+
+          if [ ! -f "$SCHEMA_FILE" ]; then
+            echo "ERROR: schema.sql not found"
+            exit 1
+          fi
+
+          echo "=== Initializing schema from $SCHEMA_FILE ==="
+          psql $DB_ARGS -f "$SCHEMA_FILE"
+
+          echo ""
+          echo "=== Verification ==="
+          psql $DB_ARGS -c "\dt"
+          psql $DB_ARGS -c "SELECT COUNT(*) as users FROM users; SELECT COUNT(*) as entitlements FROM entitlements;"
+
+      - name: Reset schema
+        if: inputs.action == 'reset'
+        env:
+          PGPASSWORD: ${{ steps.creds.outputs.db_pass }}
+        run: |
+          DB_ARGS="-h ${{ steps.creds.outputs.db_host }} -p ${{ steps.creds.outputs.db_port }} -U ${{ steps.creds.outputs.db_user }} -d ${{ steps.creds.outputs.db_name }}"
+
+          echo "=== WARNING: Dropping all tables ==="
+          psql $DB_ARGS -c "
+            DROP VIEW IF EXISTS v_users_with_entitlements CASCADE;
+            DROP VIEW IF EXISTS v_active_entitlements CASCADE;
+            DROP TABLE IF EXISTS audit_log CASCADE;
+            DROP TABLE IF EXISTS user_groups CASCADE;
+            DROP TABLE IF EXISTS user_entitlements CASCADE;
+            DROP TABLE IF EXISTS groups CASCADE;
+            DROP TABLE IF EXISTS entitlements CASCADE;
+            DROP TABLE IF EXISTS users CASCADE;
+            DROP FUNCTION IF EXISTS update_updated_at_column CASCADE;
+            DROP FUNCTION IF EXISTS create_user CASCADE;
+            DROP FUNCTION IF EXISTS update_user CASCADE;
+            DROP FUNCTION IF EXISTS deactivate_user CASCADE;
+            DROP FUNCTION IF EXISTS assign_entitlement CASCADE;
+            DROP FUNCTION IF EXISTS revoke_entitlement CASCADE;
+          "
+
+          # Re-create from schema
+          SCHEMA_FILE="modules/generic-db-connector/scripts/schema.sql"
+          if [ ! -f "$SCHEMA_FILE" ]; then
+            SCHEMA_FILE="environments/${{ inputs.environment }}/generic-db-infrastructure/scripts/schema.sql"
+          fi
+
+          echo "=== Recreating schema ==="
+          psql $DB_ARGS -f "$SCHEMA_FILE"
+          psql $DB_ARGS -c "SELECT COUNT(*) as users FROM users; SELECT COUNT(*) as entitlements FROM entitlements;"
+
+      - name: Summary
+        run: |
+          echo "## Generic DB: Schema ${{ inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Action** | ${{ inputs.action }} |" >> $GITHUB_STEP_SUMMARY

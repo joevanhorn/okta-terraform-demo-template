@@ -1,0 +1,77 @@
+# ==============================================================================
+# GENERIC DATABASE INFRASTRUCTURE - EXAMPLE
+# ==============================================================================
+# Copy this file to main.tf and customize for your environment.
+#
+# Usage:
+#   cp main.tf.example main.tf
+#   # Edit the backend and module parameters below
+#   terraform init
+#   terraform plan
+#   terraform apply
+# ==============================================================================
+
+terraform {
+  required_version = ">= 1.9.0"
+
+  backend "s3" {
+    bucket         = "YOUR-STATE-BUCKET"                              # e.g., myorg-prod-tf-state
+    key            = "Okta-GitOps/YOUR-ENVIRONMENT/generic-db/terraform.tfstate"
+    region         = "us-east-2"                                      # Your AWS region
+    encrypt        = true
+    dynamodb_table = "YOUR-LOCK-TABLE"                                # e.g., myorg-prod-tf-state-lock
+  }
+}
+
+provider "aws" {
+  region = "us-east-2"  # Change to your preferred region
+}
+
+# ==============================================================================
+# GENERIC DB CONNECTOR MODULE
+# ==============================================================================
+
+module "generic_db" {
+  source = "../../../modules/generic-db-connector"
+
+  # Required
+  name_prefix = "myorg-prod-use2"   # {environment}-{region_short}
+  environment = "myorg-prod"
+
+  # VPC Configuration (creates a new VPC by default)
+  # To use an existing VPC, set:
+  #   use_existing_vpc    = true
+  #   existing_vpc_id     = "vpc-xxxxxxxx"
+  #   existing_subnet_ids = ["subnet-aaaa", "subnet-bbbb"]
+
+  # Database Configuration (defaults shown)
+  # db_name           = "okta_connector"
+  # db_username       = "oktaadmin"
+  # postgres_version  = "15.10"
+  # instance_class    = "db.t3.micro"
+  # allocated_storage = 20
+
+  # Access Control
+  # publicly_accessible = true          # Set false for production
+  # db_allowed_cidrs   = ["0.0.0.0/0"]  # Restrict in production
+}
+
+# ==============================================================================
+# OUTPUTS
+# ==============================================================================
+
+output "db_endpoint" {
+  value = module.generic_db.db_endpoint
+}
+
+output "jdbc_url" {
+  value = module.generic_db.jdbc_url
+}
+
+output "credentials_secret" {
+  value = module.generic_db.credentials_secret_name
+}
+
+output "connection_info" {
+  value = module.generic_db.connection_info
+}

@@ -1,0 +1,77 @@
+name: "Generic DB: Deploy Infrastructure"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment name (must match GitHub Environment and directory)'
+        required: true
+        type: string
+      action:
+        description: 'Terraform action'
+        required: true
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: "Generic DB - ${{ inputs.action }}"
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.0
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-GenericDB-Deploy
+          aws-region: us-east-2
+
+      - name: Terraform Init
+        working-directory: environments/${{ inputs.environment }}/generic-db-infrastructure
+        run: terraform init
+
+      - name: Terraform Plan
+        if: inputs.action == 'plan' || inputs.action == 'apply'
+        working-directory: environments/${{ inputs.environment }}/generic-db-infrastructure
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        if: inputs.action == 'apply'
+        working-directory: environments/${{ inputs.environment }}/generic-db-infrastructure
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Destroy
+        if: inputs.action == 'destroy'
+        working-directory: environments/${{ inputs.environment }}/generic-db-infrastructure
+        run: terraform destroy -auto-approve
+
+      - name: Show Connection Info
+        if: inputs.action == 'apply'
+        working-directory: environments/${{ inputs.environment }}/generic-db-infrastructure
+        run: |
+          echo "## Generic DB Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Endpoint** | $(terraform output -raw db_endpoint) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **JDBC URL** | $(terraform output -raw jdbc_url) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Credentials Secret** | $(terraform output -raw credentials_secret) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **Next:** Run the schema init workflow, then configure the OPC connector in Okta." >> $GITHUB_STEP_SUMMARY
