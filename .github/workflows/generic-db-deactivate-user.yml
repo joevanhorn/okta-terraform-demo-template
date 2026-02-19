@@ -1,0 +1,157 @@
+name: "Generic DB: Deactivate User (Leaver)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment name'
+        required: true
+        type: string
+      user_id:
+        description: 'User ID to deactivate (e.g., usr-001)'
+        required: true
+        type: string
+      confirm:
+        description: 'Confirm deactivation (revokes all entitlements)'
+        required: true
+        type: choice
+        options:
+          - 'yes'
+          - 'no'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deactivate-user:
+    name: Deactivate User
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Check confirmation
+        if: inputs.confirm != 'yes'
+        run: |
+          echo "Deactivation cancelled - confirmation was not 'yes'."
+          exit 1
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-GenericDB-DeactivateUser
+          aws-region: us-east-2
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Fetch credentials from Secrets Manager
+        id: creds
+        run: |
+          for PATTERN in \
+            "${{ inputs.environment }}-generic-db-credentials" \
+            "${{ inputs.environment }}-use2-generic-db-credentials"; do
+            if aws secretsmanager describe-secret --secret-id "$PATTERN" --region us-east-2 2>/dev/null; then
+              SECRET_NAME="$PATTERN"
+              break
+            fi
+          done
+
+          CREDS=$(aws secretsmanager get-secret-value \
+            --secret-id "$SECRET_NAME" \
+            --region us-east-2 \
+            --query SecretString \
+            --output text)
+
+          echo "::add-mask::$(echo "$CREDS" | jq -r '.password')"
+
+          echo "db_host=$(echo "$CREDS" | jq -r '.host')" >> "$GITHUB_OUTPUT"
+          echo "db_port=$(echo "$CREDS" | jq -r '.port')" >> "$GITHUB_OUTPUT"
+          echo "db_name=$(echo "$CREDS" | jq -r '.database')" >> "$GITHUB_OUTPUT"
+          echo "db_user=$(echo "$CREDS" | jq -r '.username')" >> "$GITHUB_OUTPUT"
+          DB_PASS=$(echo "$CREDS" | jq -r '.password')
+          echo "db_pass=$DB_PASS" >> "$GITHUB_OUTPUT"
+
+      - name: Show current state
+        env:
+          PGPASSWORD: ${{ steps.creds.outputs.db_pass }}
+        run: |
+          DB_ARGS="-h ${{ steps.creds.outputs.db_host }} -p ${{ steps.creds.outputs.db_port }} -U ${{ steps.creds.outputs.db_user }} -d ${{ steps.creds.outputs.db_name }}"
+
+          USER_EXISTS=$(psql $DB_ARGS -tAc "SELECT COUNT(*) FROM users WHERE user_id = '${{ inputs.user_id }}';")
+
+          if [ "$USER_EXISTS" = "0" ]; then
+            echo "ERROR: User '${{ inputs.user_id }}' not found!"
+            exit 1
+          fi
+
+          psql $DB_ARGS -c "SELECT user_id, username, email, first_name, last_name, department, title, status FROM users WHERE user_id = '${{ inputs.user_id }}';"
+
+          echo ""
+          echo "--- Active Entitlements ---"
+          psql $DB_ARGS -c "
+            SELECT e.entitlement_id, e.name, e.category, ue.granted_at
+            FROM user_entitlements ue
+            JOIN entitlements e ON ue.entitlement_id = e.entitlement_id
+            WHERE ue.user_id = '${{ inputs.user_id }}' AND ue.status = 'ACTIVE'
+            ORDER BY e.name;
+          "
+
+      - name: Deactivate user
+        id: deactivate
+        env:
+          PGPASSWORD: ${{ steps.creds.outputs.db_pass }}
+        run: |
+          DB_ARGS="-h ${{ steps.creds.outputs.db_host }} -p ${{ steps.creds.outputs.db_port }} -U ${{ steps.creds.outputs.db_user }} -d ${{ steps.creds.outputs.db_name }}"
+
+          ENTITLEMENT_COUNT=$(psql $DB_ARGS -tAc "
+            SELECT COUNT(*) FROM user_entitlements
+            WHERE user_id = '${{ inputs.user_id }}' AND status = 'ACTIVE';
+          ")
+          echo "entitlement_count=$ENTITLEMENT_COUNT" >> "$GITHUB_OUTPUT"
+
+          psql $DB_ARGS -c "
+            UPDATE users SET
+              status = 'INACTIVE',
+              deactivated_at = CURRENT_TIMESTAMP
+            WHERE user_id = '${{ inputs.user_id }}';
+          "
+
+          psql $DB_ARGS -c "
+            UPDATE user_entitlements SET
+              status = 'REVOKED',
+              revoked_at = CURRENT_TIMESTAMP,
+              revoked_by = 'github-actions'
+            WHERE user_id = '${{ inputs.user_id }}' AND status = 'ACTIVE';
+          "
+
+          psql $DB_ARGS -c "
+            INSERT INTO audit_log (operation, entity_type, entity_id, new_values, performed_by, source)
+            VALUES ('DEACTIVATE', 'USER', '${{ inputs.user_id }}',
+                    jsonb_build_object('entitlements_revoked', '$ENTITLEMENT_COUNT'),
+                    'github-actions', 'WORKFLOW');
+          "
+
+          echo ""
+          echo "--- Deactivated User ---"
+          psql $DB_ARGS -c "SELECT user_id, username, email, status, deactivated_at FROM users WHERE user_id = '${{ inputs.user_id }}';"
+          echo "Entitlements revoked: $ENTITLEMENT_COUNT"
+
+      - name: Summary
+        run: |
+          echo "## Generic DB: User Deactivated (Leaver)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **User ID** | \`${{ inputs.user_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **New Status** | INACTIVE |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Entitlements Revoked** | ${{ steps.deactivate.outputs.entitlement_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **Next:** Run an import in Okta to sync this deactivation." >> $GITHUB_STEP_SUMMARY

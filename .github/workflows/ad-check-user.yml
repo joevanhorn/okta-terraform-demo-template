@@ -1,0 +1,140 @@
+name: "AD: Check User"
+
+# Look up a user in Active Directory and display all attributes.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment name'
+        required: true
+        type: string
+      username:
+        description: 'SAM Account Name to check'
+        required: true
+        type: string
+      region:
+        description: 'AWS region'
+        required: true
+        default: 'us-east-1'
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  check-user:
+    name: Check AD User
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-ADCheckUser
+          aws-region: ${{ inputs.region }}
+
+      - name: Find AD Domain Controller Instance
+        id: find-dc
+        run: |
+          for PATTERN in "*-ad-dc*" "*ad-dc*" "*DomainController*"; do
+            INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters \
+                "Name=tag:Name,Values=$PATTERN" \
+                "Name=instance-state-name,Values=running" \
+              --query 'Reservations[0].Instances[0].InstanceId' \
+              --output text \
+              --region ${{ inputs.region }} 2>/dev/null)
+            if [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "None" ]; then
+              break
+            fi
+          done
+
+          if [ "$INSTANCE_ID" == "None" ] || [ -z "$INSTANCE_ID" ]; then
+            INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters \
+                "Name=tag:Role,Values=DomainController,AD-DC" \
+                "Name=tag:Environment,Values=${{ inputs.environment }}" \
+                "Name=instance-state-name,Values=running" \
+              --query 'Reservations[0].Instances[0].InstanceId' \
+              --output text \
+              --region ${{ inputs.region }} 2>/dev/null)
+          fi
+
+          if [ "$INSTANCE_ID" == "None" ] || [ -z "$INSTANCE_ID" ]; then
+            echo "::error::AD DC instance not found"
+            exit 1
+          fi
+          echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+
+      - name: Check User in AD
+        run: |
+          USERNAME="${{ inputs.username }}"
+          echo "Checking for user: $USERNAME"
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ steps.find-dc.outputs.instance_id }}" \
+            --document-name "AWS-RunPowerShellScript" \
+            --timeout-seconds 60 \
+            --parameters 'commands=[
+              "$ErrorActionPreference = \"Continue\"",
+              "$username = \"'"$USERNAME"'\"",
+              "Write-Host \"=== Checking for user: $username ===\"",
+              "",
+              "$user = Get-ADUser -Filter \"samAccountName -eq ''$username''\" -Properties * -ErrorAction SilentlyContinue",
+              "",
+              "if ($user) {",
+              "    Write-Host \"USER FOUND\"",
+              "    Write-Host \"\"",
+              "    Write-Host \"=== Basic Info ===\"",
+              "    Write-Host \"Name: $($user.Name)\"",
+              "    Write-Host \"SamAccountName: $($user.SamAccountName)\"",
+              "    Write-Host \"UPN: $($user.UserPrincipalName)\"",
+              "    Write-Host \"DN: $($user.DistinguishedName)\"",
+              "    Write-Host \"Enabled: $($user.Enabled)\"",
+              "    Write-Host \"Email: $($user.mail)\"",
+              "    Write-Host \"Title: $($user.title)\"",
+              "    Write-Host \"Department: $($user.department)\"",
+              "    Write-Host \"\"",
+              "    Write-Host \"=== Group Memberships ===\"",
+              "    ($user.MemberOf | ForEach-Object { (Get-ADGroup $_).Name }) -join \", \"",
+              "    Write-Host \"\"",
+              "    Write-Host \"=== All Custom Attributes ===\"",
+              "    $user | Select-Object -Property * -ExcludeProperty PropertyNames,AddedProperties,RemovedProperties,ModifiedProperties,PropertyCount | Format-List",
+              "} else {",
+              "    Write-Host \"USER NOT FOUND\"",
+              "    Write-Host \"\"",
+              "    Write-Host \"=== Existing Users (first 50) ===\"",
+              "    Get-ADUser -Filter * -ResultSetSize 50 | Select-Object Name, SamAccountName, Enabled | Format-Table -AutoSize",
+              "}"
+            ]' \
+            --query 'Command.CommandId' \
+            --output text \
+            --region ${{ inputs.region }})
+
+          echo "Command ID: $COMMAND_ID"
+
+          for i in $(seq 1 12); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "${{ steps.find-dc.outputs.instance_id }}" \
+              --query 'Status' \
+              --output text \
+              --region ${{ inputs.region }} 2>/dev/null || echo "Pending")
+            if [ "$STATUS" == "Success" ] || [ "$STATUS" == "Failed" ]; then
+              break
+            fi
+            sleep 5
+          done
+
+          echo ""
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ steps.find-dc.outputs.instance_id }}" \
+            --query 'StandardOutputContent' \
+            --output text \
+            --region ${{ inputs.region }}

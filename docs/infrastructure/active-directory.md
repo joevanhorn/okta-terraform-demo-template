@@ -184,6 +184,50 @@ gh workflow run ad-register-instance.yml \
   -f instance_id=i-0bdd4a4684c4a8622
 ```
 
+## Diagnostic Workflows
+
+These workflows provide quick operational visibility into your AD environment without needing direct server access.
+
+### AD - Health Check (`ad-health-check.yml`)
+
+Quick health check of AD Domain Controller services. Checks NTDS, DNS, Netlogon, KDC status, AD features, and domain info.
+
+```bash
+gh workflow run ad-health-check.yml \
+  -f environment=myorg \
+  -f region=us-east-1
+```
+
+Automatically discovers the DC instance via tag patterns (`*-ad-dc*`, `*DomainController*`) or Role/Environment tags.
+
+### AD - Check Service Account Permissions (`ad-check-permissions.yml`)
+
+Verify that a service account (e.g., `okta-svc`) has the correct AD permissions — group memberships, Domain Admins status, and OU visibility.
+
+```bash
+gh workflow run ad-check-permissions.yml \
+  -f environment=myorg \
+  -f service_account=okta-svc \
+  -f region=us-east-1
+```
+
+Reports: service account info, group memberships, Domain Admins list, top-level OUs, and all service accounts.
+
+### AD - Check User (`ad-check-user.yml`)
+
+Look up a specific user in Active Directory by SAM Account Name. Displays basic info, group memberships, and all custom attributes.
+
+```bash
+gh workflow run ad-check-user.yml \
+  -f environment=myorg \
+  -f username=jsmith \
+  -f region=us-east-1
+```
+
+If the user is not found, lists the first 50 existing users for reference.
+
+---
+
 ## Module Reference
 
 ### Required Variables

@@ -1,0 +1,17 @@
+# Example variables for OPC Agent AMI build
+# Copy to variables.pkrvars.hcl and customize
+
+aws_region      = "us-east-2"
+instance_type   = "t3.small"
+ami_name_prefix = "opc-agent-rhel8"
+
+# Optional: specify VPC/subnet for build
+# vpc_id    = "vpc-xxxxxxxx"
+# subnet_id = "subnet-xxxxxxxx"
+
+tags = {
+  Environment = "shared"
+  ManagedBy   = "packer"
+  Purpose     = "opc-agent-base"
+  Owner       = "taskvantage"
+}

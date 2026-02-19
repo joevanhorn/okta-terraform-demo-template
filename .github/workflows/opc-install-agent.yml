@@ -1,0 +1,116 @@
+name: "OPC: Install Provisioning Agent"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment name'
+        required: true
+        type: string
+      target:
+        description: 'Target OPC agent(s)'
+        required: true
+        type: choice
+        options:
+          - all
+          - generic-db-1
+          - generic-db-2
+      connector_type:
+        description: 'Connector type to target'
+        required: true
+        type: choice
+        options:
+          - generic-db
+          - oracle-ebs
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  install:
+    name: Install OPA on OPC Agents
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-OPC-InstallAgent
+          aws-region: us-east-2
+
+      - name: Discover OPC instances
+        id: discover
+        run: |
+          echo "=== Discovering OPC Agent Instances ==="
+
+          if [ "${{ inputs.target }}" = "all" ]; then
+            INSTANCES=$(aws ec2 describe-instances \
+              --filters \
+                "Name=tag:Role,Values=OPC-Agent" \
+                "Name=tag:ConnectorType,Values=${{ inputs.connector_type }}" \
+                "Name=tag:Environment,Values=${{ inputs.environment }}" \
+                "Name=instance-state-name,Values=running" \
+              --query 'Reservations[].Instances[].InstanceId' \
+              --output text \
+              --region us-east-2)
+          else
+            INSTANCES=$(aws ec2 describe-instances \
+              --filters \
+                "Name=tag:Name,Values=*${{ inputs.target }}*" \
+                "Name=tag:Environment,Values=${{ inputs.environment }}" \
+                "Name=instance-state-name,Values=running" \
+              --query 'Reservations[].Instances[].InstanceId' \
+              --output text \
+              --region us-east-2)
+          fi
+
+          if [ -z "$INSTANCES" ]; then
+            echo "ERROR: No running OPC instances found for target '${{ inputs.target }}'"
+            exit 1
+          fi
+
+          echo "Found instances: $INSTANCES"
+          echo "instances=$INSTANCES" >> "$GITHUB_OUTPUT"
+
+      - name: Pre-install Okta Provisioning Agent
+        run: |
+          for INSTANCE_ID in ${{ steps.discover.outputs.instances }}; do
+            echo "=== Installing on $INSTANCE_ID ==="
+
+            aws ssm send-command \
+              --instance-ids "$INSTANCE_ID" \
+              --document-name "AWS-RunShellScript" \
+              --parameters "commands=[
+                'echo \"=== Pre-installing Okta Provisioning Agent ===\"',
+                'mkdir -p /installers/opc',
+                'echo \"Agent will be installed from Okta Admin > Settings > Downloads\"',
+                'echo \"Upload the RPM to /installers/opc/ then run:\"',
+                'echo \"  sudo yum localinstall /installers/opc/OktaProvisioningAgent*.rpm -y\"',
+                'echo \"  sudo /opt/OktaProvisioningAgent/configure_agent.sh\"',
+                'echo \"=== Pre-install check complete ===\"'
+              ]" \
+              --region us-east-2 \
+              --output text \
+              --query 'Command.CommandId'
+
+            echo "SSM command sent to $INSTANCE_ID"
+          done
+
+      - name: Summary
+        run: |
+          echo "## OPC: Agent Installation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target** | ${{ inputs.target }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Connector** | ${{ inputs.connector_type }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **Next:** Download the OPA RPM from Okta Admin > Settings > Downloads, upload to the server, and run the installer." >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,90 @@
+# ==============================================================================
+# OPC AGENT INFRASTRUCTURE - EXAMPLE
+# ==============================================================================
+# Deploys Okta On-Prem Connector (OPC) agents for database connectivity.
+#
+# Usage:
+#   cp main.tf.example main.tf
+#   terraform init && terraform plan
+# ==============================================================================
+
+terraform {
+  required_version = ">= 1.9.0"
+
+  backend "s3" {
+    bucket         = "YOUR-STATE-BUCKET"
+    key            = "Okta-GitOps/YOUR-ENVIRONMENT/opc-infrastructure/terraform.tfstate"
+    region         = "us-east-2"
+    encrypt        = true
+    dynamodb_table = "YOUR-LOCK-TABLE"
+  }
+}
+
+provider "aws" {
+  region = "us-east-2"
+}
+
+# ==============================================================================
+# DATA: Get Generic DB outputs for networking
+# ==============================================================================
+
+data "terraform_remote_state" "generic_db" {
+  backend = "s3"
+
+  config = {
+    bucket = "YOUR-STATE-BUCKET"
+    key    = "Okta-GitOps/YOUR-ENVIRONMENT/generic-db/terraform.tfstate"
+    region = "us-east-2"
+  }
+}
+
+# ==============================================================================
+# OPC AGENTS (using for_each for multiple instances)
+# ==============================================================================
+
+locals {
+  opc_agents = {
+    "generic-db-1" = { instance_number = 1 }
+    "generic-db-2" = { instance_number = 2 }  # Remove for single agent
+  }
+}
+
+module "opc_agents" {
+  source   = "../../../modules/opc-agent"
+  for_each = local.opc_agents
+
+  environment    = "myorg-prod"
+  region_short   = "use2"
+  connector_type = "generic-db"
+  instance_number = each.value.instance_number
+
+  # Networking (from Generic DB module outputs)
+  vpc_id             = data.terraform_remote_state.generic_db.outputs.vpc_id
+  subnet_id          = data.terraform_remote_state.generic_db.outputs.subnet_ids[0]
+  security_group_ids = [data.terraform_remote_state.generic_db.outputs.security_group_id]
+
+  # Okta configuration
+  okta_org_url    = "https://YOUR-ORG.okta.com"
+  database_host   = data.terraform_remote_state.generic_db.outputs.db_endpoint
+  jdbc_driver_url = "https://jdbc.postgresql.org/download/postgresql-42.7.4.jar"
+
+  # Optional: Pre-built AMI for faster deployment
+  # custom_ami_id   = "ami-xxxxxxxxxx"
+  # use_prebuilt_ami = true
+
+  # Optional: OPA PAM enrollment
+  # opa_enrollment_token = var.opa_enrollment_token
+}
+
+# ==============================================================================
+# OUTPUTS
+# ==============================================================================
+
+output "opc_agents" {
+  value = { for k, v in module.opc_agents : k => {
+    instance_id = v.instance_id
+    private_ip  = v.private_ip
+    public_ip   = v.public_ip
+    ssm_command = v.ssm_session_command
+  }}
+}

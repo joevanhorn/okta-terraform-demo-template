@@ -1,0 +1,150 @@
+name: "Generic DB: Update User (Mover)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment name'
+        required: true
+        type: string
+      user_id:
+        description: 'User ID to update (e.g., usr-001)'
+        required: true
+        type: string
+      attribute:
+        description: 'Attribute to update'
+        required: true
+        type: choice
+        options:
+          - department
+          - title
+          - email
+          - first_name
+          - last_name
+          - write_back
+      new_value:
+        description: 'New value for the attribute'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  update-user:
+    name: Update User
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-GenericDB-UpdateUser
+          aws-region: us-east-2
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Fetch credentials from Secrets Manager
+        id: creds
+        run: |
+          for PATTERN in \
+            "${{ inputs.environment }}-generic-db-credentials" \
+            "${{ inputs.environment }}-use2-generic-db-credentials"; do
+            if aws secretsmanager describe-secret --secret-id "$PATTERN" --region us-east-2 2>/dev/null; then
+              SECRET_NAME="$PATTERN"
+              break
+            fi
+          done
+
+          CREDS=$(aws secretsmanager get-secret-value \
+            --secret-id "$SECRET_NAME" \
+            --region us-east-2 \
+            --query SecretString \
+            --output text)
+
+          echo "::add-mask::$(echo "$CREDS" | jq -r '.password')"
+
+          echo "db_host=$(echo "$CREDS" | jq -r '.host')" >> "$GITHUB_OUTPUT"
+          echo "db_port=$(echo "$CREDS" | jq -r '.port')" >> "$GITHUB_OUTPUT"
+          echo "db_name=$(echo "$CREDS" | jq -r '.database')" >> "$GITHUB_OUTPUT"
+          echo "db_user=$(echo "$CREDS" | jq -r '.username')" >> "$GITHUB_OUTPUT"
+          DB_PASS=$(echo "$CREDS" | jq -r '.password')
+          echo "db_pass=$DB_PASS" >> "$GITHUB_OUTPUT"
+
+      - name: Show current state
+        env:
+          PGPASSWORD: ${{ steps.creds.outputs.db_pass }}
+        run: |
+          DB_ARGS="-h ${{ steps.creds.outputs.db_host }} -p ${{ steps.creds.outputs.db_port }} -U ${{ steps.creds.outputs.db_user }} -d ${{ steps.creds.outputs.db_name }}"
+
+          USER_EXISTS=$(psql $DB_ARGS -tAc "SELECT COUNT(*) FROM users WHERE user_id = '${{ inputs.user_id }}';")
+
+          if [ "$USER_EXISTS" = "0" ]; then
+            echo "ERROR: User '${{ inputs.user_id }}' not found!"
+            exit 1
+          fi
+
+          psql $DB_ARGS -c "SELECT user_id, username, email, first_name, last_name, display_name, department, title, write_back, status FROM users WHERE user_id = '${{ inputs.user_id }}';"
+
+      - name: Update user attribute
+        env:
+          PGPASSWORD: ${{ steps.creds.outputs.db_pass }}
+        run: |
+          DB_ARGS="-h ${{ steps.creds.outputs.db_host }} -p ${{ steps.creds.outputs.db_port }} -U ${{ steps.creds.outputs.db_user }} -d ${{ steps.creds.outputs.db_name }}"
+
+          ESCAPED_VALUE=$(echo "${{ inputs.new_value }}" | sed "s/'/''/g")
+          ATTRIBUTE="${{ inputs.attribute }}"
+
+          if [ "$ATTRIBUTE" = "first_name" ]; then
+            psql $DB_ARGS -c "
+              UPDATE users SET
+                first_name = '$ESCAPED_VALUE',
+                display_name = '$ESCAPED_VALUE' || ' ' || last_name
+              WHERE user_id = '${{ inputs.user_id }}';
+            "
+          elif [ "$ATTRIBUTE" = "last_name" ]; then
+            psql $DB_ARGS -c "
+              UPDATE users SET
+                last_name = '$ESCAPED_VALUE',
+                display_name = first_name || ' ' || '$ESCAPED_VALUE'
+              WHERE user_id = '${{ inputs.user_id }}';
+            "
+          else
+            psql $DB_ARGS -c "
+              UPDATE users SET $ATTRIBUTE = '$ESCAPED_VALUE'
+              WHERE user_id = '${{ inputs.user_id }}';
+            "
+          fi
+
+          psql $DB_ARGS -c "
+            INSERT INTO audit_log (operation, entity_type, entity_id, new_values, performed_by, source)
+            VALUES ('UPDATE', 'USER', '${{ inputs.user_id }}',
+                    jsonb_build_object('$ATTRIBUTE', '$ESCAPED_VALUE'),
+                    'github-actions', 'WORKFLOW');
+          "
+
+          echo ""
+          echo "--- Updated User ---"
+          psql $DB_ARGS -c "SELECT user_id, username, email, first_name, last_name, display_name, department, title, write_back, status FROM users WHERE user_id = '${{ inputs.user_id }}';"
+
+      - name: Summary
+        run: |
+          echo "## Generic DB: User Updated (Mover)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **User ID** | \`${{ inputs.user_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Attribute** | \`${{ inputs.attribute }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **New Value** | ${{ inputs.new_value }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **Next:** Run an import in Okta to sync this change, or wait for the next scheduled import." >> $GITHUB_STEP_SUMMARY

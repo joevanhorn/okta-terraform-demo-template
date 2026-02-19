@@ -686,6 +686,7 @@ ai-assisted/
 │   ├── backup_restore.md              # Backup and restore operations
 │   ├── cross_org_migration.md         # Cross-org migration workflows
 │   ├── deploy_scim_server.md          # SCIM server deployment
+│   ├── deploy_full_environment.md     # Full environment deployment (Claude Code)
 │   └── manage_risk_rules.md           # Risk rules and SOD policies
 │
 ├── context/                           # Context files for AI
@@ -838,7 +839,26 @@ ai-assisted/
 
 **Note:** Risk rules are managed via Python scripts, not Terraform
 
-### 8. Deploy Infrastructure
+### 8. Deploy Full Environment (Claude Code)
+**File:** `prompts/deploy_full_environment.md`
+
+**Use for:**
+- End-to-end deployment from a completed Demo Deployment Worksheet
+- Deploying both Okta resources AND infrastructure in one session
+- Claude Code handles everything: directory creation, Terraform generation, infrastructure deployment, verification
+
+**Deploys:**
+- Okta resources (users, groups, apps, OIG)
+- Active Directory Domain Controller
+- Generic Database Connector (RDS + OPC agents)
+- SCIM Server
+- OPA Gateway + security policies
+
+**How:** Fill out `demo-builder/DEMO_WORKSHEET.md`, paste to Claude Code with the prompt
+
+**Time to deploy:** 30-60 minutes (interactive, with approval gates)
+
+### 9. Deploy Infrastructure
 **File:** `prompts/deploy_infrastructure.md`
 
 **Use for:**

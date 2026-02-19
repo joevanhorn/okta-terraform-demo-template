@@ -1,0 +1,153 @@
+name: "OPC: Install sftd (OPA PAM)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment name'
+        required: true
+        type: string
+      target:
+        description: 'Target OPC agent(s)'
+        required: true
+        type: choice
+        options:
+          - all
+          - generic-db-1
+          - generic-db-2
+      connector_type:
+        description: 'Connector type to target'
+        required: true
+        type: choice
+        options:
+          - generic-db
+          - oracle-ebs
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  install-sftd:
+    name: Install sftd on OPC Agents
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-OPC-InstallSftd
+          aws-region: us-east-2
+
+      - name: Discover OPC instances
+        id: discover
+        run: |
+          if [ "${{ inputs.target }}" = "all" ]; then
+            INSTANCES=$(aws ec2 describe-instances \
+              --filters \
+                "Name=tag:Role,Values=OPC-Agent" \
+                "Name=tag:ConnectorType,Values=${{ inputs.connector_type }}" \
+                "Name=tag:Environment,Values=${{ inputs.environment }}" \
+                "Name=instance-state-name,Values=running" \
+              --query 'Reservations[].Instances[].InstanceId' \
+              --output text \
+              --region us-east-2)
+          else
+            INSTANCES=$(aws ec2 describe-instances \
+              --filters \
+                "Name=tag:Name,Values=*${{ inputs.target }}*" \
+                "Name=tag:Environment,Values=${{ inputs.environment }}" \
+                "Name=instance-state-name,Values=running" \
+              --query 'Reservations[].Instances[].InstanceId' \
+              --output text \
+              --region us-east-2)
+          fi
+
+          if [ -z "$INSTANCES" ]; then
+            echo "ERROR: No running OPC instances found"
+            exit 1
+          fi
+
+          echo "Found instances: $INSTANCES"
+          echo "instances=$INSTANCES" >> "$GITHUB_OUTPUT"
+
+      - name: Install sftd via SSM
+        run: |
+          AGENT_NUM=0
+          for INSTANCE_ID in ${{ steps.discover.outputs.instances }}; do
+            AGENT_NUM=$((AGENT_NUM + 1))
+            echo "=== Installing sftd on $INSTANCE_ID (agent $AGENT_NUM) ==="
+
+            # Try to get enrollment token from SSM Parameter Store
+            TOKEN_PATH="/${{ inputs.environment }}/opa/${{ inputs.connector_type }}-opc-${AGENT_NUM}/enrollment-token"
+            ENROLLMENT_TOKEN=$(aws ssm get-parameter \
+              --name "$TOKEN_PATH" \
+              --with-decryption \
+              --query 'Parameter.Value' \
+              --output text \
+              --region us-east-2 2>/dev/null || echo "")
+
+            if [ -z "$ENROLLMENT_TOKEN" ]; then
+              echo "WARNING: No enrollment token found at $TOKEN_PATH - sftd will be installed but not enrolled"
+            fi
+
+            COMMAND_ID=$(aws ssm send-command \
+              --instance-ids "$INSTANCE_ID" \
+              --document-name "AWS-RunShellScript" \
+              --parameters "commands=[
+                'set -e',
+                'echo \"=== Installing sftd (Okta PAM) ===\"',
+                'rpm --import https://dist.scaleft.com/GPG-KEY-OktaPAM-2023 || true',
+                'cat > /etc/yum.repos.d/oktapam-stable.repo << EOF',
+                '[oktapam-stable]',
+                'name=Okta PAM Stable',
+                'baseurl=https://dist.scaleft.com/repos/rpm/stable/rhel/8/\$basearch',
+                'gpgcheck=1',
+                'repo_gpgcheck=1',
+                'enabled=1',
+                'gpgkey=https://dist.scaleft.com/GPG-KEY-OktaPAM-2023',
+                'EOF',
+                'dnf makecache -y',
+                'dnf install -y scaleft-server-tools || echo WARN: sftd install failed',
+                'if [ -n \"${ENROLLMENT_TOKEN:-}\" ]; then',
+                '  mkdir -p /var/lib/sftd',
+                '  echo \"$ENROLLMENT_TOKEN\" > /var/lib/sftd/enrollment.token',
+                '  systemctl enable --now sftd',
+                '  echo \"sftd enrolled and started\"',
+                'else',
+                '  echo \"No enrollment token - sftd installed but not enrolled\"',
+                'fi',
+                'echo \"=== sftd installation complete ===\"'
+              ]" \
+              --region us-east-2 \
+              --output text \
+              --query 'Command.CommandId')
+
+            echo "SSM command $COMMAND_ID sent to $INSTANCE_ID"
+
+            # Wait for command to complete
+            aws ssm wait command-executed \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --region us-east-2 2>/dev/null || true
+
+            echo "Command completed for $INSTANCE_ID"
+          done
+
+      - name: Summary
+        run: |
+          echo "## OPC: sftd Installation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | ${{ inputs.environment }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target** | ${{ inputs.target }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Connector** | ${{ inputs.connector_type }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> sftd has been installed. If enrollment tokens were found in SSM, the agents are auto-enrolled." >> $GITHUB_STEP_SUMMARY

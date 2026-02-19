@@ -1,0 +1,157 @@
+name: "Generic DB: Create User (Joiner)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment name'
+        required: true
+        type: string
+      user_id:
+        description: 'Unique user ID (e.g., usr-006)'
+        required: true
+        type: string
+      username:
+        description: 'Login username (e.g., nwilliams)'
+        required: true
+        type: string
+      email:
+        description: 'Email address'
+        required: true
+        type: string
+      first_name:
+        description: 'First name'
+        required: true
+        type: string
+      last_name:
+        description: 'Last name'
+        required: true
+        type: string
+      department:
+        description: 'Department'
+        required: true
+        type: choice
+        options:
+          - Engineering
+          - Finance
+          - HR
+          - IT
+          - Marketing
+          - Sales
+          - Operations
+          - Legal
+      title:
+        description: 'Job title (optional)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  create-user:
+    name: Create User
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-GenericDB-CreateUser
+          aws-region: us-east-2
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      - name: Fetch credentials from Secrets Manager
+        id: creds
+        run: |
+          for PATTERN in \
+            "${{ inputs.environment }}-generic-db-credentials" \
+            "${{ inputs.environment }}-use2-generic-db-credentials"; do
+            if aws secretsmanager describe-secret --secret-id "$PATTERN" --region us-east-2 2>/dev/null; then
+              SECRET_NAME="$PATTERN"
+              break
+            fi
+          done
+
+          CREDS=$(aws secretsmanager get-secret-value \
+            --secret-id "$SECRET_NAME" \
+            --region us-east-2 \
+            --query SecretString \
+            --output text)
+
+          echo "::add-mask::$(echo "$CREDS" | jq -r '.password')"
+
+          echo "db_host=$(echo "$CREDS" | jq -r '.host')" >> "$GITHUB_OUTPUT"
+          echo "db_port=$(echo "$CREDS" | jq -r '.port')" >> "$GITHUB_OUTPUT"
+          echo "db_name=$(echo "$CREDS" | jq -r '.database')" >> "$GITHUB_OUTPUT"
+          echo "db_user=$(echo "$CREDS" | jq -r '.username')" >> "$GITHUB_OUTPUT"
+          DB_PASS=$(echo "$CREDS" | jq -r '.password')
+          echo "db_pass=$DB_PASS" >> "$GITHUB_OUTPUT"
+
+      - name: Create user
+        env:
+          PGPASSWORD: ${{ steps.creds.outputs.db_pass }}
+        run: |
+          echo "=========================================="
+          echo "CREATING USER: ${{ inputs.user_id }}"
+          echo "=========================================="
+
+          DB_ARGS="-h ${{ steps.creds.outputs.db_host }} -p ${{ steps.creds.outputs.db_port }} -U ${{ steps.creds.outputs.db_user }} -d ${{ steps.creds.outputs.db_name }}"
+
+          TITLE="${{ inputs.title }}"
+          if [ -z "$TITLE" ]; then
+            TITLE_SQL="NULL"
+          else
+            TITLE_SQL="'$(echo "$TITLE" | sed "s/'/''/g")'"
+          fi
+
+          psql $DB_ARGS -c "
+            INSERT INTO users (user_id, username, email, first_name, last_name, display_name, department, title, status)
+            VALUES (
+              '$(echo "${{ inputs.user_id }}" | sed "s/'/''/g")',
+              '$(echo "${{ inputs.username }}" | sed "s/'/''/g")',
+              '$(echo "${{ inputs.email }}" | sed "s/'/''/g")',
+              '$(echo "${{ inputs.first_name }}" | sed "s/'/''/g")',
+              '$(echo "${{ inputs.last_name }}" | sed "s/'/''/g")',
+              '$(echo "${{ inputs.first_name }} ${{ inputs.last_name }}" | sed "s/'/''/g")',
+              '$(echo "${{ inputs.department }}" | sed "s/'/''/g")',
+              $TITLE_SQL,
+              'ACTIVE'
+            );
+
+            INSERT INTO audit_log (operation, entity_type, entity_id, new_values, performed_by, source)
+            VALUES ('CREATE', 'USER', '$(echo "${{ inputs.user_id }}" | sed "s/'/''/g")',
+                    jsonb_build_object('username', '$(echo "${{ inputs.username }}" | sed "s/'/''/g")', 'email', '$(echo "${{ inputs.email }}" | sed "s/'/''/g")', 'department', '$(echo "${{ inputs.department }}" | sed "s/'/''/g")'),
+                    'github-actions', 'WORKFLOW');
+          "
+
+          echo ""
+          echo "--- Created User ---"
+          psql $DB_ARGS -c "SELECT user_id, username, email, first_name, last_name, department, title, status FROM users WHERE user_id = '${{ inputs.user_id }}';"
+
+      - name: Summary
+        run: |
+          echo "## Generic DB: User Created (Joiner)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **User ID** | \`${{ inputs.user_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Username** | ${{ inputs.username }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Email** | ${{ inputs.email }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Name** | ${{ inputs.first_name }} ${{ inputs.last_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Department** | ${{ inputs.department }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Title** | ${{ inputs.title || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Status** | ACTIVE |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **Next:** Run an import in Okta to sync this user into the directory." >> $GITHUB_STEP_SUMMARY

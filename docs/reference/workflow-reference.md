@@ -747,7 +747,7 @@ gh workflow run oig-owners.yml -f environment=myenv -f dry_run=false
 
 ## Summary
 
-**21 workflows, organized by category prefixes:**
+**40+ workflows, organized by category prefixes:**
 
 **Terraform (`tf-*`):**
 - tf-plan.yml - Auto-triggered on PR/push
@@ -769,15 +769,51 @@ gh workflow run oig-owners.yml -f environment=myenv -f dry_run=false
 **Migration (`migrate-*`):**
 - migrate-cross-org.yml - Copy between orgs
 
+**Active Directory (`ad-*`):**
+- ad-deploy.yml - Deploy AD Domain Controller
+- ad-manage-instance.yml - Manage AD instances (diagnose, reboot, get-users, etc.)
+- ad-register-instance.yml - Register AD instance in SSM Parameter Store
+- ad-install-okta-agent.yml - Install Okta AD Agent
+- ad-health-check.yml - Quick AD DC health check (NTDS, DNS, Netlogon, KDC)
+- ad-check-permissions.yml - Verify service account permissions
+- ad-check-user.yml - Look up AD user with full attributes
+
+**Generic Database Connector (`generic-db-*`):**
+- generic-db-deploy.yml - Deploy RDS + VPC infrastructure
+- generic-db-schema-init.yml - Initialize database schema
+- generic-db-create-user.yml - Create user via stored procedure
+- generic-db-update-user.yml - Update user via stored procedure
+- generic-db-deactivate-user.yml - Deactivate user via stored procedure
+
+**OPC Agent (`opc-*`):**
+- opc-deploy.yml - Deploy OPC Agent EC2 instances
+- opc-install-agent.yml - Install OPC agent on instances
+- opc-install-sftd.yml - Install sftd (OPA server agent)
+
+**OPA Privileged Access (`opa-*`):**
+- opa-plan.yml - Plan OPA Terraform resources
+- opa-apply.yml - Apply OPA Terraform resources
+- opa-test.yml - Test OPA provider connectivity
+- opa-discover.yml - Discover existing OPA resources
+- opa-deploy-gateway.yml - Deploy OPA gateway on EC2
+- opa-install-agents.yml - Install sftd/PAM on servers (Windows + Linux)
+- opa-state-cleanup.yml - Remove OPA entries from Terraform state
+
+**SCIM Server (`scim-*`):**
+- deploy-scim-server.yml - Deploy SCIM server infrastructure
+- scim-check-status.yml - SCIM server health diagnostics
+
+**Diagnostics (`diagnose-*`):**
+- diagnose-instance.yml - EC2 instance diagnostics (status, SSM, SGs, console)
+- diagnose-connectivity.yml - Network connectivity diagnostics (NACLs, routes, ports)
+
 **Other:**
 - import-all-resources.yml - Import from Okta
 - export-oig.yml - Export to JSON
 - validate-pr.yml - Auto-triggered PR validation
 - governance-setup.yml - Initial setup
 - fix-bundle-campaign-errors.yml - Fix bundle errors
-- opa-plan.yml - OPA resource planning
 - deploy-oag-app.yml - Deploy OAG apps
-- deploy-scim-server.yml - Deploy SCIM server
 - sync-template.yml - Sync from template
 - generate-oauth-keys.yml - Generate OAuth keys
 

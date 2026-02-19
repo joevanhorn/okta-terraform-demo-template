@@ -1,0 +1,643 @@
+# =============================================================================
+# OKTA PRIVILEGED ACCESS (OPA) - SECURITY POLICIES & SUDO BUNDLES
+# =============================================================================
+# Tiered sudo command bundles and security policies for fine-grained
+# privilege management. Policies assign bundles to groups across all
+# enrolled Linux servers using the built-in system.os_type label.
+#
+# Access Matrix:
+#   PAM-ReadOnly-Users  -> Read-Only
+#   PAM-Operators       -> Read-Only + Operator
+#   PAM-Database-Admins -> Read-Only + Operator + Database (+ password checkout)
+#   PAM_ADMINISTRATORS  -> All bundles + Admin permissions (+ password checkout)
+#
+# Prerequisites:
+#   1. Enable the oktapam provider in provider.tf
+#   2. Set GitHub secrets: OKTAPAM_KEY, OKTAPAM_SECRET, OKTAPAM_TEAM
+#   3. Copy this file to opa_security_policies.tf (remove .example)
+#   4. Run: gh workflow run opa-apply.yml -f environment=<your-env>
+#
+# Critical Gotchas:
+#   - type = "default" is REQUIRED on all security_policy_v2 resources
+#   - Password checkout rules MUST come BEFORE SSH rules (API return order)
+#   - admin_level_permissions CANNOT coexist with sudo_command_bundles
+#   - password_checkout_ssh requires account_selector_type = "username"
+# =============================================================================
+
+# =============================================================================
+# SUDO COMMAND BUNDLES - TIERED ACCESS
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# READ-ONLY BUNDLE - View logs, status, configs (no changes)
+# -----------------------------------------------------------------------------
+resource "oktapam_sudo_command_bundle" "readonly" {
+  name = "Read-Only-Operations"
+
+  # View system logs
+  structured_commands {
+    command      = "/usr/bin/tail"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "-f /var/log/*"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/less"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "/var/log/*"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/cat"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "/var/log/*"
+  }
+
+  # View service status (no changes)
+  structured_commands {
+    command      = "/usr/bin/systemctl"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "status *"
+  }
+
+  # View journal logs
+  structured_commands {
+    command      = "/usr/bin/journalctl"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  # View disk usage
+  structured_commands {
+    command      = "/usr/bin/df"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  # View memory usage
+  structured_commands {
+    command      = "/usr/bin/free"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  # View running processes
+  structured_commands {
+    command      = "/usr/bin/ps"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/top"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  # View network connections
+  structured_commands {
+    command      = "/usr/bin/ss"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/netstat"
+    command_type = "executable"
+    args_type    = "any"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# OPERATOR BUNDLE - Restart services, basic troubleshooting
+# -----------------------------------------------------------------------------
+resource "oktapam_sudo_command_bundle" "operator" {
+  name = "Operator-Operations"
+
+  # Service management (restart only, not stop/disable)
+  structured_commands {
+    command      = "/usr/bin/systemctl"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "restart *"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/systemctl"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "reload *"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/systemctl"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "status *"
+  }
+
+  # Clear disk space (safe locations)
+  structured_commands {
+    command      = "/usr/bin/rm"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "-f /tmp/*"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/rm"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "-f /var/tmp/*"
+  }
+
+  # Package updates (security only)
+  structured_commands {
+    command      = "/usr/bin/dnf"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "update -y --security"
+  }
+
+  # OPA/PAM agent management
+  structured_commands {
+    command      = "/usr/bin/systemctl"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "* sftd"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/systemctl"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "* amazon-ssm-agent"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# ADMIN BUNDLE - Full system administration
+# -----------------------------------------------------------------------------
+resource "oktapam_sudo_command_bundle" "admin" {
+  name = "Admin-Operations"
+
+  # Full systemctl access
+  structured_commands {
+    command      = "/usr/bin/systemctl"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  # Package management
+  structured_commands {
+    command      = "/usr/bin/dnf"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/yum"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/rpm"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  # User management
+  structured_commands {
+    command      = "/usr/sbin/useradd"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/sbin/usermod"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/passwd"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  # File operations
+  structured_commands {
+    command      = "/usr/bin/chmod"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/chown"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  # Network troubleshooting
+  structured_commands {
+    command      = "/usr/bin/ip"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/sbin/iptables"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  # Editors
+  structured_commands {
+    command      = "/usr/bin/vi"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/vim"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/nano"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  # Reboot
+  structured_commands {
+    command      = "/usr/sbin/reboot"
+    command_type = "executable"
+    args_type    = "none"
+  }
+
+  structured_commands {
+    command      = "/usr/sbin/shutdown"
+    command_type = "executable"
+    args_type    = "any"
+  }
+}
+
+# -----------------------------------------------------------------------------
+# DATABASE BUNDLE - Database-specific operations
+# -----------------------------------------------------------------------------
+resource "oktapam_sudo_command_bundle" "database" {
+  name = "Database-Operations"
+
+  # PostgreSQL
+  structured_commands {
+    command      = "/usr/bin/psql"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/pg_dump"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/pg_restore"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/systemctl"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "* postgresql*"
+  }
+
+  # MySQL/MariaDB
+  structured_commands {
+    command      = "/usr/bin/mysql"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/mysqldump"
+    command_type = "executable"
+    args_type    = "any"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/systemctl"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "* mysql*"
+  }
+
+  structured_commands {
+    command      = "/usr/bin/systemctl"
+    command_type = "executable"
+    args_type    = "custom"
+    args         = "* mariadb*"
+  }
+}
+
+# =============================================================================
+# OPA GROUPS - ACCESS TIERS
+# =============================================================================
+
+resource "oktapam_group" "readonly_users" {
+  name = "PAM-ReadOnly-Users"
+}
+
+resource "oktapam_group" "operators" {
+  name = "PAM-Operators"
+}
+
+resource "oktapam_group" "db_admins" {
+  name = "PAM-Database-Admins"
+}
+
+resource "oktapam_group" "pam_administrators" {
+  name = "PAM_ADMINISTRATORS"
+}
+
+# =============================================================================
+# SECURITY POLICIES - ACCESS TIERS
+# =============================================================================
+# Uses the built-in "system.os_type" label to match all enrolled Linux servers.
+# type = "default" is REQUIRED to prevent state drift.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Policy 1: Read-Only Server Access
+# -----------------------------------------------------------------------------
+resource "oktapam_security_policy_v2" "readonly_access" {
+  type        = "default"
+  name        = "Read-Only-Server-Access"
+  description = "View-only access: logs, status, disk usage, network connections"
+  active      = true
+  principals  = { user_groups = [oktapam_group.readonly_users.id] }
+
+  rules = [
+    {
+      name          = "readonly-ssh-linux"
+      resource_type = "server_based_resource"
+      resource_selector = {
+        server_based_resource = {
+          selectors = [
+            {
+              server_label = {
+                account_selector_type = "none"
+                account_selector      = {}
+                server_selector = {
+                  labels = { "system.os_type" = "linux" }
+                }
+              }
+            }
+          ]
+        }
+      }
+      privileges = [
+        {
+          principal_account_ssh = {
+            principal_account_ssh = true
+            sudo_display_name     = "Read-Only Operations"
+            sudo_command_bundles = [
+              oktapam_sudo_command_bundle.readonly.id,
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
+
+# -----------------------------------------------------------------------------
+# Policy 2: Operator Server Access
+# -----------------------------------------------------------------------------
+resource "oktapam_security_policy_v2" "operator_access" {
+  type        = "default"
+  name        = "Operator-Server-Access"
+  description = "Service restarts, basic troubleshooting, security updates"
+  active      = true
+  principals  = { user_groups = [oktapam_group.operators.id] }
+
+  rules = [
+    {
+      name          = "operator-ssh-linux"
+      resource_type = "server_based_resource"
+      resource_selector = {
+        server_based_resource = {
+          selectors = [
+            {
+              server_label = {
+                account_selector_type = "none"
+                account_selector      = {}
+                server_selector = {
+                  labels = { "system.os_type" = "linux" }
+                }
+              }
+            }
+          ]
+        }
+      }
+      privileges = [
+        {
+          principal_account_ssh = {
+            principal_account_ssh = true
+            sudo_display_name     = "Operator Operations"
+            sudo_command_bundles = [
+              oktapam_sudo_command_bundle.readonly.id,
+              oktapam_sudo_command_bundle.operator.id,
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
+
+# -----------------------------------------------------------------------------
+# Policy 3: Database Admin Access (includes password checkout)
+# -----------------------------------------------------------------------------
+resource "oktapam_security_policy_v2" "db_admin_access" {
+  type        = "default"
+  name        = "Database-Admin-Access"
+  description = "Database operations, password checkout, operator-level system access"
+  active      = true
+  principals  = { user_groups = [oktapam_group.db_admins.id] }
+
+  rules = [
+    # Rule 1: Password checkout for vaulted accounts
+    # NOTE: Password checkout rules MUST come BEFORE SSH rules to match
+    # the order returned by the OPA API and prevent perpetual drift.
+    {
+      name          = "db-admin-password-checkout"
+      resource_type = "server_based_resource"
+      resource_selector = {
+        server_based_resource = {
+          selectors = [
+            {
+              server_label = {
+                account_selector_type = "username"
+                account_selector = {
+                  usernames = ["root", "postgres", "oracle"]
+                }
+                server_selector = {
+                  labels = { "system.os_type" = "linux" }
+                }
+              }
+            }
+          ]
+        }
+      }
+      privileges = [
+        { password_checkout_ssh = { password_checkout_ssh = true } },
+      ]
+    },
+    # Rule 2: SSH with sudo bundles
+    {
+      name          = "db-admin-ssh-sudo"
+      resource_type = "server_based_resource"
+      resource_selector = {
+        server_based_resource = {
+          selectors = [
+            {
+              server_label = {
+                account_selector_type = "none"
+                account_selector      = {}
+                server_selector = {
+                  labels = { "system.os_type" = "linux" }
+                }
+              }
+            }
+          ]
+        }
+      }
+      privileges = [
+        {
+          principal_account_ssh = {
+            principal_account_ssh = true
+            sudo_display_name     = "Database Admin Operations"
+            sudo_command_bundles = [
+              oktapam_sudo_command_bundle.readonly.id,
+              oktapam_sudo_command_bundle.operator.id,
+              oktapam_sudo_command_bundle.database.id,
+            ]
+          }
+        }
+      ]
+    },
+  ]
+}
+
+# -----------------------------------------------------------------------------
+# Policy 4: Full Admin Access
+# -----------------------------------------------------------------------------
+resource "oktapam_security_policy_v2" "full_admin_access" {
+  type        = "default"
+  name        = "Full-Admin-Access"
+  description = "Full administrative access to all servers"
+  active      = true
+  principals  = { user_groups = [oktapam_group.pam_administrators.id] }
+
+  rules = [
+    # Rule 1: Password checkout for vaulted accounts
+    # NOTE: API returns password_checkout_ssh before principal_account_ssh
+    {
+      name          = "full-admin-password-checkout"
+      resource_type = "server_based_resource"
+      resource_selector = {
+        server_based_resource = {
+          selectors = [
+            {
+              server_label = {
+                account_selector_type = "username"
+                account_selector = {
+                  usernames = ["root", "ec2-user", "postgres", "oracle"]
+                }
+                server_selector = {
+                  labels = { "system.os_type" = "linux" }
+                }
+              }
+            }
+          ]
+        }
+      }
+      privileges = [
+        { password_checkout_ssh = { password_checkout_ssh = true } },
+      ]
+    },
+    # Rule 2: Admin-level SSH (implies full sudo, no bundles needed)
+    # NOTE: admin_level_permissions CANNOT coexist with sudo_command_bundles
+    {
+      name          = "full-admin-ssh"
+      resource_type = "server_based_resource"
+      resource_selector = {
+        server_based_resource = {
+          selectors = [
+            {
+              server_label = {
+                account_selector_type = "none"
+                account_selector      = {}
+                server_selector = {
+                  labels = { "system.os_type" = "linux" }
+                }
+              }
+            }
+          ]
+        }
+      }
+      privileges = [
+        {
+          principal_account_ssh = {
+            principal_account_ssh   = true
+            admin_level_permissions = true
+          }
+        }
+      ]
+    },
+  ]
+}
+
+# =============================================================================
+# OUTPUTS
+# =============================================================================
+
+output "opa_sudo_bundles" {
+  description = "OPA sudo command bundle IDs"
+  value = {
+    readonly = oktapam_sudo_command_bundle.readonly.id
+    operator = oktapam_sudo_command_bundle.operator.id
+    admin    = oktapam_sudo_command_bundle.admin.id
+    database = oktapam_sudo_command_bundle.database.id
+  }
+}
+
+output "opa_access_groups" {
+  description = "OPA access group IDs for policy assignment"
+  value = {
+    readonly_users = oktapam_group.readonly_users.id
+    operators      = oktapam_group.operators.id
+    db_admins      = oktapam_group.db_admins.id
+    pam_admins     = oktapam_group.pam_administrators.id
+  }
+}
+
+output "opa_security_policies" {
+  description = "OPA security policy IDs"
+  value = {
+    readonly_access   = oktapam_security_policy_v2.readonly_access.id
+    operator_access   = oktapam_security_policy_v2.operator_access.id
+    db_admin_access   = oktapam_security_policy_v2.db_admin_access.id
+    full_admin_access = oktapam_security_policy_v2.full_admin_access.id
+  }
+}
