@@ -8,11 +8,12 @@ A GitOps template for managing Okta Identity Governance using Terraform, GitHub 
 
 ### Path 1: AI-Assisted Deployment (Recommended)
 
-The fastest way to get started. Fill out a deployment worksheet and hand it to Claude Code.
+The fastest way to get a complete environment running -- Okta resources **and** infrastructure.
 
-1. Fill out [Demo Deployment Worksheet](demo-builder/DEMO_WORKSHEET.md)
+1. Fill out the [Demo Deployment Worksheet](demo-builder/DEMO_WORKSHEET.md) (Okta users/groups/apps + AD, Generic DB, OPA, SCIM infrastructure)
 2. Open Claude Code in this repository
-3. Paste the completed worksheet -- Claude deploys everything
+3. Paste the completed worksheet with the [deployment prompt](ai-assisted/prompts/deploy_full_environment.md)
+4. Claude deploys everything -- Terraform, infrastructure, verification -- pausing for your approval at each step
 
 ### Path 2: Demo Builder
 
@@ -62,9 +63,11 @@ Production-grade workflow with PRs, approval gates, and CI/CD.
 │   └── *-infrastructure/        # Optional: AD, Generic DB, OPC, OAG
 ├── modules/                     # Reusable Terraform modules
 │   ├── ad-domain-controller/    # Windows AD DC on AWS
+│   ├── generic-db-connector/    # PostgreSQL RDS + schema + stored procedures
+│   ├── opc-agent/               # OPC Agent EC2 instances
 │   ├── lifecycle-management/    # JML automation with OIG
 │   └── saml-federation/         # SAML app with attribute mapping
-├── .github/workflows/           # 25+ GitHub Actions workflows
+├── .github/workflows/           # 40+ GitHub Actions workflows
 ├── scripts/                     # Python automation (45+ scripts)
 ├── demo-builder/                # YAML-based demo generation
 │   └── examples/                # Industry templates (financial, healthcare, tech)

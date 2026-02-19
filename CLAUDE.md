@@ -335,11 +335,34 @@ This repository supports optional Okta Privileged Access (OPA) integration via t
 
 See `docs/infrastructure/opa-privileged-access.md` for configuration instructions. Example: `environments/myorg/terraform/opa_resources.tf.example`.
 
-## Demo Builder
+## Demo Builder & Deployment Worksheet
 
 Generate complete demo environments from YAML config files with pre-built industry examples (financial services, healthcare, technology).
 
-See `demo-builder/README.md` for documentation and `demo-builder/DEMO_WORKSHEET.md` for the questionnaire. AI-assisted generation is available via `ai-assisted/README.md`.
+See `demo-builder/README.md` for documentation. AI-assisted generation is available via `ai-assisted/README.md`.
+
+### Deployment Worksheet (Primary Entry Point)
+
+The **Demo Deployment Worksheet** (`demo-builder/DEMO_WORKSHEET.md`) is the recommended starting point for deploying a full environment. It covers:
+- Sections 1-6: Okta resources (users, groups, apps, OIG, policies)
+- Sections 7-11: Infrastructure (AD, Generic DB, OPC agents, OPA, SCIM)
+- Section 12: Output preferences
+
+**To process a completed worksheet with Claude Code:**
+
+1. Parse the worksheet to extract all configuration values
+2. Create the environment directory: `environments/{name}/terraform/` and `environments/{name}/config/`
+3. Generate Terraform for Okta resources (users, groups, apps, entitlement bundles)
+4. Deploy infrastructure in order (each in its own subdirectory):
+   - AD: `environments/{name}/ad-infrastructure/` using `modules/ad-domain-controller`
+   - Generic DB: `environments/{name}/generic-db-infrastructure/` using `modules/generic-db-connector`
+   - OPC: `environments/{name}/opc-infrastructure/` using `modules/opc-agent`
+   - SCIM: `environments/{name}/infrastructure/scim-server/`
+   - OPA: Add `opa_*.tf` files to `environments/{name}/terraform/`
+5. Run `terraform init` and `terraform plan` for each stack -- pause for approval before apply
+6. After apply, verify with diagnostic workflows (`ad-health-check.yml`, `scim-check-status.yml`, `opa-test.yml`, etc.)
+
+See `ai-assisted/prompts/deploy_full_environment.md` for the full deployment prompt template.
 
 ## Backup and Restore
 

@@ -212,26 +212,162 @@ Schedule periodic access certifications:
 
 ---
 
-## Section 7: Infrastructure (Optional)
+## Section 7: Active Directory Infrastructure (Optional)
 
-### Do you need AWS infrastructure for your demo?
+### Deploy AD Domain Controller?
 - [ ] No (skip this section)
 - [ ] Yes
 
-### Active Directory
-- [ ] Deploy AD Domain Controller
-- Domain name: ______________
-- NetBIOS name: _____________
+**Domain configuration:**
 
-### SCIM Server
-- [ ] Deploy SCIM test server
+| Setting | Value |
+|---------|-------|
+| AD domain name (e.g., corp.demo.local) | _________________ |
+| NetBIOS name (e.g., CORP) | _________________ |
+| AWS region(s) | _________________ |
+| Instance type | `t3.medium` (default) |
 
-### Okta Privileged Access (OPA)
-- [ ] Enable OPA resources
+**OU structure** (check all that apply):
+- [ ] Use default OUs (Company > Users/Groups/Computers/Service Accounts)
+- [ ] Custom OUs (list below):
+  - ________________
+  - ________________
+  - ________________
+
+**Create sample users?**
+- [ ] Yes (recommended -- creates 22 users across 7 departments)
+- [ ] No
+
+**Install Okta AD Agent?**
+- [ ] Yes (installer will be pre-downloaded; requires interactive browser activation)
+- [ ] No
 
 ---
 
-## Section 8: Output Preferences
+## Section 8: Generic Database Connector (Optional)
+
+### Deploy Generic DB Connector?
+- [ ] No (skip this section)
+- [ ] Yes
+
+| Setting | Value |
+|---------|-------|
+| Database engine | PostgreSQL (default) |
+| Instance class (e.g., db.t3.micro) | _________________ |
+| Database name | _________________ |
+| AWS region | _________________ |
+
+**Sample data:**
+
+| Setting | Value |
+|---------|-------|
+| Number of sample users | ______ (default: 50) |
+| Departments for sample users | _________________ |
+
+**Entitlements / Roles to define:**
+
+| Role Name | Description |
+|-----------|-------------|
+| _________ | ___________ |
+| _________ | ___________ |
+| _________ | ___________ |
+| _________ | ___________ |
+
+*Example: Administrator, Standard User, Read Only, Support Agent, Billing Manager*
+
+**OPC Agents:**
+
+| Setting | Value |
+|---------|-------|
+| Number of OPC agents | ______ (1 for single, 2 for HA) |
+| Agent instance type | `t3.medium` (default) |
+| Use pre-built AMI? | [ ] Yes  [ ] No (install from scratch) |
+
+**Write-back requirements:**
+- [ ] Create users in DB when provisioned from Okta
+- [ ] Update users in DB when profile changes in Okta
+- [ ] Deactivate users in DB when deprovisioned from Okta
+- [ ] All of the above (full JML lifecycle)
+
+---
+
+## Section 9: Okta Privileged Access (Optional)
+
+### Enable OPA?
+- [ ] No (skip this section)
+- [ ] Yes
+
+**Security policy tiers** (check all that apply):
+- [ ] Read-Only (view logs, system status)
+- [ ] Operator (restart services, manage jobs)
+- [ ] Admin (full access, create/delete resources)
+- [ ] Database Admin (database tools, password checkout)
+- [ ] Custom tier: _________________________
+
+**Which servers need PAM enrollment?**
+- [ ] AD Domain Controller(s)
+- [ ] SCIM Server
+- [ ] OPC Agent instances
+- [ ] OPA Gateway
+- [ ] Other: _________________________
+
+**Password checkout:**
+- [ ] Enable password checkout for service accounts
+- [ ] Not needed
+
+**OPA Gateway:**
+- [ ] Deploy OPA Gateway on EC2
+- [ ] Not needed (agent-only)
+
+---
+
+## Section 10: SCIM Server (Optional)
+
+### Deploy SCIM Server?
+- [ ] No (skip this section)
+- [ ] Yes
+
+| Setting | Value |
+|---------|-------|
+| Domain name (e.g., scim.demo.example.com) | _________________ |
+| Route53 Zone ID | _________________ |
+| Instance type | `t3.micro` (default) |
+| Authentication mode | [ ] Bearer token  [ ] Basic auth |
+
+**Custom entitlements:**
+- [ ] Use default roles (5 standard roles)
+- [ ] Use custom entitlements file: ________________
+
+---
+
+## Section 11: Deployment Preferences
+
+| Setting | Value |
+|---------|-------|
+| AWS region (primary) | _________________ |
+| Environment name prefix | _________________ |
+| S3 state bucket name | _________________ |
+| Deployment approach | [ ] All at once  [ ] Incremental (Okta first, then infra) |
+
+**GitHub Environment setup:**
+- [ ] Create GitHub Environment with secrets automatically
+- [ ] I'll set up GitHub Environment manually
+
+**Required GitHub Environment secrets** (for reference):
+
+| Secret | Purpose |
+|--------|---------|
+| `OKTA_ORG_NAME` | Okta org (e.g., your-org) |
+| `OKTA_BASE_URL` | Okta domain (e.g., okta.com) |
+| `OKTA_API_TOKEN` | Okta API token |
+| `AWS_ROLE_ARN` | AWS OIDC role for GitHub Actions |
+| `OKTAPAM_KEY` | OPA API key (if OPA enabled) |
+| `OKTAPAM_SECRET` | OPA API secret (if OPA enabled) |
+| `OKTAPAM_TEAM` | OPA team name (if OPA enabled) |
+
+---
+
+## Section 12: Output Preferences
 
 **Output format:**
 - [ ] Separate files (users.tf, groups.tf, apps.tf, etc.) - Recommended
@@ -251,7 +387,27 @@ Schedule periodic access certifications:
 
 Once you've filled out this worksheet:
 
-### Option A: AI-Assisted (Recommended)
+### Option A: Claude Code Full Deployment (Recommended)
+
+The fastest path -- Claude Code deploys everything end-to-end.
+
+1. Open Claude Code in this repository
+2. Paste this prompt along with your completed worksheet:
+   ```
+   I have a completed Demo Deployment Worksheet. Please deploy the full
+   environment following the instructions in ai-assisted/prompts/deploy_full_environment.md.
+
+   HERE IS MY COMPLETED WORKSHEET:
+   [Paste your filled worksheet here]
+   ```
+3. Claude Code will create all Terraform, deploy infrastructure, and verify
+4. Review and approve each `terraform apply` as prompted
+
+See [Full Environment Deployment Prompt](../ai-assisted/prompts/deploy_full_environment.md) for details.
+
+### Option B: AI-Assisted YAML Generation
+
+Generate a YAML config from the worksheet using any AI, then build.
 
 1. Copy this entire filled-out worksheet
 2. Open ChatGPT, Claude, or Gemini
@@ -264,13 +420,13 @@ Once you've filled out this worksheet:
 4. Save the output as `demo-builder/my-demo.yaml`
 5. Run: `python scripts/build_demo.py --config demo-builder/my-demo.yaml`
 
-### Option B: Manual
+### Option C: Manual
 
 1. Copy `demo-builder/demo-config.yaml.template` to `demo-builder/my-demo.yaml`
 2. Edit the YAML using your worksheet answers
 3. Run: `python scripts/build_demo.py --config demo-builder/my-demo.yaml`
 
-### Option C: Use Pre-built Example
+### Option D: Use Pre-built Example
 
 1. Browse `demo-builder/examples/` for similar scenarios
 2. Copy and customize
