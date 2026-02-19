@@ -543,6 +543,34 @@ CONFIGURING SCIM APPLICATION
 
 ---
 
+## Operational Workflows
+
+### SCIM - Check Server Status (`scim-check-status.yml`)
+
+Diagnose SCIM server health: process status, listening ports, service status, health endpoints, recent logs, disk usage, and OPA agent status.
+
+```bash
+gh workflow run scim-check-status.yml \
+  -f environment=myorg \
+  -f region=us-east-1
+```
+
+Discovers the SCIM instance automatically via:
+1. Tag name patterns (`*scim*`, `*SCIM*`)
+2. Role/Environment tags
+3. Terraform state output
+
+Checks performed:
+- SCIM process running
+- Ports 80/443/8080/8443 listening
+- `scim-server` or `nginx` systemd service
+- `http://localhost:8080/health` endpoint
+- Recent journal/log entries
+- Disk usage
+- External health endpoint (if public IP available)
+
+---
+
 ## Troubleshooting
 
 ### Python Script Fails
