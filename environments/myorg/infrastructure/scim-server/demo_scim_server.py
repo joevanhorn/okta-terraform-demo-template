@@ -1,12 +1,32 @@
 # demo_scim_server.py - SCIM 2.0 Server with Entitlements Demo
 # Repository: https://github.com/joevanhorn/api-entitlements-demo
 # IMPROVED VERSION with enhanced debugging for user matching issues
+# Supports Okta OIG entitlement discovery via non-standard URN
 
 from flask import Flask, request, jsonify, render_template_string
 from datetime import datetime
 import json
+import logging
 import re
 import os
+
+# ---------------------------------------------------------------------------
+# SCIM Schema URNs
+# ---------------------------------------------------------------------------
+USER_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User"
+ENTITLEMENT_SCHEMA = "urn:okta:scim:schemas:core:1.0:Entitlement"
+LIST_RESPONSE_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+ERROR_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:Error"
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -65,6 +85,19 @@ def _require_auth_for_scim():
             "status": "401",
         }), 401
 # --- END AUTH MIDDLEWARE ---
+
+# --- BEGIN REQUEST/RESPONSE LOGGING ---
+@app.before_request
+def _log_request():
+    logger.info("%s %s", request.method, request.path)
+    if request.is_json and request.data:
+        logger.debug("Request body: %s", request.get_data(as_text=True))
+
+@app.after_request
+def _log_response(response):
+    logger.info("%s %s -> %s", request.method, request.path, response.status_code)
+    return response
+# --- END REQUEST/RESPONSE LOGGING ---
 
 
 # In-memory storage - simulates your cloud application's database
@@ -192,6 +225,187 @@ def service_provider_config():
             }
         ]
     })
+
+# ---------------------------------------------------------------------------
+# Entitlement Discovery Endpoints (Okta OIG)
+# ---------------------------------------------------------------------------
+# Okta discovers entitlements via a non-standard schema URN:
+#   urn:okta:scim:schemas:core:1.0:Entitlement
+# The standard IETF URN (urn:ietf:params:scim:schemas:core:2.0:Entitlement)
+# does NOT work for Okta's Governance tab.
+# See: https://developer.okta.com/docs/guides/scim-with-entitlements/main/
+
+@app.route('/scim/v2/ResourceTypes', methods=['GET'])
+def get_resource_types():
+    """Declare available resource types including Entitlements for OIG discovery.
+
+    Okta reads /ResourceTypes and looks for entries whose 'schema' field
+    matches the Okta entitlement URN. For each match it calls the declared
+    'endpoint' to import entitlements into the Governance tab.
+    """
+    resources = [
+        {
+            "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
+            "id": "User",
+            "name": "User",
+            "endpoint": "/Users",
+            "description": "Application User",
+            "schema": USER_SCHEMA,
+        },
+        {
+            "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
+            "id": "Entitlement",
+            "name": "Entitlement",
+            "endpoint": "/Entitlements",
+            "description": "Application Role / Entitlement",
+            "schema": ENTITLEMENT_SCHEMA,
+        },
+    ]
+    return jsonify({
+        "schemas": [LIST_RESPONSE_SCHEMA],
+        "totalResults": len(resources),
+        "Resources": resources,
+    })
+
+@app.route('/scim/v2/Schemas', methods=['GET'])
+def get_schemas():
+    """Return SCIM schema definitions for User resources."""
+    user_schema = {
+        "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Schema"],
+        "id": USER_SCHEMA,
+        "name": "User",
+        "description": "Application User account",
+        "attributes": [
+            {
+                "name": "userName",
+                "type": "string",
+                "multiValued": False,
+                "required": True,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "server",
+                "description": "Unique identifier for the user",
+            },
+            {
+                "name": "name",
+                "type": "complex",
+                "multiValued": False,
+                "required": False,
+                "mutability": "readWrite",
+                "returned": "default",
+                "description": "User name components",
+                "subAttributes": [
+                    {"name": "givenName", "type": "string", "mutability": "readWrite", "returned": "default"},
+                    {"name": "familyName", "type": "string", "mutability": "readWrite", "returned": "default"},
+                ],
+            },
+            {
+                "name": "emails",
+                "type": "complex",
+                "multiValued": True,
+                "required": False,
+                "mutability": "readWrite",
+                "returned": "default",
+                "description": "Email addresses",
+                "subAttributes": [
+                    {"name": "value", "type": "string", "mutability": "readWrite", "returned": "default"},
+                    {"name": "primary", "type": "boolean", "mutability": "readWrite", "returned": "default"},
+                    {"name": "type", "type": "string", "mutability": "readWrite", "returned": "default"},
+                ],
+            },
+            {
+                "name": "active",
+                "type": "boolean",
+                "multiValued": False,
+                "required": False,
+                "mutability": "readWrite",
+                "returned": "default",
+                "description": "User active status",
+            },
+            {
+                "name": "roles",
+                "type": "complex",
+                "multiValued": True,
+                "required": False,
+                "mutability": "readWrite",
+                "returned": "default",
+                "description": "Application roles assigned to the user",
+                "subAttributes": [
+                    {"name": "value", "type": "string", "mutability": "readWrite", "returned": "default"},
+                    {"name": "display", "type": "string", "mutability": "readOnly", "returned": "default"},
+                ],
+            },
+        ],
+    }
+    return jsonify({
+        "schemas": [LIST_RESPONSE_SCHEMA],
+        "totalResults": 1,
+        "Resources": [user_schema],
+    })
+
+@app.route('/scim/v2/Entitlements', methods=['GET'])
+def list_entitlements():
+    """Return all entitlements using Okta's custom schema URN.
+
+    Each entitlement must include: id, displayName, type, description.
+    The 'schemas' array MUST use urn:okta:scim:schemas:core:1.0:Entitlement
+    for Okta to recognise these as governance entitlements.
+    """
+    start_index = int(request.args.get('startIndex', 1))
+    count = int(request.args.get('count', 100))
+
+    resources = []
+    for ent in entitlements_db.values():
+        resources.append({
+            "schemas": [ENTITLEMENT_SCHEMA],
+            "id": ent["id"],
+            "displayName": ent.get("displayName", ent["name"]),
+            "type": "Entitlement",
+            "description": ent.get("description", ""),
+            "meta": {
+                "resourceType": "Entitlement",
+                "location": f"/scim/v2/Entitlements/{ent['id']}",
+            },
+        })
+
+    total = len(resources)
+    page_start = max(start_index - 1, 0)  # SCIM is 1-indexed
+    page = resources[page_start:page_start + count]
+
+    return jsonify({
+        "schemas": [LIST_RESPONSE_SCHEMA],
+        "totalResults": total,
+        "startIndex": start_index,
+        "itemsPerPage": len(page),
+        "Resources": page,
+    })
+
+@app.route('/scim/v2/Entitlements/<entitlement_id>', methods=['GET'])
+def get_entitlement(entitlement_id):
+    """Return a single entitlement by ID."""
+    ent = entitlements_db.get(entitlement_id)
+    if not ent:
+        return jsonify({
+            "schemas": [ERROR_SCHEMA],
+            "status": "404",
+            "detail": f"Entitlement {entitlement_id} not found",
+        }), 404
+
+    return jsonify({
+        "schemas": [ENTITLEMENT_SCHEMA],
+        "id": ent["id"],
+        "displayName": ent.get("displayName", ent["name"]),
+        "type": "Entitlement",
+        "description": ent.get("description", ""),
+        "meta": {
+            "resourceType": "Entitlement",
+            "location": f"/scim/v2/Entitlements/{ent['id']}",
+        },
+    })
+
+# ---------------------------------------------------------------------------
+# User Provisioning Endpoints
+# ---------------------------------------------------------------------------
 
 @app.route('/scim/v2/Users', methods=['POST'])
 def create_user():
@@ -594,10 +808,11 @@ if __name__ == '__main__':
     print(f"📦 Repository: joevanhorn/api-entitlements-demo")
     print(f"📍 Dashboard: http://localhost:5000")
     print(f"📍 SCIM API: http://localhost:5000/scim/v2")
+    print(f"📍 Entitlement Discovery: /scim/v2/ResourceTypes, /scim/v2/Entitlements")
     print(f"🔑 Auth Token: Bearer {auth_token}")
-    print(f"🎭 Available Roles: {len(entitlements_db)}")
+    print(f"🎭 Available Entitlements: {len(entitlements_db)}")
     for role in entitlements_db.values():
-        print(f"   • {role['name']} - {role['description']}")
+        print(f"   • {role.get('displayName', role['name'])} ({role['id']}) - {role['description']}")
     print("="*70)
     print("\n⏳ Starting server...\n")
     

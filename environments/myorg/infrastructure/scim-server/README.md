@@ -672,10 +672,11 @@ Each entitlement object requires:
 |-------|------|----------|-------------|
 | `id` | string | Yes | Unique identifier (e.g., `role_admin`) |
 | `name` | string | Yes | Display name shown in dashboard |
+| `displayName` | string | No | Name shown in Okta Governance tab (falls back to `name`) |
 | `description` | string | Yes | Description of the role's purpose |
 | `permissions` | array | Yes | List of permission strings |
 
-**Important:** The `id` field is used as the SCIM role value that Okta will provision.
+**Important:** The `id` field is used as the SCIM role value that Okta will provision. The `displayName` field is used by the `/Entitlements` endpoint for Okta's Governance tab.
 
 ## Monitoring and Troubleshooting
 
@@ -836,11 +837,57 @@ environments/myorg/infrastructure/scim-server/
 ├── main.tf                  # Infrastructure resources
 ├── outputs.tf               # Output values
 ├── user-data.sh             # EC2 initialization script
-├── demo_scim_server.py      # Flask SCIM 2.0 server application
+├── demo_scim_server.py      # Flask SCIM 2.0 server (provisioning + entitlement discovery)
+├── entitlements.json        # Default entitlements with displayName
+├── examples/                # Pre-built entitlement templates
+│   ├── entitlements-salesforce.json
+│   ├── entitlements-aws.json
+│   └── entitlements-generic.json
 ├── requirements.txt         # Python dependencies
 ├── .gitignore               # Ignore sensitive files
 └── README.md                # This file
 ```
+
+## Entitlement Discovery (Okta Governance Tab)
+
+The SCIM server supports Okta's entitlement discovery protocol, which surfaces application roles in the **Governance tab** for access reviews and certification campaigns.
+
+### Discovery Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /scim/v2/ResourceTypes` | Declares User and Entitlement resource types |
+| `GET /scim/v2/Schemas` | Returns User schema definition |
+| `GET /scim/v2/Entitlements` | Lists all entitlements (paginated) |
+| `GET /scim/v2/Entitlements/<id>` | Single entitlement lookup |
+
+### How It Works
+
+Okta discovers entitlements using a **non-standard schema URN**: `urn:okta:scim:schemas:core:1.0:Entitlement`. The standard IETF URN does not work.
+
+1. Okta calls `/ResourceTypes` and finds entries with the Okta entitlement URN
+2. For each match, Okta calls the declared endpoint (`/Entitlements`)
+3. Entitlements appear in the app's Governance tab
+
+### Testing Entitlement Discovery
+
+```bash
+# Verify ResourceTypes includes entitlements
+curl -s https://scim.yourdomain.com/scim/v2/ResourceTypes \
+  -H "Authorization: Bearer YOUR_TOKEN" | python3 -m json.tool
+
+# List all entitlements
+curl -s https://scim.yourdomain.com/scim/v2/Entitlements \
+  -H "Authorization: Bearer YOUR_TOKEN" | python3 -m json.tool
+```
+
+### Important Notes
+
+- Okta imports the schema **once at app creation**. If you add entitlement endpoints after creating the app, you must delete and recreate the SCIM app in Okta.
+- When using Header Auth (`scim2headerauth`), enter the token in Okta with the `Bearer ` prefix (e.g., `Bearer your-token-here`).
+- Each entitlement JSON entry should include a `displayName` field (falls back to `name` if missing).
+
+For the full guide, see [SCIM Entitlement Discovery](../../../../docs/governance/scim-entitlement-discovery.md).
 
 ## Integration with Okta Identity Governance
 
