@@ -44,6 +44,8 @@ See [OPC Agents](opc-agents.md) for deploying the on-prem connector.
 3. Configure JDBC connection using the output from `terraform output connection_info`
 4. Set up attribute mappings (see SQL Queries section below)
 
+> **CRITICAL: Enable "Provisioning to App" for entitlement import.** Okta requires downstream provisioning (Provisioning to App) to be enabled AND the Update User SQL query to be configured before entitlement import will work. Without this, imports succeed and users appear, but `ent-*` entitlement attributes are never created on user profiles. Okta silently discards the entitlement data from the SCIM server. This is not documented by Okta — see [Entitlement Import Requirements](#entitlement-import-requirements) below.
+
 ## Terraform Module
 
 The `modules/generic-db-connector/` module creates:
@@ -196,6 +198,39 @@ When configuring the SCIM connector for write-back, use the `ext_` prefix for cu
 | `ext_write_back` | `write_back` | Write-back only |
 
 **Write-back direction**: Set to "To App" only in the Okta app attribute mapping. This allows Okta to push attribute changes back to the database.
+
+## Entitlement Import Requirements
+
+Importing entitlements from the Generic Database Connector has an **undocumented dependency** on downstream provisioning. If entitlements aren't appearing on user profiles after import, check the following:
+
+### Required Configuration
+
+1. **Enable "Provisioning to App"** — In the app's Provisioning tab, enable the "To App" direction. This adds the `PUSH_PROFILE_UPDATES` feature to the app.
+2. **Configure the Update User SQL query** — Even if you don't plan to push updates back to the database, this query must be set. Without it, Okta will not process entitlement data during import.
+3. **Configure entitlement queries** — "Get All Entitlements" and "Get User Entitlements" SQL queries must be set in the Provisioning tab.
+4. **Set Entitlement ID and Display Name columns** — Under the entitlement configuration, map the `id` and `displayName` columns.
+
+### How It Works
+
+During a full import, Okta:
+1. Calls `GET /Users` to retrieve all users (via the "Get All Users" SQL query)
+2. For each user, calls the "Get User Entitlements" SQL query to retrieve their entitlements
+3. Calls the "Get All Entitlements" SQL query to build the entitlement catalog
+4. Creates dynamic `ent-{category}` attributes on user profiles with the entitlement values
+
+### Symptoms of Missing Configuration
+
+| Symptom | Cause |
+|---------|-------|
+| Users import fine, but no `ent-*` attributes on profiles | "Provisioning to App" not enabled or Update User query missing |
+| SCIM server logs show entitlements returned successfully | Data is flowing correctly — the issue is on the Okta side |
+| System log shows `custom_object.complete: totalObjects: 0` | This is **normal** — entitlements are NOT custom objects |
+| `ent-*` attributes don't appear in the app schema API | This is **normal** — entitlement attributes are dynamic and only visible on user profile objects |
+
+### Other Notes
+
+- **Incremental imports don't work** with the on-prem SCIM server (v1.6.0). The server only supports `userName` filter, not `meta.lastModified`. Use full imports instead.
+- **Entitlement Management must be opted in** on the app (`emOptInStatus: ENABLED`) for entitlements to appear in the Governance tab.
 
 ## Cost Estimate
 
