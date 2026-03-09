@@ -46,6 +46,7 @@ Production-grade workflow with PRs, approval gates, and CI/CD.
 | **OAG (Access Gateway)** | Deploy and manage Okta Access Gateway applications | Infrastructure |
 | **Lifecycle Management** | Joiner/Mover/Leaver automation, contractor workflows, OIG integration | Infrastructure |
 | **SAML Federation** | Reusable SAML app module with attribute mapping and group assignments | Infrastructure |
+| **Identity Threat Protection** | ITP demo automation (session hijacking, SSF signals, entity risk policy management), dual-browser video recording | Infrastructure |
 | **Demo Builder** | Generate complete environments from YAML configs with industry templates | Tooling |
 | **Backup and Restore** | Resource-based exports and S3 state-based rollback | Tooling |
 | **Cross-Org Migration** | Copy groups, memberships, and entitlement grants between Okta tenants | Tooling |
@@ -65,6 +66,7 @@ Production-grade workflow with PRs, approval gates, and CI/CD.
 │   ├── ad-domain-controller/    # Windows AD DC on AWS
 │   ├── generic-db-connector/    # PostgreSQL RDS + schema + stored procedures
 │   ├── opc-agent/               # OPC Agent EC2 instances
+│   ├── itp-demo/                # Identity Threat Protection demo automation
 │   ├── lifecycle-management/    # JML automation with OIG
 │   └── saml-federation/         # SAML app with attribute mapping
 ├── .github/workflows/           # 40+ GitHub Actions workflows
@@ -118,13 +120,15 @@ Each environment maintains independent Terraform state in S3 with DynamoDB locki
 
 ## Documentation
 
-All documentation has been organized into the `docs/` directory by topic:
+> **Start here:** The [Documentation Hub](docs/README.md) is the central index for all docs, organized by what you're trying to do. For returning users, the [Quick Reference](docs/QUICK-REFERENCE.md) is a single-page cheat sheet with key paths, commands, and gotchas.
+
+All documentation lives in the `docs/` directory, organized by topic:
 
 | Section | Contents |
 |---|---|
 | [Getting Started](docs/getting-started/README.md) | Setup guides, prerequisites, backend configuration, directory structure |
 | [Guides](docs/guides/demo-building.md) | Demo building, cross-org migration, lifecycle management, rollback procedures |
-| [Infrastructure](docs/infrastructure/active-directory.md) | Active Directory, OPA, SCIM server, OAG deployment |
+| [Infrastructure](docs/infrastructure/active-directory.md) | Active Directory, OPA, SCIM server, OAG, ITP demo deployment |
 | [Governance](docs/governance/labels.md) | Labels, entitlements, label workflows, GitOps value proposition |
 | [Reference](docs/reference/workflow-reference.md) | Terraform basics, workflow reference, API management, provider coverage |
 | [Troubleshooting](docs/troubleshooting/general.md) | Common issues, entitlement bundle errors, workflow fixes |

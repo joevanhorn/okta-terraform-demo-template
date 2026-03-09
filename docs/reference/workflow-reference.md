@@ -1,5 +1,7 @@
 # Workflows Guide - Which Workflow When?
 
+> **Prerequisites:** Before running workflows, ensure your GitHub Environment is configured with the required secrets. See [Prerequisites](../getting-started/prerequisites.md) and [GitHub GitOps Setup](../getting-started/github-gitops.md).
+
 **Problem:** 21 workflows, which one do I use?
 
 **Solution:** This guide! Find your task below and we'll tell you exactly which workflow to run.

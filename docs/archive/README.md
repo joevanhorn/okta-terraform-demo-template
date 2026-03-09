@@ -1,5 +1,7 @@
 # Archived Documentation
 
+> **These docs are superseded.** Everything below has been replaced by the current documentation. See the [Documentation Hub](../README.md) for up-to-date guides.
+
 This folder contains documentation that has been superseded by the new simplified documentation structure.
 
 **These documents are kept for historical reference only and are no longer maintained.**
