@@ -1,8 +1,34 @@
-# Okta Terraform Provider - Resource Coverage Matrix
+# Okta Terraform Provider - Coverage & Analysis
 
 **Last Updated:** 2025-11-19
 **Provider Version:** v6.4.0
 **Purpose:** Track which Okta features are available in Terraform vs API-only vs Manual
+
+---
+
+## Summary
+
+The Okta Terraform Provider (v6.4.0) includes **103 resources** and **47 data sources** across 28 categories. Key highlights:
+
+- **OIG support** added in v6.0.0-v6.4.0: 10 resources and 13 data sources for entitlements, reviews, requests, and approvals
+- **3 CRITICAL gaps** remain: resource owners, governance labels, and risk rules (SOD policies) -- managed via Python scripts
+- **95% OIG coverage**, 100% Users & Groups, 90% Applications, 95% Auth & Policies
+- **~37% of resources** lack comprehensive examples in the demo template
+
+### OIG Resources Added in v6.x
+
+| Resource | Version | Purpose |
+|----------|---------|---------|
+| `okta_campaign` | v6.0.0 | Access review campaigns |
+| `okta_entitlement` | v6.0.0 | Individual entitlements |
+| `okta_entitlement_bundle` | v6.2.0 | Entitlement bundles |
+| `okta_review` | v6.1.0 | Access reviews |
+| `okta_principal_entitlements` | v6.1.0 | Principal entitlement assignments |
+| `okta_request_condition` | v6.1.0 | Access request conditions |
+| `okta_request_sequence` | v6.1.0 | Approval workflows |
+| `okta_request_setting_organization` | v6.1.0 | Org-level request settings |
+| `okta_request_setting_resource` | v6.1.0 | Resource-level request settings |
+| `okta_request_v2` | v6.1.0 | Access requests |
 
 ---
 
@@ -316,15 +342,44 @@
 
 ---
 
-## Related Documents
+## Missing Resources -- Priority Request List
 
-- **[PROVIDER_ANALYSIS.md](./PROVIDER_ANALYSIS.md)** - Detailed provider analysis
-- **[CLAUDE.md](../CLAUDE.md)** - Repository guide
-- **[API_MANAGEMENT.md](./API_MANAGEMENT.md)** - Python API scripts
-- **[TERRAFORM_RESOURCES.md](./TERRAFORM_RESOURCES.md)** - Resource guide
+These resources are not yet available in the Terraform provider.
+
+### Tier 1 -- CRITICAL (Blocks Full OIG Automation)
+
+| Resource | Current Workaround | Impact |
+|----------|-------------------|--------|
+| `okta_resource_owner` | `scripts/apply_resource_owners.py` | Cannot assign owners in Terraform |
+| `okta_governance_label` | `scripts/apply_admin_labels.py` | Cannot categorize resources in Terraform |
+| `okta_risk_rule` / `okta_sod_policy` | `scripts/apply_risk_rules.py` | Cannot define SOD policies in code |
+
+### Tier 2 -- HIGH (Reduces Manual Work)
+
+| Resource | Current Workaround | Impact |
+|----------|-------------------|--------|
+| `okta_app_provisioning_connection` | Manual UI | Cannot automate SCIM provisioning setup |
+| `okta_bundle_grant` | Manual UI | Cannot assign bundles to users/groups in Terraform |
+| `okta_app_logo` | Manual UI | Cannot automate app branding |
+
+### Tier 3 -- Nice to Have
+
+| Resource | Priority |
+|----------|----------|
+| `okta_session_policy` | MEDIUM |
+| `okta_feature_flag` | MEDIUM |
+| `okta_org_contact` | LOW |
 
 ---
 
-**Document Version:** 1.0
+## Related Documents
+
+- **[API Management](./api-management.md)** -- Python API scripts reference
+- **[Terraform Basics](./terraform-basics.md)** -- Resource examples and HCL patterns
+- **[Workflow Reference](./workflow-reference.md)** -- GitHub Actions workflows
+
+---
+
+**Document Version:** 2.0
 **Last Updated:** 2025-11-19
 **Maintained By:** okta-terraform-demo-template maintainers

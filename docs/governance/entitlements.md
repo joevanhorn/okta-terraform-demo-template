@@ -357,3 +357,7 @@ The script handles rate limiting automatically with exponential backoff. For bul
 - [Okta Identity Governance API](https://developer.okta.com/docs/api/iga/)
 - [2025 OIG API Release Notes](https://developer.okta.com/docs/release-notes/2025-okta-identity-governance/)
 - [API_MANAGEMENT.md](./API_MANAGEMENT.md) - Other OIG API operations
+
+## See Also
+
+- **[Provider Coverage](../reference/provider-coverage.md)** -- Full matrix of what's in the Terraform provider vs API vs manual, including missing OIG resources
