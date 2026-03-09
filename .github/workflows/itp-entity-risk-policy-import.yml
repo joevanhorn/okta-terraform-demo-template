@@ -1,0 +1,156 @@
+name: ITP - Import Entity Risk Policy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (must match environments/ directory name)'
+        required: true
+        type: string
+        default: 'myorg'
+      commit_changes:
+        description: 'Commit imported policy to repository'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  import-entity-risk-policy:
+    name: Import Entity Risk Policy from Okta
+    runs-on: ubuntu-latest
+
+    environment: ${{ inputs.environment }}
+
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Workflow Overview
+        run: |
+          echo "=================================================="
+          echo "  IMPORT ENTITY RISK POLICY FROM OKTA"
+          echo "=================================================="
+          echo ""
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Commit Changes: ${{ inputs.commit_changes }}"
+          echo "=================================================="
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Set up environment variables
+        env:
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+        run: |
+          echo "OKTA_ORG_NAME=${OKTA_ORG_NAME}" >> $GITHUB_ENV
+          echo "OKTA_BASE_URL=${OKTA_BASE_URL}" >> $GITHUB_ENV
+          echo "OKTA_API_TOKEN=${OKTA_API_TOKEN}" >> $GITHUB_ENV
+
+      - name: Import entity risk policy
+        id: import
+        run: |
+          OUTPUT_FILE="environments/${{ inputs.environment }}/config/entity_risk_policy.json"
+
+          python3 scripts/import_entity_risk_policy.py \
+            --output "$OUTPUT_FILE" \
+            2>&1 | tee import.log
+
+          IMPORT_STATUS=$?
+          echo "import_status=$IMPORT_STATUS" >> $GITHUB_OUTPUT
+
+          # Count imported rules
+          if [ -f "$OUTPUT_FILE" ]; then
+            RULE_COUNT=$(jq '.rules | length' "$OUTPUT_FILE")
+            POLICY_NAME=$(jq -r '.policy.name // "Unknown"' "$OUTPUT_FILE")
+          else
+            RULE_COUNT=0
+            POLICY_NAME="N/A"
+          fi
+
+          echo "rule_count=$RULE_COUNT" >> $GITHUB_OUTPUT
+          echo "policy_name=$POLICY_NAME" >> $GITHUB_OUTPUT
+
+      - name: Check for changes
+        id: changes
+        run: |
+          CONFIG_FILE="environments/${{ inputs.environment }}/config/entity_risk_policy.json"
+          if [ ! -f "$CONFIG_FILE" ] || git diff --quiet "$CONFIG_FILE" 2>/dev/null; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changes detected"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Changes detected"
+          fi
+
+      - name: Commit and push changes
+        if: steps.changes.outputs.changed == 'true' && inputs.commit_changes == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          git add "environments/${{ inputs.environment }}/config/entity_risk_policy.json"
+
+          git commit -m "chore: Import entity risk policy from Okta (${{ inputs.environment }})" \
+            -m "Imported ${{ steps.import.outputs.rule_count }} rules from ${{ steps.import.outputs.policy_name }}"
+
+          git push
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: itp-import-${{ inputs.environment }}-${{ github.run_number }}
+          path: |
+            import.log
+            environments/${{ inputs.environment }}/config/entity_risk_policy.json
+          retention-days: 90
+
+      - name: Post summary
+        if: always()
+        run: |
+          echo "## Entity Risk Policy Import Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Policy:** ${{ steps.import.outputs.policy_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.import.outputs.import_status }}" -eq 0 ]; then
+            echo "**Status:** Import completed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "**Rules Imported:** ${{ steps.import.outputs.rule_count }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Status:** Import failed (see log below)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.changes.outputs.changed }}" == "true" ]; then
+            if [ "${{ inputs.commit_changes }}" == "true" ]; then
+              echo "**Changes:** Committed to repository" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "**Changes:** Detected but not committed (commit_changes=false)" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "**Changes:** No changes detected (config already up-to-date)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Import Log" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat import.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,73 @@
+# ==============================================================================
+# ITP (Identity Threat Protection) Demo
+# ==============================================================================
+# Uncomment this file (rename to itp_demo.tf) to enable the ITP demo module.
+#
+# This module deploys:
+#   - Lambda in eu-west-1 for session hijacking simulation (real mode)
+#   - Lambda JWKS endpoint for SSF signed JWT signals (ssf mode)
+#   - S3 bucket for demo video recordings
+#   - SSM parameters for SSF provider config and private key
+#
+# Prerequisites:
+#   1. Add AWS provider to your provider.tf (see docs/infrastructure/itp-aws-requirements.md)
+#   2. Store ITP demo credentials in SSM (see docs/guides/itp-demo.md)
+#   3. terraform init && terraform apply
+#   4. Run setup_ssf_provider.py to register the SSF provider with Okta
+#
+# For full setup guide, see: docs/guides/itp-demo.md
+# ==============================================================================
+
+# # --- AWS Provider (add to provider.tf if not already present) ---
+# #
+# # provider "aws" {
+# #   region = "us-east-1"  # Primary region
+# # }
+
+# # --- ITP Demo Module ---
+#
+# module "itp_demo" {
+#   source = "../../../modules/itp-demo"
+#
+#   environment = "myorg"
+#
+#   # Feature flags — enable what you need
+#   enable_session_replayer = true   # Lambda for real-mode session hijacking
+#   enable_ssf_endpoint    = true   # Lambda JWKS for SSF mode
+#   enable_video_bucket    = true   # S3 bucket for demo videos
+#
+#   # Attacker Lambda region (should differ from your primary region)
+#   attacker_region = "eu-west-1"
+#
+#   # SSM path prefix (credentials stored under this path)
+#   # ssm_prefix = "/myorg/itp"  # default: /{environment}/itp
+#
+#   # Video retention (days)
+#   # video_retention_days = 90
+#
+#   # GitHub Actions role ARN (for S3 bucket policy, optional)
+#   # github_actions_role_arn = "arn:aws:iam::123456789012:role/GitHubActions-OktaTerraform"
+#
+#   tags = {
+#     Purpose     = "ITP Demo"
+#     ManagedBy   = "Terraform"
+#     Environment = "myorg"
+#   }
+# }
+#
+# # --- Outputs ---
+#
+# output "itp_lambda_function_name" {
+#   description = "Attacker Lambda function name (for --attacker-lambda flag)"
+#   value       = module.itp_demo.lambda_function_name
+# }
+#
+# output "itp_ssf_jwks_url" {
+#   description = "JWKS URL for SSF provider registration"
+#   value       = module.itp_demo.ssf_jwks_url
+# }
+#
+# output "itp_video_bucket" {
+#   description = "S3 bucket for demo video recordings"
+#   value       = module.itp_demo.video_bucket_name
+# }

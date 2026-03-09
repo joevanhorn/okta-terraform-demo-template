@@ -1,0 +1,267 @@
+name: ITP - Demo Trigger
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (must match environments/ directory name)'
+        required: true
+        type: string
+        default: 'myorg'
+      mode:
+        description: 'Demo mode'
+        required: true
+        type: choice
+        options:
+          - quick
+          - real
+          - ssf
+      user_email:
+        description: 'Target user email'
+        required: true
+        type: string
+      risk_level:
+        description: 'Risk level (quick mode only). API only accepts HIGH or LOW.'
+        required: false
+        default: 'HIGH'
+        type: choice
+        options:
+          - HIGH
+          - LOW
+      monitor_events:
+        description: 'Monitor system log for ITP events after trigger'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      monitor_duration:
+        description: 'Event monitoring duration in seconds'
+        required: false
+        default: '60'
+        type: string
+      auto_reset:
+        description: 'Reset user risk to LOW after demo'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      attacker_region:
+        description: 'Attacker Lambda region (real mode only)'
+        required: false
+        default: 'eu-west-1'
+        type: string
+      record_video:
+        description: 'Record browser session video (real mode only)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      ssf_risk_level:
+        description: 'SSF signal risk level (ssf mode only)'
+        required: false
+        default: 'HIGH'
+        type: choice
+        options:
+          - HIGH
+          - LOW
+      aws_region:
+        description: 'AWS region for SSM/Lambda operations'
+        required: false
+        default: 'us-east-1'
+        type: string
+
+jobs:
+  trigger-demo:
+    name: ITP Demo - ${{ inputs.mode }} mode
+    runs-on: ubuntu-latest
+
+    environment: ${{ inputs.environment }}
+
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+
+    steps:
+      - name: Workflow Overview
+        run: |
+          echo "=================================================="
+          echo "  ITP DEMO TRIGGER"
+          echo "=================================================="
+          echo ""
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Mode: ${{ inputs.mode }}"
+          echo "User: ${{ inputs.user_email }}"
+          if [ "${{ inputs.mode }}" == "quick" ]; then
+            echo "Risk Level: ${{ inputs.risk_level }}"
+          elif [ "${{ inputs.mode }}" == "real" ]; then
+            echo "Attacker Region: ${{ inputs.attacker_region }}"
+          else
+            echo "SSF Risk Level: ${{ inputs.ssf_risk_level }}"
+          fi
+          echo "Monitor: ${{ inputs.monitor_events }}"
+          echo "Auto Reset: ${{ inputs.auto_reset }}"
+          echo "=================================================="
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies (quick mode)
+        if: inputs.mode == 'quick'
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Install dependencies (ssf mode)
+        if: inputs.mode == 'ssf'
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pyjwt cryptography boto3
+
+      - name: Install dependencies (real mode)
+        if: inputs.mode == 'real'
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests pyotp playwright boto3
+          playwright install chromium
+
+      - name: Configure AWS Credentials
+        if: inputs.mode == 'real' || inputs.mode == 'ssf'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-ITPDemo
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Set up environment variables
+        env:
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+        run: |
+          echo "OKTA_ORG_NAME=${OKTA_ORG_NAME}" >> $GITHUB_ENV
+          echo "OKTA_BASE_URL=${OKTA_BASE_URL}" >> $GITHUB_ENV
+          echo "OKTA_API_TOKEN=${OKTA_API_TOKEN}" >> $GITHUB_ENV
+
+      - name: Run ITP Demo (quick mode)
+        if: inputs.mode == 'quick'
+        run: |
+          ARGS="--mode quick --user ${{ inputs.user_email }} --risk-level ${{ inputs.risk_level }}"
+
+          if [ "${{ inputs.monitor_events }}" == "true" ]; then
+            ARGS="$ARGS --monitor --monitor-duration ${{ inputs.monitor_duration }}"
+          fi
+
+          if [ "${{ inputs.auto_reset }}" == "true" ]; then
+            ARGS="$ARGS --auto-reset"
+          fi
+
+          cd scripts
+          python3 trigger_itp_demo.py $ARGS 2>&1 | tee ../demo.log
+
+      - name: Run ITP Demo (real mode)
+        if: inputs.mode == 'real'
+        run: |
+          ARGS="--mode real --user ${{ inputs.user_email }}"
+          ARGS="$ARGS --ssm-prefix /${{ inputs.environment }}/itp"
+          ARGS="$ARGS --attacker-region ${{ inputs.attacker_region }}"
+          ARGS="$ARGS --attacker-lambda ${{ inputs.environment }}-itp-session-replayer"
+
+          if [ "${{ inputs.record_video }}" == "true" ]; then
+            ARGS="$ARGS --record-video ../itp-demo-video"
+            ARGS="$ARGS --upload-s3 ${{ inputs.environment }}-itp-demo-videos"
+          fi
+
+          if [ "${{ inputs.monitor_events }}" == "true" ]; then
+            ARGS="$ARGS --monitor --monitor-duration ${{ inputs.monitor_duration }}"
+          fi
+
+          if [ "${{ inputs.auto_reset }}" == "true" ]; then
+            ARGS="$ARGS --auto-reset"
+          fi
+
+          cd scripts
+          python3 trigger_itp_demo.py $ARGS 2>&1 | tee ../demo.log
+
+      - name: Run ITP Demo (ssf mode)
+        if: inputs.mode == 'ssf'
+        run: |
+          ARGS="--mode ssf --user ${{ inputs.user_email }} --risk-level ${{ inputs.ssf_risk_level }}"
+          ARGS="$ARGS --ssm-prefix /${{ inputs.environment }}/itp"
+
+          if [ "${{ inputs.monitor_events }}" == "true" ]; then
+            ARGS="$ARGS --monitor --monitor-duration ${{ inputs.monitor_duration }}"
+          fi
+
+          if [ "${{ inputs.auto_reset }}" == "true" ]; then
+            ARGS="$ARGS --auto-reset"
+          fi
+
+          cd scripts
+          python3 trigger_itp_demo.py $ARGS 2>&1 | tee ../demo.log
+
+      - name: Extract presigned URL from log
+        if: inputs.mode == 'real' && inputs.record_video == 'true'
+        run: |
+          PRESIGNED_URL=$(grep -oP '(?<=Presigned URL \(7 days\): )https://\S+' demo.log | tail -1 || true)
+          if [ -n "$PRESIGNED_URL" ]; then
+            echo "PRESIGNED_URL=$PRESIGNED_URL" >> $GITHUB_ENV
+          fi
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: itp-demo-${{ inputs.mode }}-${{ github.run_number }}
+          path: |
+            demo.log
+            itp-demo-video/*.webm
+          retention-days: 30
+
+      - name: Post summary
+        if: always()
+        run: |
+          echo "## ITP Demo Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Mode:** ${{ inputs.mode }}" >> $GITHUB_STEP_SUMMARY
+          echo "**User:** ${{ inputs.user_email }}" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ inputs.mode }}" == "quick" ]; then
+            echo "**Risk Level:** ${{ inputs.risk_level }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Quick mode sets user risk via admin API." >> $GITHUB_STEP_SUMMARY
+            echo "System log will show: *Admin reported user risk*" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ inputs.mode }}" == "real" ]; then
+            echo "**Attacker Region:** ${{ inputs.attacker_region }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Real mode performs session hijacking simulation." >> $GITHUB_STEP_SUMMARY
+            echo "System log will show: *Session hijacking detected*" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ inputs.mode }}" == "ssf" ]; then
+            echo "**SSF Risk Level:** ${{ inputs.ssf_risk_level }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "SSF mode sends a security event via Shared Signals Framework." >> $GITHUB_STEP_SUMMARY
+            echo "System log will show: *Security events provider reported risk*" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -n "$PRESIGNED_URL" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Demo Video" >> $GITHUB_STEP_SUMMARY
+            echo "[$PRESIGNED_URL]($PRESIGNED_URL)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Output" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat demo.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

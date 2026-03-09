@@ -1,0 +1,130 @@
+name: ITP - Monitor Events
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (must match environments/ directory name)'
+        required: true
+        type: string
+        default: 'myorg'
+      duration_seconds:
+        description: 'Monitoring duration in seconds'
+        required: false
+        default: '120'
+        type: string
+      user_filter:
+        description: 'Filter by user email (optional)'
+        required: false
+        type: string
+      event_types:
+        description: 'Comma-separated event types (optional, default: all ITP events)'
+        required: false
+        type: string
+
+jobs:
+  monitor-events:
+    name: Monitor ITP Events
+    runs-on: ubuntu-latest
+
+    environment: ${{ inputs.environment }}
+
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Workflow Overview
+        run: |
+          echo "=================================================="
+          echo "  ITP EVENT MONITOR"
+          echo "=================================================="
+          echo ""
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Duration: ${{ inputs.duration_seconds }}s"
+          echo "User Filter: ${{ inputs.user_filter || 'None' }}"
+          echo "Event Types: ${{ inputs.event_types || 'All ITP events' }}"
+          echo "=================================================="
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Set up environment variables
+        env:
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+        run: |
+          echo "OKTA_ORG_NAME=${OKTA_ORG_NAME}" >> $GITHUB_ENV
+          echo "OKTA_BASE_URL=${OKTA_BASE_URL}" >> $GITHUB_ENV
+          echo "OKTA_API_TOKEN=${OKTA_API_TOKEN}" >> $GITHUB_ENV
+
+      - name: Monitor ITP events
+        run: |
+          ARGS="--duration ${{ inputs.duration_seconds }}"
+          ARGS="$ARGS --output events.json"
+
+          if [ -n "${{ inputs.user_filter }}" ]; then
+            ARGS="$ARGS --user ${{ inputs.user_filter }}"
+          fi
+
+          if [ -n "${{ inputs.event_types }}" ]; then
+            ARGS="$ARGS --event-types ${{ inputs.event_types }}"
+          fi
+
+          python3 scripts/monitor_itp_events.py $ARGS 2>&1 | tee monitor.log
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: itp-events-${{ inputs.environment }}-${{ github.run_number }}
+          path: |
+            monitor.log
+            events.json
+          retention-days: 30
+
+      - name: Post summary
+        if: always()
+        run: |
+          echo "## ITP Event Monitor Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Duration:** ${{ inputs.duration_seconds }}s" >> $GITHUB_STEP_SUMMARY
+
+          if [ -n "${{ inputs.user_filter }}" ]; then
+            echo "**User Filter:** ${{ inputs.user_filter }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f events.json ]; then
+            EVENT_COUNT=$(jq '. | length' events.json)
+            echo "**Events Captured:** ${EVENT_COUNT}" >> $GITHUB_STEP_SUMMARY
+
+            if [ "$EVENT_COUNT" -gt 0 ]; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### Events" >> $GITHUB_STEP_SUMMARY
+              echo '```json' >> $GITHUB_STEP_SUMMARY
+              jq '.[].eventType' events.json >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "**Events Captured:** 0" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Monitor Log" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat monitor.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

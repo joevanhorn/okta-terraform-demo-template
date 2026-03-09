@@ -1,0 +1,124 @@
+name: ITP - SSF Provider Setup
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (must match environments/ directory name)'
+        required: true
+        type: string
+        default: 'myorg'
+      provider_name:
+        description: 'Provider display name in Okta'
+        required: false
+        default: 'ITP Demo Signal Source'
+        type: string
+      ssm_prefix:
+        description: 'SSM parameter path prefix (default: /{environment}/itp/ssf-demo)'
+        required: false
+        type: string
+      aws_region:
+        description: 'AWS region for SSM operations'
+        required: false
+        default: 'us-east-1'
+        type: string
+
+jobs:
+  register-provider:
+    name: SSF Provider Registration
+    runs-on: ubuntu-latest
+
+    environment: ${{ inputs.environment }}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Workflow Overview
+        run: |
+          SSM_PREFIX="${{ inputs.ssm_prefix }}"
+          if [ -z "$SSM_PREFIX" ]; then
+            SSM_PREFIX="/${{ inputs.environment }}/itp/ssf-demo"
+          fi
+          echo "=================================================="
+          echo "  SSF PROVIDER REGISTRATION (Post-Terraform)"
+          echo "=================================================="
+          echo ""
+          echo "Environment:   ${{ inputs.environment }}"
+          echo "Provider Name: ${{ inputs.provider_name }}"
+          echo "SSM Prefix:    ${SSM_PREFIX}"
+          echo ""
+          echo "Prerequisites: terraform apply must have created"
+          echo "the Lambda JWKS endpoint and SSM parameters first."
+          echo "=================================================="
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests boto3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-SSFSetup
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Register SSF Provider with Okta
+        env:
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+        run: |
+          SSM_PREFIX="${{ inputs.ssm_prefix }}"
+          if [ -z "$SSM_PREFIX" ]; then
+            SSM_PREFIX="/${{ inputs.environment }}/itp/ssf-demo"
+          fi
+
+          cd scripts
+          python3 setup_ssf_provider.py \
+            --provider-name "${{ inputs.provider_name }}" \
+            --ssm-prefix "$SSM_PREFIX" \
+            --aws-region ${{ inputs.aws_region }} \
+            2>&1 | tee ../setup.log
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ssf-setup-${{ github.run_number }}
+          path: setup.log
+          retention-days: 30
+
+      - name: Post summary
+        if: always()
+        run: |
+          SSM_PREFIX="${{ inputs.ssm_prefix }}"
+          if [ -z "$SSM_PREFIX" ]; then
+            SSM_PREFIX="/${{ inputs.environment }}/itp/ssf-demo"
+          fi
+
+          echo "## SSF Provider Registration Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Provider Name:** ${{ inputs.provider_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**SSM Prefix:** ${SSM_PREFIX}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Setup Flow" >> $GITHUB_STEP_SUMMARY
+          echo "1. \`terraform apply\` — Lambda JWKS endpoint + RSA keys + SSM params" >> $GITHUB_STEP_SUMMARY
+          echo "2. This workflow — Register provider with Okta, update SSM config" >> $GITHUB_STEP_SUMMARY
+          echo "3. Run ITP Demo Trigger workflow with **ssf** mode to test" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Output" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat setup.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
