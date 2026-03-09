@@ -1,0 +1,193 @@
+name: ITP - Apply Entity Risk Policy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (must match environments/ directory name)'
+        required: true
+        type: string
+        default: 'myorg'
+      dry_run:
+        description: 'Dry run mode (show what would change without applying)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      delete_removed:
+        description: 'Delete rules that exist in Okta but not in config'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  apply-entity-risk-policy:
+    name: Apply Entity Risk Policy to Okta
+    runs-on: ubuntu-latest
+
+    environment: ${{ inputs.environment }}
+
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Workflow Overview
+        run: |
+          echo "=================================================="
+          echo "  APPLY ENTITY RISK POLICY TO OKTA"
+          echo "=================================================="
+          echo ""
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Dry Run: ${{ inputs.dry_run }}"
+          echo "Delete Removed: ${{ inputs.delete_removed }}"
+          echo "=================================================="
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Set up environment variables
+        env:
+          OKTA_API_TOKEN: ${{ secrets.OKTA_API_TOKEN }}
+          OKTA_ORG_NAME: ${{ secrets.OKTA_ORG_NAME }}
+          OKTA_BASE_URL: ${{ secrets.OKTA_BASE_URL }}
+        run: |
+          echo "OKTA_ORG_NAME=${OKTA_ORG_NAME}" >> $GITHUB_ENV
+          echo "OKTA_BASE_URL=${OKTA_BASE_URL}" >> $GITHUB_ENV
+          echo "OKTA_API_TOKEN=${OKTA_API_TOKEN}" >> $GITHUB_ENV
+
+      - name: Check config file
+        run: |
+          CONFIG_FILE="environments/${{ inputs.environment }}/config/entity_risk_policy.json"
+
+          if [ ! -f "$CONFIG_FILE" ]; then
+            echo "entity_risk_policy.json not found at $CONFIG_FILE"
+            echo "Run the import workflow first:"
+            echo "  gh workflow run itp-entity-risk-policy-import.yml -f environment=${{ inputs.environment }}"
+            exit 1
+          fi
+
+          echo "Found entity_risk_policy.json"
+          echo ""
+          echo "Policy:"
+          jq '.policy | {name, id, status}' "$CONFIG_FILE"
+          echo ""
+          echo "Rules:"
+          jq '.rules[] | {name, status, actions: .actions.entityRisk.actions}' "$CONFIG_FILE"
+
+      - name: Apply entity risk policy
+        id: apply
+        run: |
+          CONFIG_FILE="environments/${{ inputs.environment }}/config/entity_risk_policy.json"
+          ARGS="--config $CONFIG_FILE"
+
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
+            echo "Running in DRY RUN mode..."
+            ARGS="$ARGS --dry-run"
+          else
+            echo "Running in APPLY mode..."
+          fi
+
+          if [ "${{ inputs.delete_removed }}" == "true" ]; then
+            echo "Will delete rules not in config..."
+            ARGS="$ARGS --delete-removed"
+          fi
+
+          python3 scripts/apply_entity_risk_policy.py $ARGS 2>&1 | tee apply.log
+
+          APPLY_STATUS=$?
+          echo "apply_status=$APPLY_STATUS" >> $GITHUB_OUTPUT
+
+      - name: Parse results
+        id: results
+        run: |
+          CONFIG_FILE="environments/${{ inputs.environment }}/config/entity_risk_policy.json"
+          TOTAL=$(jq '.rules | length' "$CONFIG_FILE")
+          echo "total=$TOTAL" >> $GITHUB_OUTPUT
+
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
+            echo "dry_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [ "${{ steps.apply.outputs.apply_status }}" -eq 0 ]; then
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "success=false" >> $GITHUB_OUTPUT
+          fi
+
+          CREATE_COUNT=$(grep -c "CREATE:" apply.log || echo "0")
+          UPDATE_COUNT=$(grep -c "UPDATE:" apply.log || echo "0")
+          DELETE_COUNT=$(grep -c "DELETE:" apply.log || echo "0")
+
+          echo "create_count=$CREATE_COUNT" >> $GITHUB_OUTPUT
+          echo "update_count=$UPDATE_COUNT" >> $GITHUB_OUTPUT
+          echo "delete_count=$DELETE_COUNT" >> $GITHUB_OUTPUT
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: itp-apply-${{ inputs.environment }}-${{ github.run_number }}
+          path: apply.log
+          retention-days: 90
+
+      - name: Post summary
+        if: always()
+        run: |
+          echo "## Entity Risk Policy Apply Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.results.outputs.dry_run }}" == "true" ]; then
+            echo "**Mode:** Dry Run (no changes made)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Mode:** Apply (changes executed)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Operations" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Operation | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Create | ${{ steps.results.outputs.create_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Update | ${{ steps.results.outputs.update_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Delete | ${{ steps.results.outputs.delete_count }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Total Rules** | **${{ steps.results.outputs.total }}** |" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.results.outputs.success }}" == "true" ]; then
+            echo "**Status:** Completed successfully" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Status:** Completed with errors" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Full Log" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat apply.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.results.outputs.dry_run }}" == "true" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Next:** Re-run with dry_run=false to apply changes" >> $GITHUB_STEP_SUMMARY
+          fi

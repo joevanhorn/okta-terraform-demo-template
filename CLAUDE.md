@@ -103,6 +103,43 @@ gh workflow run oig-manage-entitlements.yml \
 
 See `docs/reference/workflow-reference.md` for the complete list of all workflows.
 
+### ITP Demo (Identity Threat Protection)
+
+```bash
+# Quick mode — set user risk via admin API (instant, no infrastructure)
+python3 scripts/trigger_itp_demo.py --mode quick \
+  --user user@example.com --risk-level HIGH --monitor --auto-reset
+
+# Real mode — session hijacking simulation (Lambda + Playwright)
+python3 scripts/trigger_itp_demo.py --mode real \
+  --user itp-demo-test@example.com \
+  --ssm-prefix /myorg/itp \
+  --attacker-lambda myorg-itp-session-replayer \
+  --attacker-region eu-west-1 --monitor --auto-reset
+
+# SSF mode — signed JWT security event signal
+python3 scripts/trigger_itp_demo.py --mode ssf \
+  --user user@example.com --risk-level HIGH \
+  --ssm-prefix /myorg/itp --monitor --auto-reset
+
+# Standalone event monitor
+python3 scripts/monitor_itp_events.py --duration 120 --user user@example.com
+
+# Via GitHub Actions (all modes)
+gh workflow run itp-demo-trigger.yml \
+  -f environment=myorg -f mode=quick \
+  -f user_email=user@example.com -f risk_level=HIGH
+
+# Entity risk policy management
+gh workflow run itp-entity-risk-policy-import.yml -f environment=myorg
+gh workflow run itp-entity-risk-policy-apply.yml -f environment=myorg -f dry_run=false
+
+# SSF provider registration (one-time)
+gh workflow run itp-ssf-provider-setup.yml -f environment=myorg
+```
+
+See `docs/guides/itp-demo.md` for full setup, architecture, and troubleshooting.
+
 ### Key Python Scripts
 
 ```bash
@@ -140,7 +177,7 @@ See `docs/reference/api-management.md` for the complete Python scripts reference
 .
 ├── environments/               # Multi-tenant configurations (one dir per org)
 ├── scripts/                    # Python automation (import, sync, apply)
-├── modules/                    # Reusable Terraform modules
+├── modules/                    # Reusable Terraform modules (incl. itp-demo)
 ├── demo-builder/               # Demo environment generator (see demo-builder/README.md)
 ├── ai-assisted/                # AI code generation tools (see ai-assisted/README.md)
 ├── backup-restore/             # Backup and disaster recovery
