@@ -1,51 +1,73 @@
 # Demo Builder
 
-Generate complete Okta demo environments from a simple YAML configuration file.
+Generate and deploy complete Okta demo environments — users, groups, apps, governance, infrastructure, and more.
 
-## Quick Start
+## Quick Start (Recommended)
+
+The fastest way to build a demo is the **Worksheet + Claude Code** approach:
+
+1. Fill out `DEMO_WORKSHEET.md` with your demo requirements
+2. Open Claude Code in this repository root
+3. Paste this prompt:
+
+   ```
+   I have a completed Demo Deployment Worksheet. Please deploy the full
+   environment following the instructions in
+   ai-assisted/prompts/deploy_full_environment.md.
+
+   HERE IS MY COMPLETED WORKSHEET:
+   [Paste your filled worksheet here]
+   ```
+
+4. Claude Code will generate Terraform, deploy via GitHub workflows, configure governance, and validate — prompting you before each apply
+
+This approach handles **everything**: Okta resources, OIG governance, lifecycle management, AD infrastructure, database connectors, OPC agents, SCIM servers, OPA privileged access, ITP demos, and SAML federation.
+
+## What Gets Deployed
+
+The worksheet covers 14 sections across 6 categories:
+
+| Category | Sections | What's Created |
+|----------|----------|---------------|
+| **Okta Basics** | 1-4 | Users, groups, apps, policies |
+| **Governance** | 5-6 | Entitlement bundles, access reviews, lifecycle management |
+| **Security** | 7-8 | Sign-on/password policies, ITP demo |
+| **Infrastructure** | 9-12 | AD, database, OPC agents, SCIM, OPA |
+| **Advanced** | 13 | SAML federation |
+| **Deployment** | 14 | AWS backend, GitHub secrets |
+
+Only Sections 1-4 are required. Everything else is opt-in.
+
+## Alternative Approaches
+
+### Pre-built Industry Examples
+
+Browse `examples/` for industry-specific configurations to use as inspiration:
+
+- `examples/financial-services-demo.yaml` — Bank/fintech with SOX compliance
+- `examples/healthcare-demo.yaml` — Healthcare with HIPAA compliance
+- `examples/technology-company-demo.yaml` — SaaS with SOC2 compliance
+
+These YAML configs work with `build_demo.py` for basic Okta resource generation (users, groups, apps). For full environment deployment including infrastructure, use the worksheet approach above.
+
+### Legacy: build_demo.py (Deprecated)
+
+> **Note:** `build_demo.py` generates basic Okta resources only (users, groups, apps, OIG bundles). It does not deploy infrastructure, configure governance APIs, or set up ITP demos. Use the Worksheet + Claude Code approach for full deployments.
 
 ```bash
-# 1. Copy the template
+# Copy template
 cp demo-builder/demo-config.yaml.template demo-builder/my-demo.yaml
 
-# 2. Edit your configuration
+# Edit configuration
 vim demo-builder/my-demo.yaml
 
-# 3. Generate Terraform files
+# Generate Terraform files
 python scripts/build_demo.py --config demo-builder/my-demo.yaml
 
-# 4. Apply to Okta
+# Apply to Okta
 cd environments/myorg/terraform
 terraform init && terraform plan && terraform apply
 ```
-
-## Three Ways to Build a Demo
-
-### Option 1: Edit Config Directly
-
-Best for: Technical users comfortable with YAML
-
-1. Copy `demo-config.yaml.template` to your own config file
-2. Edit the YAML to define your users, groups, and apps
-3. Run `build_demo.py` to generate Terraform
-
-### Option 2: Use the Worksheet + AI
-
-Best for: Non-technical users, complex demos
-
-1. Fill out `DEMO_WORKSHEET.md` with your requirements
-2. Paste to AI (ChatGPT, Claude, Gemini) with the prompt from `ai-assisted/prompts/generate_demo_config.md`
-3. Save the generated YAML config
-4. Run `build_demo.py` to generate Terraform
-
-### Option 3: Use Pre-built Examples
-
-Best for: Quick demos, industry-specific scenarios
-
-1. Browse `examples/` for pre-built configurations
-2. Copy one as your starting point
-3. Customize as needed
-4. Run `build_demo.py` to generate Terraform
 
 ## Configuration Reference
 
@@ -56,7 +78,6 @@ environment:
   name: "myorg"                        # Directory name (environments/myorg/terraform)
   description: "My Demo"               # Human-readable description
   email_domain: "example.com"          # Domain for auto-generated emails
-  # email_domain: "dept.company.com"   # Subdomains are supported
 ```
 
 ### Departments and Users
@@ -166,7 +187,7 @@ output:
   validate_on_generate: true
 ```
 
-## CLI Reference
+## CLI Reference (build_demo.py)
 
 ```bash
 # Basic generation
@@ -188,17 +209,6 @@ python scripts/build_demo.py --config my-demo.yaml --schema-check
 python scripts/build_demo.py --config my-demo.yaml --no-backup
 ```
 
-### Backup Behavior
-
-When overwriting existing files, the generator creates backups with timestamps:
-
-```
-users.tf                        # Current file
-users.tf.bak.20251222190443     # Backup from Dec 22, 2024 at 19:04:43
-```
-
-Use `--no-backup` to skip creating backup files.
-
 ## Generated Files
 
 When `separate_files: true`:
@@ -211,29 +221,6 @@ environments/myorg/terraform/
 ├── apps.tf               # okta_app_oauth resources
 ├── app_assignments.tf    # okta_app_group_assignment resources
 └── oig.tf                # okta_entitlement_bundle, okta_reviews
-```
-
-When `separate_files: false`:
-
-```
-environments/myorg/terraform/
-└── demo.tf               # All resources in one file
-```
-
-## Validation
-
-The generator validates your config against a JSON schema:
-
-- Required fields present
-- Valid email formats
-- Valid application types
-- Valid date formats for access reviews
-- Group references exist
-
-To validate without generating:
-
-```bash
-python scripts/build_demo.py --config my-demo.yaml --schema-check
 ```
 
 ## Examples
@@ -295,10 +282,10 @@ python scripts/build_demo.py --config /path/to/my-demo.yaml
 You must have at least one department with a manager. Empty departments arrays are not allowed:
 
 ```yaml
-# ❌ Invalid
+# Invalid
 departments: []
 
-# ✅ Valid - at least one department required
+# Valid - at least one department required
 departments:
   - name: "General"
     manager:
@@ -317,12 +304,7 @@ Check your YAML syntax. Common issues:
 
 ### "Invalid application type"
 
-Application type must be one of:
-- `oauth_web` - Server-side web applications
-- `oauth_spa` - Single page applications
-- `oauth_service` - Machine-to-machine / API
-- `oauth_native` - Mobile / desktop apps
-- `saml` - SAML enterprise SSO
+Application type must be one of: `oauth_web`, `oauth_spa`, `oauth_service`, `oauth_native`, `saml`
 
 ### "Group not found for app"
 
@@ -330,48 +312,14 @@ Ensure the group name in `assign_to_groups` matches either:
 - A department name (creates `{Department} Team` group)
 - An additional group name in `groups.additional`
 
-### Generated code has syntax errors
-
-Run with `--validate` to check:
-
-```bash
-python scripts/build_demo.py --config my-demo.yaml --validate
-```
-
-## Integration with GitOps
-
-The demo builder integrates with the GitOps workflow:
-
-1. **Generate locally:**
-   ```bash
-   python scripts/build_demo.py --config demo-builder/my-demo.yaml
-   ```
-
-2. **Create a PR:**
-   ```bash
-   git checkout -b feature/new-demo
-   git add environments/myorg/terraform/
-   git commit -m "feat: Add new demo environment"
-   git push -u origin feature/new-demo
-   gh pr create
-   ```
-
-3. **Automated validation:**
-   - PR triggers `terraform plan`
-   - Review the plan in PR comments
-
-4. **Apply after merge:**
-   - Merge PR to main
-   - Trigger `tf-apply.yml` workflow
-
 ## File Structure
 
 ```
 demo-builder/
 ├── README.md                      # This file
-├── demo-config.yaml.template      # Full template with all options
+├── demo-config.yaml.template      # YAML template (for build_demo.py)
 ├── demo-config.schema.json        # JSON schema for validation
-├── DEMO_WORKSHEET.md              # Fill-in-the-blanks questionnaire
+├── DEMO_WORKSHEET.md              # Deployment worksheet (for Claude Code)
 └── examples/
     ├── healthcare-demo.yaml
     ├── financial-services-demo.yaml
@@ -381,6 +329,7 @@ demo-builder/
 
 ## Related Documentation
 
+- [deploy_full_environment.md](../ai-assisted/prompts/deploy_full_environment.md) - Full deployment prompt for Claude Code
 - [TERRAFORM-BASICS.md](../TERRAFORM-BASICS.md) - Terraform patterns and examples
 - [DEMO_GUIDE.md](../DEMO_GUIDE.md) - Demo building strategies
 - [ai-assisted/](../ai-assisted/) - AI-assisted code generation
