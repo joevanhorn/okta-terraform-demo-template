@@ -332,6 +332,66 @@ Or use the `opa-install-agents.yml` workflow to automate via SSM.
 
 Both providers share the same S3 backend state. OPA resources are in `opa_*.tf` files for easy identification.
 
+## Active Directory Integration
+
+OPA can manage privileged access to Active Directory domain controllers and AD-joined servers. The `opa_ad_integration.tf.example` file provides a complete, production-tested configuration.
+
+### Architecture
+
+```
+Okta (SaaS) <-> OPA Gateway <-> Active Directory Domain Controller
+                                        ↓
+                                   AD Users/Groups (synced to OPA)
+```
+
+### Prerequisites
+
+1. OPA provider enabled in `provider.tf` (see Quick Start above)
+2. AD infrastructure deployed (use `modules/ad-domain-controller` or existing AD)
+3. OPA Gateway installed with network access to AD domain controllers
+4. OPA secrets configured in GitHub Environment
+
+### Resources Provided
+
+| Resource | Type | Purpose |
+|----------|------|---------|
+| Gateway setup token | `oktapam_gateway_setup_token` | Activate gateway for AD connectivity |
+| Resource group | `oktapam_resource_group` | Organize AD-related servers |
+| Project | `oktapam_resource_group_project` | AD server enrollment with RDP/SSH recording |
+| Enrollment token | `oktapam_resource_group_server_enrollment_token` | Enroll domain controllers in OPA |
+| AD connection | `oktapam_ad_connection` | Connect OPA to AD domain |
+| User sync task | `oktapam_ad_user_sync_task_settings` | Auto-sync AD users to OPA |
+| Account discovery | `oktapam_ad_task_settings` | Discover accounts in specific OUs |
+| Groups | `oktapam_group` | AD-Administrators, AD-Helpdesk |
+| Sudo bundle | `oktapam_sudo_command_bundle` | AD management commands (realm, adcli, sssctl) |
+| Security policies | `oktapam_security_policy_v2` | Tiered access: admin + helpdesk |
+| Password settings | `oktapam_password_settings` | Rotation for AD service accounts |
+| Secret folders | `oktapam_secret_folder` | Secure storage for AD credentials |
+| Secrets | `oktapam_secret` | Service account and DSRM passwords |
+
+### Setup
+
+```bash
+# Copy the example file and customize
+cp environments/myorg/terraform/opa_ad_integration.tf.example \
+   environments/myorg/terraform/opa_ad_integration.tf
+
+# Uncomment the resources you need
+# Edit gateway_id, domain settings, and service account credentials
+# Add required variables to variables.tf (templates provided in the file)
+
+# Plan and apply
+gh workflow run opa-plan.yml -f environment=myorg
+gh workflow run opa-apply.yml -f environment=myorg
+```
+
+### Key Notes
+
+- The `gateway_id` in `oktapam_ad_connection` must be obtained from the OPA Console after gateway installation — it cannot be retrieved via Terraform
+- The AD connection service account needs read access for user/group sync; password reset permissions are needed only if enabling password rotation
+- For Linux servers joined to AD via SSSD/realmd, use the AD management sudo bundle (realm, adcli, sssctl commands)
+- Security policies follow the same schema rules documented above (password checkout before SSH, `type = "default"`, etc.)
+
 ## References
 
 - [Okta PAM Provider - Terraform Registry](https://registry.terraform.io/providers/okta/oktapam/latest/docs)
