@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
+# ⚠️ DEPRECATED: This script generates basic Okta resources only.
+# For full environment deployment (infrastructure, ITP, OPA, lifecycle management),
+# use the Demo Deployment Worksheet with Claude Code instead:
+#   1. Fill out demo-builder/DEMO_WORKSHEET.md
+#   2. Follow ai-assisted/prompts/deploy_full_environment.md
 """
 Okta Demo Builder - Generate Terraform files from YAML configuration.
+
+DEPRECATED: Use the Demo Deployment Worksheet with Claude Code for full
+environment deployment. This script only generates basic Okta resources
+(users, groups, apps, OIG bundles). See demo-builder/DEMO_WORKSHEET.md.
 
 Usage:
     python scripts/build_demo.py --config demo-builder/demo-config.yaml
@@ -760,6 +769,11 @@ def run_terraform_validate(output_dir: Path) -> bool:
 # =============================================================================
 
 def main():
+    print("WARNING: build_demo.py is deprecated. Use the Demo Deployment Worksheet")
+    print("with Claude Code for full environment deployment including infrastructure.")
+    print("See: demo-builder/DEMO_WORKSHEET.md")
+    print()
+
     parser = argparse.ArgumentParser(
         description="Generate Terraform files from Okta demo configuration",
         formatter_class=argparse.RawDescriptionHelpFormatter,

@@ -2,13 +2,15 @@
 # OKTA DEMO CONFIGURATION TEMPLATE
 # =============================================================================
 #
+# ⚠️ DEPRECATED: This template is for use with build_demo.py which is deprecated.
+# For full environment deployment, use the Demo Deployment Worksheet with Claude Code:
+#   1. Fill out demo-builder/DEMO_WORKSHEET.md
+#   2. Follow ai-assisted/prompts/deploy_full_environment.md
+#
 # This file defines your complete Okta demo environment. Fill in the sections
 # below and run the generator to create Terraform files:
 #
 #   python scripts/build_demo.py --config demo-builder/demo-config.yaml
-#
-# For AI-assisted generation, fill out DEMO_WORKSHEET.md and paste to your
-# AI assistant with the prompt in ai-assisted/prompts/generate_demo_config.md
 #
 # =============================================================================
 
