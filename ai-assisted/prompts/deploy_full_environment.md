@@ -174,11 +174,18 @@ gh run list --workflow=tf-apply.yml --limit 1
 
 Generate from Section 5:
 
-- `okta_entitlement_bundle` for each bundle in the table
-- `okta_access_review_campaign` for each campaign
-- Set `status = "ACTIVE"` on bundles
+- `okta_access_review_campaign` for each campaign in the table
 
-CRITICAL: Entitlement values must be alphabetically ordered by `external_value` (see CLAUDE.md gotcha #11).
+NOTE: Entitlement bundles are NOT generated at this stage. Bundles are per-app and
+reference specific entitlement values that must first be synced into each application.
+Bundle creation happens after:
+1. Apps are deployed and entitlement management is enabled (see Entitlement Management Settings below)
+2. Entitlements are imported/synced from their source (SCIM, Generic DB Connector, Okta integration)
+3. The user creates bundles in Okta Admin UI or adds `okta_entitlement_bundle` resources to Terraform
+   referencing specific app entitlements (see `RESOURCE_EXAMPLES.tf` for the pattern)
+
+CRITICAL: When creating `okta_entitlement_bundle` resources in Terraform, entitlement values must
+be alphabetically ordered by `external_value` (see CLAUDE.md gotcha #11).
 
 #### Deploy OIG Resources
 
@@ -226,19 +233,24 @@ Or via workflow:
 gh workflow run labels-apply.yml -f label_type=admin -f environment={env_name} -f dry_run=false
 ```
 
-#### Entitlement Management Settings (if enabled)
+#### Entitlement Management Settings
 
-If "Auto-enable entitlement management on apps" is Yes:
+Enable entitlement management on each app marked "Yes" in the worksheet's Entitlement Management table.
+This is a prerequisite for entitlement import/sync and bundle creation.
 
 ```bash
 python3 scripts/manage_entitlement_settings.py --action list    # Review current state
 
+# Enable on specific apps, or use auto mode to enable on all eligible apps
 gh workflow run oig-manage-entitlements.yml \
   -f mode=auto -f environment={env_name} -f dry_run=true    # PAUSE — review
 
 gh workflow run oig-manage-entitlements.yml \
   -f mode=auto -f environment={env_name} -f dry_run=false
 ```
+
+After entitlements are synced into apps (via Okta integration, SCIM, or DB Connector), the user
+can create entitlement bundles in Okta Admin UI or add `okta_entitlement_bundle` Terraform resources.
 
 #### Risk Rules (if enabled)
 
@@ -266,9 +278,13 @@ gh workflow run oig-risk-rules-apply.yml -f environment={env_name} -f dry_run=fa
 
 Print a notice:
 ```
-MANUAL STEP REQUIRED: Entitlement bundle assignments (which users/groups receive
-which bundles) must be configured in Okta Admin UI:
-  Admin Console → Identity Governance → Entitlement Bundles → [Bundle] → Assignments
+MANUAL STEPS REQUIRED after entitlements sync into apps:
+  1. Create entitlement bundles referencing specific app entitlements:
+     Admin Console → Identity Governance → Entitlement Bundles → Create Bundle
+     (Or add okta_entitlement_bundle resources to Terraform — see RESOURCE_EXAMPLES.tf)
+  2. Assign bundles to users/groups:
+     Admin Console → Identity Governance → Entitlement Bundles → [Bundle] → Assignments
+     (Bundle assignments are NOT managed by Terraform)
 ```
 
 ### Phase 4: Lifecycle Management (if Section 6 enabled)
@@ -811,7 +827,7 @@ RESOURCES CREATED:
   Policies:    {policy_count}
 
 GOVERNANCE (if enabled):
-  Bundles:     {bundle_count}
+  Entitlement-enabled apps: {entitlement_app_count}
   Campaigns:   {campaign_count}
   Owners:      {owner_status}
   Labels:      {label_status}
@@ -831,6 +847,7 @@ DEMO COMMANDS:
   ITP Real:    python3 scripts/trigger_itp_demo.py --mode real --user {email} --password-ssm /{env}/itp-demo/password --totp-ssm /{env}/itp-demo/totp-secret --monitor --auto-reset
 
 MANUAL FOLLOW-UP STEPS:
+  [ ] Create entitlement bundles after entitlements sync into apps (Admin UI or Terraform)
   [ ] Assign entitlement bundles to users/groups in Okta Admin UI
   [ ] Activate AD Agent (if deployed) — interactive browser login required
   [ ] Activate OPC Agent (if deployed) — interactive browser login required
@@ -875,7 +892,9 @@ These rules MUST be followed during deployment:
 - OPA API host is NOT `app.scaleft.com` — use `OKTAPAM_API_HOST` secret
 
 ### Governance Rules
-- Entitlement bundle assignments are MANUAL (Okta Admin UI) — Terraform manages definitions only
+- Entitlement bundles are per-app — they reference specific entitlement values synced into each application
+- Bundles can only be created AFTER entitlements are synced into apps (not before)
+- Bundle creation and user/group assignments are MANUAL (Okta Admin UI) or via Terraform (see RESOURCE_EXAMPLES.tf)
 - Resource owners and labels use Python scripts (not Terraform provider)
 - Labels use two-phase workflow (validate on PR, apply on merge)
 - Store credentials as SSM SecureString only

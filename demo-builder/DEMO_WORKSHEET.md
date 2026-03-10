@@ -117,17 +117,28 @@ Department groups are auto-created from Section 2. Define additional groups here
 Yes
 ```
 
-#### Entitlement Bundles
+#### Entitlement Management
 
-| Bundle Name | Description | Status |
-|-------------|-------------|--------|
-| Standard Employee Access | Slack, email, HR portal | ACTIVE |
-| Engineering Tools | GitHub, CI/CD, cloud consoles | ACTIVE |
-| Manager Toolkit | Reporting dashboards, approval tools | ACTIVE |
-| Finance Systems | ERP, expense management, payroll | ACTIVE |
-| Privileged IT Access | Admin consoles, server access | ACTIVE |
+Entitlement bundles are built **per-app** from entitlement values that are synced into each application. The workflow is:
 
-Note: Bundle-to-user/group assignments are manual in Okta Admin UI after deployment.
+1. Apps are deployed (Section 4)
+2. Entitlement management is enabled on each app (API call)
+3. Entitlements are imported/synced from their source (SCIM connector, Generic DB Connector, etc.)
+4. Bundles are created in Okta Admin UI or Terraform, referencing specific app entitlements
+
+Which apps from Section 4 should have entitlement management enabled?
+
+| App Name | Enable Entitlements? | Entitlement Source |
+|----------|---------------------|-------------------|
+| Salesforce | Yes | Okta integration (automatic) |
+| Slack | No | — |
+| GitHub | No | — |
+| ServiceNow | Yes | Okta integration (automatic) |
+| Workday | Yes | Okta integration (automatic) |
+
+**Entitlement source options**: `Okta integration (automatic)`, `SCIM server (Section 11)`, `Generic DB Connector (Section 10)`, `Manual`
+
+Note: Entitlement bundles are created **after** entitlements are synced into apps — not before. Bundle definitions and user/group assignments are managed in Okta Admin UI or via Terraform once entitlements are available. See `RESOURCE_EXAMPLES.tf` for the `okta_entitlement_bundle` Terraform pattern.
 
 #### Access Review Campaigns
 
