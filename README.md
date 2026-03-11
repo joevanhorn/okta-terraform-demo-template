@@ -128,7 +128,7 @@ All documentation lives in the `docs/` directory, organized by topic:
 |---|---|
 | [Getting Started](docs/getting-started/README.md) | Setup guides, prerequisites, backend configuration, directory structure |
 | [Guides](docs/guides/demo-building.md) | Demo building, cross-org migration, lifecycle management, rollback procedures |
-| [Infrastructure](docs/infrastructure/active-directory.md) | Active Directory, OPA, SCIM server, OAG, ITP demo deployment |
+| [Infrastructure](modules/ad-domain-controller/docs/active-directory.md) | Active Directory, OPA, SCIM server, OAG, ITP demo deployment |
 | [Governance](docs/governance/labels.md) | Labels, entitlements, label workflows, GitOps value proposition |
 | [Reference](docs/reference/workflow-reference.md) | Terraform basics, workflow reference, API management, provider coverage |
 | [Troubleshooting](docs/troubleshooting/general.md) | Common issues, entitlement bundle errors, workflow fixes |

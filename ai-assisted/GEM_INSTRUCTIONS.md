@@ -1070,7 +1070,7 @@ provider "aws" {
 
 ### SCIM Server Main Infrastructure Pattern
 
-**Reference existing file**: `environments/myorg/infrastructure/scim-server/main.tf` has complete working example.
+**Reference existing file**: `modules/scim-server/main.tf` has complete working example.
 
 **Key components to include:**
 
@@ -1164,7 +1164,7 @@ output "scim_app_id" {
 output "scim_configuration_command" {
   description = "Command to configure SCIM connection via Python script"
   value       = <<-EOT
-    python3 scripts/configure_scim_app.py \
+    python3 modules/scim-server/scripts/configure_scim_app.py \
       --app-id $${okta_app_auto_login.scim_demo.id} \
       --scim-url $${data.terraform_remote_state.scim_server.outputs.scim_base_url} \
       --test-connection
@@ -1179,7 +1179,7 @@ output "scim_configuration_command" {
 After `terraform apply`, users **MUST** run Python script:
 
 ```bash
-python3 scripts/configure_scim_app.py \
+python3 modules/scim-server/scripts/configure_scim_app.py \
   --app-id <app_id> \
   --scim-url <scim_base_url> \
   --scim-token <bearer_token> \
@@ -1249,7 +1249,7 @@ variable "scim_app_label" {
 
 Generate TWO sets of files:
 
-**Set 1**: `environments/myorg/infrastructure/scim-server/`
+**Set 1**: `modules/scim-server/`
 - provider.tf (AWS with S3 backend)
 - variables.tf (domain, tokens, custom healthcare roles)
 - main.tf (EC2, security groups, Route53)
@@ -1263,7 +1263,7 @@ Generate TWO sets of files:
 **Include in comments**:
 ```
 # IMPORTANT: After terraform apply, configure SCIM connection:
-# python3 ../../scripts/configure_scim_app.py \
+# python3 ../../modules/scim-server/scripts/configure_scim_app.py \
 #   --app-id <from terraform output> \
 #   --scim-url <from infrastructure output> \
 #   --scim-token <from variables> \

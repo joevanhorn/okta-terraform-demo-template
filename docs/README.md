@@ -28,7 +28,7 @@ Manage entitlements, labels, risk rules, and resource owners as code.
 | Label Workflow | [label-workflow.md](governance/label-workflow.md) | Two-phase GitOps workflow for labels (validate then apply) |
 | Labels API | [labels-api-validation.md](governance/labels-api-validation.md) | API validation details and endpoint reference |
 | Risk Rules | [gitops-value.md](governance/gitops-value.md) | GitOps value proposition for governance features |
-| SCIM Entitlements | [scim-entitlement-discovery.md](governance/scim-entitlement-discovery.md) | Surface app entitlements via SCIM 2.0 server |
+| SCIM Entitlements | [scim-entitlement-discovery.md](../modules/scim-server/docs/scim-entitlement-discovery.md) | Surface app entitlements via SCIM 2.0 server |
 
 ---
 
@@ -38,15 +38,15 @@ Deploy and manage supporting infrastructure for Okta integrations.
 
 | Topic | Doc | Description |
 |-------|-----|-------------|
-| Active Directory | [active-directory.md](infrastructure/active-directory.md) | Deploy Windows AD DCs on AWS, Okta AD Agent |
-| Generic DB Connector | [generic-db-connector.md](infrastructure/generic-db-connector.md) | PostgreSQL RDS, OPC agents, JML lifecycle |
-| OPA (Privileged Access) | [opa-privileged-access.md](infrastructure/opa-privileged-access.md) | OPA gateway, security policies, server enrollment |
-| OPC Agents | [opc-agents.md](infrastructure/opc-agents.md) | On-premises connector agent deployment |
-| SCIM Server | [scim-server.md](infrastructure/scim-server.md) | On-prem SCIM server setup and configuration |
-| OAG Deployment | [oag-deployment.md](infrastructure/oag-deployment.md) | Okta Access Gateway deployment |
-| OAG API | [oag-api.md](infrastructure/oag-api.md) | OAG application management API |
-| ITP Demo | [itp-demo.md](guides/itp-demo.md) | Identity Threat Protection demo automation |
-| ITP AWS Requirements | [itp-aws-requirements.md](infrastructure/itp-aws-requirements.md) | AWS infrastructure for ITP demo |
+| Active Directory | [active-directory.md](../modules/ad-domain-controller/docs/active-directory.md) | Deploy Windows AD DCs on AWS, Okta AD Agent |
+| Generic DB Connector | [generic-db-connector.md](../modules/generic-db-connector/docs/generic-db-connector.md) | PostgreSQL RDS, OPC agents, JML lifecycle |
+| OPA (Privileged Access) | [opa-privileged-access.md](../modules/opa/docs/opa-privileged-access.md) | OPA gateway, security policies, server enrollment |
+| OPC Agents | [opc-agents.md](../modules/opc-agent/docs/opc-agents.md) | On-premises connector agent deployment |
+| SCIM Server | [scim-server.md](../modules/scim-server/docs/scim-server.md) | On-prem SCIM server setup and configuration |
+| OAG Deployment | [oag-deployment.md](../modules/oag/docs/oag-deployment.md) | Okta Access Gateway deployment |
+| OAG API | [oag-api.md](../modules/oag/docs/oag-api.md) | OAG application management API |
+| ITP Demo | [itp-demo.md](../modules/itp-demo/docs/itp-demo.md) | Identity Threat Protection demo automation |
+| ITP AWS Requirements | [itp-aws-requirements.md](../modules/itp-demo/docs/itp-aws-requirements.md) | AWS infrastructure for ITP demo |
 
 ---
 
@@ -57,12 +57,12 @@ Step-by-step guides for common tasks.
 | Topic | Doc | Description |
 |-------|-----|-------------|
 | Demo Building | [demo-building.md](guides/demo-building.md) | Build demos from YAML configs with AI assistance |
-| Lifecycle Management | [lifecycle-management.md](guides/lifecycle-management.md) | Joiner/Mover/Leaver automation |
-| SAML Federation | [saml-federation.md](guides/saml-federation.md) | Reusable SAML app module |
+| Lifecycle Management | [lifecycle-management.md](../modules/lifecycle-management/docs/lifecycle-management.md) | Joiner/Mover/Leaver automation |
+| SAML Federation | [saml-federation.md](../modules/saml-federation/docs/saml-federation.md) | Reusable SAML app module |
 | Cross-Org Migration | [cross-org-migration.md](guides/cross-org-migration.md) | Copy groups, memberships, grants between tenants |
 | Rollback | [rollback.md](guides/rollback.md) | Backup and restore procedures |
 | Demo Platform | [demo-platform-integration.md](guides/demo-platform-integration.md) | Integration with Okta demo platform |
-| ITP Demo | [itp-demo.md](guides/itp-demo.md) | Session hijacking simulation, SSF signals, risk policies |
+| ITP Demo | [itp-demo.md](../modules/itp-demo/docs/itp-demo.md) | Session hijacking simulation, SSF signals, risk policies |
 
 ---
 

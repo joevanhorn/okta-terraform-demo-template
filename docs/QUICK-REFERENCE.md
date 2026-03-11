@@ -59,7 +59,7 @@ terraform apply           # Apply (with approval)
 | `scripts/apply_risk_rules.py` | Apply risk rules / SOD policies |
 | `scripts/manage_entitlement_settings.py` | Enable/disable entitlement management on apps |
 | `scripts/build_demo.py` | Generate Terraform from YAML config |
-| `scripts/trigger_itp_demo.py` | ITP demo trigger (quick/real/ssf modes) |
+| `modules/itp-demo/scripts/trigger_itp_demo.py` | ITP demo trigger (quick/real/ssf modes) |
 
 ---
 

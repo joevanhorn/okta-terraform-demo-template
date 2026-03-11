@@ -66,7 +66,7 @@ Reusable Terraform module for JML (Joiner/Mover/Leaver) lifecycle management:
 - ✅ OIG integration: entitlement bundles, review campaigns
 - ✅ Group rules for automatic assignment
 - ✅ Comprehensive documentation (`docs/LIFECYCLE_MANAGEMENT.md`)
-- ✅ AI prompt template (`ai-assisted/prompts/setup_lifecycle_management.md`)
+- ✅ AI prompt template (`modules/lifecycle-management/docs/setup_lifecycle_management.md`)
 
 **Completed:** 2026-01-06
 
@@ -80,7 +80,7 @@ Reusable Terraform module for SAML federation:
 - ✅ JIT provisioning and account linking
 - ✅ IdP discovery routing rules
 - ✅ Comprehensive documentation (`docs/SAML_FEDERATION.md`)
-- ✅ AI prompt template (`ai-assisted/prompts/setup_saml_federation.md`)
+- ✅ AI prompt template (`modules/saml-federation/docs/setup_saml_federation.md`)
 
 **Completed:** 2026-01-06
 

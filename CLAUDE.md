@@ -107,23 +107,23 @@ See `docs/reference/workflow-reference.md` for the complete list of all workflow
 
 ```bash
 # Quick mode — set user risk via admin API (instant, no infrastructure)
-python3 scripts/trigger_itp_demo.py --mode quick \
+python3 modules/itp-demo/scripts/trigger_itp_demo.py --mode quick \
   --user user@example.com --risk-level HIGH --monitor --auto-reset
 
 # Real mode — session hijacking simulation (Lambda + Playwright)
-python3 scripts/trigger_itp_demo.py --mode real \
+python3 modules/itp-demo/scripts/trigger_itp_demo.py --mode real \
   --user itp-demo-test@example.com \
   --ssm-prefix /myorg/itp \
   --attacker-lambda myorg-itp-session-replayer \
   --attacker-region eu-west-1 --monitor --auto-reset
 
 # SSF mode — signed JWT security event signal
-python3 scripts/trigger_itp_demo.py --mode ssf \
+python3 modules/itp-demo/scripts/trigger_itp_demo.py --mode ssf \
   --user user@example.com --risk-level HIGH \
   --ssm-prefix /myorg/itp --monitor --auto-reset
 
 # Standalone event monitor
-python3 scripts/monitor_itp_events.py --duration 120 --user user@example.com
+python3 modules/itp-demo/scripts/monitor_itp_events.py --duration 120 --user user@example.com
 
 # Via GitHub Actions (all modes)
 gh workflow run itp-demo-trigger.yml \
@@ -138,7 +138,7 @@ gh workflow run itp-entity-risk-policy-apply.yml -f environment=myorg -f dry_run
 gh workflow run itp-ssf-provider-setup.yml -f environment=myorg
 ```
 
-See `docs/guides/itp-demo.md` for full setup, architecture, and troubleshooting.
+See `modules/itp-demo/docs/itp-demo.md` for full setup, architecture, and troubleshooting.
 
 ### Key Python Scripts
 
@@ -175,14 +175,14 @@ See `docs/reference/api-management.md` for the complete Python scripts reference
 
 ```
 .
+├── modules/                    # Self-contained feature packages (terraform, scripts, docs, examples)
 ├── environments/               # Multi-tenant configurations (one dir per org)
-├── scripts/                    # Python automation (import, sync, apply)
-├── modules/                    # Reusable Terraform modules (incl. itp-demo)
-├── demo-builder/               # Demo environment generator (see demo-builder/README.md)
+├── scripts/                    # OIG/governance Python automation (import, sync, apply)
+├── docs/                       # Cross-cutting documentation (getting-started, reference, troubleshooting)
 ├── ai-assisted/                # AI code generation tools (see ai-assisted/README.md)
+├── demo-builder/               # Demo environment generator (see demo-builder/README.md)
 ├── backup-restore/             # Backup and disaster recovery
-├── docs/                       # Comprehensive documentation
-├── testing/                    # Validation guides
+├── aws-backend/                # AWS S3/DynamoDB backend setup
 └── .github/workflows/          # GitHub Actions
 ```
 
@@ -370,7 +370,7 @@ See `docs/getting-started/aws-backend.md` for the complete setup and migration g
 
 This repository supports optional Okta Privileged Access (OPA) integration via the `oktapam` provider for server access projects, secret management, security policies, and AD integration.
 
-See `docs/infrastructure/opa-privileged-access.md` for configuration instructions. Example: `environments/myorg/terraform/opa_resources.tf.example`.
+See `modules/opa/docs/opa-privileged-access.md` for configuration instructions. Example: `modules/opa/examples/opa_resources.tf.example`.
 
 ## Demo Builder & Deployment Worksheet
 
@@ -390,12 +390,12 @@ The **Demo Deployment Worksheet** (`demo-builder/DEMO_WORKSHEET.md`) is the reco
 1. Parse the worksheet to extract all configuration values
 2. Create the environment directory: `environments/{name}/terraform/` and `environments/{name}/config/`
 3. Generate Terraform for Okta resources (users, groups, apps, entitlement bundles)
-4. Deploy infrastructure in order (each in its own subdirectory):
-   - AD: `environments/{name}/ad-infrastructure/` using `modules/ad-domain-controller`
-   - Generic DB: `environments/{name}/generic-db-infrastructure/` using `modules/generic-db-connector`
-   - OPC: `environments/{name}/opc-infrastructure/` using `modules/opc-agent`
-   - SCIM: `environments/{name}/infrastructure/scim-server/`
-   - OPA: Add `opa_*.tf` files to `environments/{name}/terraform/`
+4. Deploy infrastructure using modules (see each module's `examples/` for reference configs):
+   - AD: `modules/ad-domain-controller` (examples in `modules/ad-domain-controller/examples/`)
+   - Generic DB: `modules/generic-db-connector` (examples in `modules/generic-db-connector/examples/`)
+   - OPC: `modules/opc-agent` (examples in `modules/opc-agent/examples/`)
+   - SCIM: `modules/scim-server`
+   - OPA: Add `opa_*.tf` files to `environments/{name}/terraform/` (examples in `modules/opa/examples/`)
 5. Run `terraform init` and `terraform plan` for each stack -- pause for approval before apply
 6. After apply, verify with diagnostic workflows (`ad-health-check.yml`, `scim-check-status.yml`, `opa-test.yml`, etc.)
 

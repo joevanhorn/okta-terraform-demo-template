@@ -82,7 +82,7 @@ jobs:
             ARGS="$ARGS --event-types ${{ inputs.event_types }}"
           fi
 
-          python3 scripts/monitor_itp_events.py $ARGS 2>&1 | tee monitor.log
+          python3 modules/itp-demo/scripts/monitor_itp_events.py $ARGS 2>&1 | tee monitor.log
 
       - name: Upload results
         uses: actions/upload-artifact@v4

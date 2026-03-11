@@ -72,12 +72,10 @@ okta-terraform-complete-demo/
 │   ├── apply_admin_labels.py       # Auto-label admin resources
 │   ├── import_risk_rules.py        # Import risk rules (SOD policies)
 │   ├── apply_risk_rules.py         # Apply risk rules to Okta
-│   ├── configure_scim_app.py       # Configure SCIM connection (API-only)
 │   ├── manage_entitlement_settings.py  # Enable/disable entitlement mgmt
 │   ├── export_groups_to_terraform.py   # Groups → Terraform (cross-org)
 │   ├── copy_group_memberships.py       # Export/import memberships (cross-org)
-│   ├── copy_grants_between_orgs.py     # Export/import grants (cross-org)
-│   └── import_opa_resources.py         # Import OPA resources
+│   └── copy_grants_between_orgs.py     # Export/import grants (cross-org)
 ├── docs/                       # Documentation
 ├── testing/                    # Testing and validation guides
 └── .github/workflows/          # GitHub Actions workflows
@@ -160,7 +158,7 @@ Each resource type has its own file:
   - Data source to read SCIM server state from S3
   - Creates Okta app for SCIM provisioning
   - Outputs app ID and configuration commands
-- `scripts/configure_scim_app.py` - Python script to configure SCIM connection via API
+- `modules/scim-server/scripts/configure_scim_app.py` - Python script to configure SCIM connection via API
   - Enables SCIM provisioning
   - Configures connection (base URL, authentication)
   - Tests connection
@@ -284,7 +282,7 @@ cd environments/myorg/terraform
 terraform apply
 
 # Step 4: Configure SCIM connection (Python - API only)
-python3 ../../scripts/configure_scim_app.py \
+python3 ../../modules/scim-server/scripts/configure_scim_app.py \
   --app-id $(terraform output -raw scim_app_id) \
   --scim-url https://scim.demo-myorg.example.com/scim/v2 \
   --scim-token <from-github-secret-SCIM_AUTH_TOKEN> \
@@ -294,7 +292,7 @@ python3 ../../scripts/configure_scim_app.py \
 **Alternative: Manual Terraform Deployment**
 ```bash
 # For local development/testing
-cd environments/myorg/infrastructure/scim-server
+cd modules/scim-server
 cp terraform.tfvars.example terraform.tfvars
 vim terraform.tfvars  # Edit with your values
 terraform init
@@ -307,9 +305,9 @@ These settings must be configured via Okta Admin API (Python script handles this
 
 **Documentation:**
 - GitHub Workflow: `.github/workflows/deploy-scim-server.yml`
-- SCIM Server README: `environments/myorg/infrastructure/scim-server/README.md`
+- SCIM Server README: `modules/scim-server/README.md`
 - Automation Guide: `docs/SCIM_OKTA_AUTOMATION.md`
-- Secrets Migration: `environments/myorg/infrastructure/scim-server/GITHUB_SECRETS_MIGRATION.md`
+- Secrets Migration: `modules/scim-server/GITHUB_SECRETS_MIGRATION.md`
 
 ## Backup and Restore
 

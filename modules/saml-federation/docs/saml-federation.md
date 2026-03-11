@@ -778,7 +778,7 @@ curl -s -H "Authorization: SSWS ${OKTA_API_TOKEN}" \
 ## Related Documentation
 
 - [Module README](../modules/saml-federation/README.md)
-- [AI Prompt Template](../ai-assisted/prompts/setup_saml_federation.md)
+- [AI Prompt Template](setup_saml_federation.md)
 - [Okta SAML IdP API](https://developer.okta.com/docs/reference/api/idps/)
 - [Okta SAML App API](https://developer.okta.com/docs/reference/api/apps/)
 

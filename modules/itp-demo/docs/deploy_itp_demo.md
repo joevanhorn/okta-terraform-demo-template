@@ -57,7 +57,7 @@ DEPLOYMENT STEPS (follow in order):
    c. AWS IAM Permissions for ITP:
       - Check if the GitHub Actions role has ITP permissions (Lambda, SSM)
       - If not, offer to attach the ITP IAM policy from
-        docs/infrastructure/itp-aws-requirements.md
+        modules/itp-demo/docs/itp-aws-requirements.md
       - The Terraform deployment role needs: Lambda, IAM, SSM, CloudWatch Logs
       - The runtime role needs: SSM read, Lambda invoke, S3 write (for videos)
 

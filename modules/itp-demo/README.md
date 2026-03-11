@@ -24,28 +24,23 @@ Terraform module for Okta Identity Threat Protection (ITP) demo automation. Depl
 
 | File | Purpose |
 |------|---------|
-| [`docs/guides/itp-demo.md`](../../docs/guides/itp-demo.md) | Complete ITP demo guide — architecture, setup, usage, troubleshooting |
-| [`docs/guides/itp-demo-prerequisites.md`](../../docs/guides/itp-demo-prerequisites.md) | Prerequisites checklist by mode, secrets inventory, verification commands |
-| [`docs/infrastructure/itp-aws-requirements.md`](../../docs/infrastructure/itp-aws-requirements.md) | AWS IAM policies, cross-region deployment, SSM layout, cost estimates |
-
-### AI-Assisted Deployment
-
-| File | Purpose |
-|------|---------|
-| [`ai-assisted/prompts/deploy_itp_demo.md`](../../ai-assisted/prompts/deploy_itp_demo.md) | Claude Code deployment prompt — paste into Claude Code to deploy end-to-end |
+| [`docs/itp-demo.md`](docs/itp-demo.md) | Complete ITP demo guide — architecture, setup, usage, troubleshooting |
+| [`docs/itp-demo-prerequisites.md`](docs/itp-demo-prerequisites.md) | Prerequisites checklist by mode, secrets inventory, verification commands |
+| [`docs/itp-aws-requirements.md`](docs/itp-aws-requirements.md) | AWS IAM policies, cross-region deployment, SSM layout, cost estimates |
+| [`docs/deploy_itp_demo.md`](docs/deploy_itp_demo.md) | Claude Code deployment prompt — paste into Claude Code to deploy end-to-end |
 
 ### Scripts
 
 | File | Purpose |
 |------|---------|
-| [`scripts/trigger_itp_demo.py`](../../scripts/trigger_itp_demo.py) | Main CLI — orchestrates all three demo modes |
-| [`scripts/setup_ssf_provider.py`](../../scripts/setup_ssf_provider.py) | Registers SSF provider with Okta (post-Terraform) |
-| [`scripts/monitor_itp_events.py`](../../scripts/monitor_itp_events.py) | Real-time system log watcher for ITP events |
-| [`scripts/import_entity_risk_policy.py`](../../scripts/import_entity_risk_policy.py) | Imports entity risk policy from Okta to JSON |
-| [`scripts/apply_entity_risk_policy.py`](../../scripts/apply_entity_risk_policy.py) | Applies entity risk policy rules to Okta |
-| [`scripts/itp/session_authenticator.py`](../../scripts/itp/session_authenticator.py) | Headless browser authentication via Playwright (real mode) |
-| [`scripts/itp/session_replayer.py`](../../scripts/itp/session_replayer.py) | Cookie replay from local context (real mode) |
-| [`scripts/itp/ssf_provider.py`](../../scripts/itp/ssf_provider.py) | SSF provider registration and SET signal sending |
+| [`scripts/trigger_itp_demo.py`](scripts/trigger_itp_demo.py) | Main CLI — orchestrates all three demo modes |
+| [`scripts/setup_ssf_provider.py`](scripts/setup_ssf_provider.py) | Registers SSF provider with Okta (post-Terraform) |
+| [`scripts/monitor_itp_events.py`](scripts/monitor_itp_events.py) | Real-time system log watcher for ITP events |
+| [`scripts/import_entity_risk_policy.py`](scripts/import_entity_risk_policy.py) | Imports entity risk policy from Okta to JSON |
+| [`scripts/apply_entity_risk_policy.py`](scripts/apply_entity_risk_policy.py) | Applies entity risk policy rules to Okta |
+| [`scripts/itp/session_authenticator.py`](scripts/itp/session_authenticator.py) | Headless browser authentication via Playwright (real mode) |
+| [`scripts/itp/session_replayer.py`](scripts/itp/session_replayer.py) | Cookie replay from local context (real mode) |
+| [`scripts/itp/ssf_provider.py`](scripts/itp/ssf_provider.py) | SSF provider registration and SET signal sending |
 
 ### GitHub Actions Workflows
 
@@ -61,12 +56,12 @@ Terraform module for Okta Identity Threat Protection (ITP) demo automation. Depl
 
 | File | Purpose |
 |------|---------|
-| [`environments/myorg/terraform/itp_demo.tf.example`](../../environments/myorg/terraform/itp_demo.tf.example) | Example Terraform config — copy and customize for your environment |
+| [`examples/itp_demo.tf.example`](examples/itp_demo.tf.example) | Example Terraform config — copy and customize for your environment |
 
 ---
 
 ## Quick Start
 
-1. **Check prerequisites:** [`docs/guides/itp-demo-prerequisites.md`](../../docs/guides/itp-demo-prerequisites.md)
-2. **Deploy with Claude Code:** [`ai-assisted/prompts/deploy_itp_demo.md`](../../ai-assisted/prompts/deploy_itp_demo.md)
-3. **Or deploy manually:** [`docs/guides/itp-demo.md`](../../docs/guides/itp-demo.md)
+1. **Check prerequisites:** [`docs/itp-demo-prerequisites.md`](docs/itp-demo-prerequisites.md)
+2. **Deploy with Claude Code:** [`docs/deploy_itp_demo.md`](docs/deploy_itp_demo.md)
+3. **Or deploy manually:** [`docs/itp-demo.md`](docs/itp-demo.md)

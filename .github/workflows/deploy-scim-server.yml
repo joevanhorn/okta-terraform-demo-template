@@ -208,7 +208,7 @@ jobs:
           echo "APP_ID=\$(terraform output -raw scim_app_id)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "# Configure SCIM connection" >> $GITHUB_STEP_SUMMARY
-          echo "python3 ../../scripts/configure_scim_app.py \\" >> $GITHUB_STEP_SUMMARY
+          echo "python3 ../../modules/scim-server/scripts/configure_scim_app.py \\" >> $GITHUB_STEP_SUMMARY
           echo "  --app-id \"\$APP_ID\" \\" >> $GITHUB_STEP_SUMMARY
           echo "  --scim-url \"https://${{ github.event.inputs.domain_name }}/scim/v2\" \\" >> $GITHUB_STEP_SUMMARY
           echo "  --scim-token \"${{ steps.generate_token.outputs.token }}\" \\" >> $GITHUB_STEP_SUMMARY

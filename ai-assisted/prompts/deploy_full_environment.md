@@ -737,7 +737,7 @@ If entity risk policy rules are defined:
 
 ```bash
 # Import current policy
-python3 scripts/import_entity_risk_policy.py \
+python3 modules/itp-demo/scripts/import_entity_risk_policy.py \
   --output environments/{env_name}/config/entity_risk_policy.json
 
 # Check if HIGH risk rule exists, if not create one
@@ -753,7 +753,7 @@ Run validation checks for each deployed component:
 #### Quick Mode ITP Test (if ITP enabled)
 
 ```bash
-python3 scripts/trigger_itp_demo.py --mode quick \
+python3 modules/itp-demo/scripts/trigger_itp_demo.py --mode quick \
   --user {test_email} --risk-level HIGH --monitor --auto-reset
 ```
 
@@ -768,14 +768,14 @@ gh workflow run itp-demo-trigger.yml \
 #### SSF Mode Test (if SSF enabled)
 
 ```bash
-python3 scripts/trigger_itp_demo.py --mode ssf \
+python3 modules/itp-demo/scripts/trigger_itp_demo.py --mode ssf \
   --user {test_email} --risk-level HIGH --monitor --auto-reset
 ```
 
 #### Real Mode Test (if Real mode enabled)
 
 ```bash
-python3 scripts/trigger_itp_demo.py --mode real \
+python3 modules/itp-demo/scripts/trigger_itp_demo.py --mode real \
   --user {test_email} \
   --password-ssm /{env_name}/itp-demo/password \
   --totp-ssm /{env_name}/itp-demo/totp-secret \
@@ -842,9 +842,9 @@ INFRASTRUCTURE (if deployed):
   Federation:  {federation_status}
 
 DEMO COMMANDS:
-  ITP Quick:   python3 scripts/trigger_itp_demo.py --mode quick --user {email} --monitor --auto-reset
-  ITP SSF:     python3 scripts/trigger_itp_demo.py --mode ssf --user {email} --monitor --auto-reset
-  ITP Real:    python3 scripts/trigger_itp_demo.py --mode real --user {email} --password-ssm /{env}/itp-demo/password --totp-ssm /{env}/itp-demo/totp-secret --monitor --auto-reset
+  ITP Quick:   python3 modules/itp-demo/scripts/trigger_itp_demo.py --mode quick --user {email} --monitor --auto-reset
+  ITP SSF:     python3 modules/itp-demo/scripts/trigger_itp_demo.py --mode ssf --user {email} --monitor --auto-reset
+  ITP Real:    python3 modules/itp-demo/scripts/trigger_itp_demo.py --mode real --user {email} --password-ssm /{env}/itp-demo/password --totp-ssm /{env}/itp-demo/totp-secret --monitor --auto-reset
 
 MANUAL FOLLOW-UP STEPS:
   [ ] Create entitlement bundles after entitlements sync into apps (Admin UI or Terraform)
@@ -856,8 +856,8 @@ MANUAL FOLLOW-UP STEPS:
 
 DOCUMENTATION:
   Worksheet:   demo-builder/DEMO_WORKSHEET.md
-  ITP Guide:   docs/guides/itp-demo.md
-  AD Guide:    docs/infrastructure/ad-domain-controller.md
+  ITP Guide:   modules/itp-demo/docs/itp-demo.md
+  AD Guide:    modules/ad-domain-controller/docs/active-directory.md
   API Scripts: docs/reference/api-management.md
   Workflows:   docs/reference/workflow-reference.md
 ============================================================

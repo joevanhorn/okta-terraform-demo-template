@@ -84,12 +84,12 @@ jobs:
             SSM_PREFIX="/${{ inputs.environment }}/itp/ssf-demo"
           fi
 
-          cd scripts
+          cd modules/itp-demo/scripts
           python3 setup_ssf_provider.py \
             --provider-name "${{ inputs.provider_name }}" \
             --ssm-prefix "$SSM_PREFIX" \
             --aws-region ${{ inputs.aws_region }} \
-            2>&1 | tee ../setup.log
+            2>&1 | tee ../../../setup.log
 
       - name: Upload results
         uses: actions/upload-artifact@v4

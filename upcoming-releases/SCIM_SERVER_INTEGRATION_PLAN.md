@@ -39,7 +39,7 @@ The implementation follows the established pattern of optional infrastructure de
 
 ### Deliverables
 
-#### Infrastructure Files (`environments/myorg/infrastructure/scim-server/`)
+#### Infrastructure Files (`modules/scim-server/`)
 - [x] `provider.tf` - AWS provider with S3 backend configuration
 - [x] `variables.tf` - Complete variable definitions with validation (including network config)
 - [x] `main.tf` - EC2, security groups, EIP, Route53, IAM roles, CloudWatch
@@ -152,7 +152,7 @@ Use Terraform to create and configure the Okta SCIM application automatically, r
   - Comprehensive error handling and validation
 
 #### Documentation
-- [ ] Update `environments/myorg/infrastructure/scim-server/README.md`
+- [ ] Update `modules/scim-server/README.md`
   - Add "Automated Okta Configuration" section
   - Document Terraform + Python approach
   - Provide step-by-step automation guide
@@ -189,7 +189,7 @@ Use Terraform to create and configure the Okta SCIM application automatically, r
             │ Provides app_id
             ▼
 ┌─────────────────────────────────────────────────────┐
-│ Python Script (scripts/configure_scim_app.py)       │
+│ Python Script (modules/scim-server/scripts/configure_scim_app.py) │
 │ - Enables SCIM provisioning (via API)               │
 │ - Configures SCIM connection settings               │
 │ - Tests connection                                   │
@@ -208,10 +208,10 @@ terraform apply
 
 **Step 2: Python (SCIM Configuration)**
 ```bash
-python3 scripts/configure_scim_app.py \
+python3 modules/scim-server/scripts/configure_scim_app.py \
   --app-id $(terraform output -raw scim_app_id) \
-  --scim-url $(cd ../infrastructure/scim-server && terraform output -raw scim_base_url) \
-  --scim-token $(cd ../infrastructure/scim-server && terraform output -json okta_configuration | jq -r '.header_auth_token') \
+  --scim-url $(cd ../../../modules/scim-server && terraform output -raw scim_base_url) \
+  --scim-token $(cd ../../../modules/scim-server && terraform output -json okta_configuration | jq -r '.header_auth_token') \
   --test-connection
 ```
 
@@ -476,7 +476,7 @@ These must be done via **Okta Admin API** (which the Python script handles).
 ### ✅ Completed (Release 1)
 - ✅ Created `upcoming-releases/` directory
 - ✅ Created release plan document
-- ✅ Created `environments/myorg/infrastructure/scim-server/` directory
+- ✅ Created `modules/scim-server/` directory
 - ✅ Created `provider.tf` with S3 backend configuration
 - ✅ Created `variables.tf` with comprehensive variable definitions (including network config)
 - ✅ Created `main.tf` (EC2, security groups, networking, CloudWatch)
@@ -665,7 +665,7 @@ These must be done via **Okta Admin API** (which the Python script handles).
 - `docs/SCIM_SERVER_SETUP.md` (Release 4)
 - `docs/CUSTOM_SCIM_INTEGRATION.md` (Release 4)
 - `docs/API_ONLY_ENTITLEMENTS.md` (Release 4)
-- `ai-assisted/prompts/deploy_scim_server.md` (Release 3)
+- `modules/scim-server/docs/deploy_scim_server.md` (Release 3)
 - `testing/SCIM_SERVER_VALIDATION.md` (Release 4)
 
 ---
