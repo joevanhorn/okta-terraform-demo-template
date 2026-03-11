@@ -111,7 +111,7 @@ variable "github_repo" {
 variable "scim_server_path" {
   description = "Path to SCIM server code within repository"
   type        = string
-  default     = "main/environments/myorg/infrastructure/scim-server"
+  default     = "main/modules/scim-server"
 }
 
 variable "custom_entitlements" {

@@ -154,7 +154,7 @@ Check the workflow summary in GitHub Actions for:
 Use this for local development or testing:
 
 ```bash
-cd environments/myorg/infrastructure/scim-server
+cd modules/scim-server
 
 # Create terraform.tfvars from example
 cp terraform.tfvars.example terraform.tfvars
@@ -227,7 +227,7 @@ gh workflow run deploy-scim-server.yml \
   -f action=apply
 
 # Via Terraform
-cd environments/myorg/infrastructure/scim-server
+cd modules/scim-server
 terraform apply -var="entitlements_file=examples/entitlements-aws.json"
 ```
 
@@ -248,7 +248,7 @@ Create a JSON file following this schema:
 }
 ```
 
-See `environments/myorg/infrastructure/scim-server/README.md` for complete documentation.
+See `modules/scim-server/README.md` for complete documentation.
 
 ---
 
@@ -894,7 +894,7 @@ echo "📍 Next: Assign users to app in Okta Admin Console"
 set -e
 
 echo "Step 1: Deploy SCIM Server"
-cd environments/myorg/infrastructure/scim-server
+cd modules/scim-server
 terraform init
 terraform apply -auto-approve
 

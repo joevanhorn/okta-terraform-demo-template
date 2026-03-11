@@ -107,7 +107,7 @@ admin_cidr_blocks = ["10.0.0.0/8"]  # Your corporate network
 ### Step 3: Deploy Infrastructure
 
 ```bash
-cd environments/myorg/oag-infrastructure/terraform
+cd modules/oag/examples/oag-infrastructure/terraform
 
 terraform init
 terraform plan
@@ -167,24 +167,24 @@ Add these secrets to your GitHub Environment:
 ```bash
 # List applications
 python scripts/manage_oag_apps.py \
-  --config environments/myorg/config/oag_apps.json \
+  --config modules/oag/examples/oag_apps.json \
   --action list
 
 # Deploy applications (dry run)
 python scripts/manage_oag_apps.py \
-  --config environments/myorg/config/oag_apps.json \
+  --config modules/oag/examples/oag_apps.json \
   --action deploy \
   --dry-run
 
 # Deploy specific application
 python scripts/manage_oag_apps.py \
-  --config environments/myorg/config/oag_apps.json \
+  --config modules/oag/examples/oag_apps.json \
   --action deploy \
   --app "Legacy HR Portal"
 
 # Show application details
 python scripts/manage_oag_apps.py \
-  --config environments/myorg/config/oag_apps.json \
+  --config modules/oag/examples/oag_apps.json \
   --action show \
   --app "Legacy HR Portal"
 ```

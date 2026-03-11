@@ -536,10 +536,10 @@ resource "okta_app_group_assignment" "salesforce_marketing" {
 
 ### Infrastructure Directory Structure
 
-Each environment can have AWS infrastructure for Active Directory integration:
+Active Directory infrastructure lives in the `modules/ad-domain-controller/` module, with examples in `modules/ad-domain-controller/examples/`:
 
 ```
-environments/{env}/infrastructure/
+modules/ad-domain-controller/
 ├── provider.tf              # AWS provider with S3 backend
 ├── variables.tf             # Infrastructure variables
 ├── vpc.tf                   # VPC, subnets, routing
@@ -547,8 +547,9 @@ environments/{env}/infrastructure/
 ├── ad-domain-controller.tf  # EC2 instance
 ├── outputs.tf               # Connection info
 ├── terraform.tfvars.example # Example config
-└── scripts/
-    └── userdata.ps1         # PowerShell automation
+├── scripts/
+│   └── userdata.ps1         # PowerShell automation
+└── examples/                # Example configurations
 ```
 
 ### When to Generate Infrastructure Code
@@ -560,7 +561,8 @@ environments/{env}/infrastructure/
 - "I need AD infrastructure for my demo"
 
 **Infrastructure file targets:**
-- Save to: `environments/{env}/infrastructure/{file}.tf`
+- Reference module at: `modules/ad-domain-controller/`
+- See examples at: `modules/ad-domain-controller/examples/`
 - NOT in the terraform/ directory (Okta resources go there)
 
 ### AWS Provider Configuration
@@ -986,17 +988,18 @@ Generate security-groups.tf with all AD ports:
 
 ### SCIM Server Directory Structure
 
-Custom SCIM 2.0 server for demonstrating API-only entitlements:
+Custom SCIM 2.0 server for demonstrating API-only entitlements lives in the `modules/scim-server/` module:
 
 ```
-environments/{env}/infrastructure/scim-server/
+modules/scim-server/
 ├── provider.tf          # AWS provider with S3 backend
 ├── variables.tf         # SCIM server variables
 ├── main.tf              # EC2, security groups, Route53
 ├── outputs.tf           # SCIM URLs, connection info
-├── user-data.sh         # Server initialization script
-├── demo_scim_server.py  # Flask SCIM 2.0 server
-├── requirements.txt     # Python dependencies
+├── app/                 # SCIM server application code
+├── scripts/             # Configuration and helper scripts
+├── examples/            # Example configurations
+├── docs/                # Documentation
 └── README.md            # Deployment guide
 ```
 
@@ -1018,7 +1021,7 @@ scim_app.tf  # Okta SCIM application (reads infrastructure state)
 
 **IMPORTANT**: SCIM involves TWO separate Terraform configurations:
 
-1. **Infrastructure** (`infrastructure/scim-server/`):
+1. **Infrastructure** (`modules/scim-server/`):
    - AWS EC2 with Flask SCIM server
    - Automatic HTTPS via Caddy + Let's Encrypt
    - Custom entitlements/roles
@@ -1225,7 +1228,7 @@ variable "scim_auth_token" {
 
 # SCIM app variables (in terraform/variables.tf)
 variable "scim_environment" {
-  description = "Environment name for SCIM server state lookup (must match infrastructure/scim-server deployment)"
+  description = "Environment name for SCIM server state lookup (must match modules/scim-server deployment)"
   type        = string
   default     = "myorg"
 }
@@ -1247,15 +1250,15 @@ variable "scim_app_label" {
 
 **Scenario: "Deploy SCIM server for healthcare demo"**
 
-Generate TWO sets of files:
+Reference TWO sets of files:
 
-**Set 1**: `modules/scim-server/`
+**Set 1**: `modules/scim-server/` (infrastructure module)
 - provider.tf (AWS with S3 backend)
 - variables.tf (domain, tokens, custom healthcare roles)
 - main.tf (EC2, security groups, Route53)
 - outputs.tf (SCIM URLs, setup instructions)
 
-**Set 2**: `environments/myorg/terraform/scim_app.tf`
+**Set 2**: `environments/myorg/terraform/scim_app.tf` (Okta side)
 - Data source to read SCIM server state
 - Okta app resource
 - Configuration command output

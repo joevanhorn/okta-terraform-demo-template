@@ -15,7 +15,7 @@
 #   Okta (SaaS) <-> OPA Gateway <-> Active Directory Domain Controller
 #
 # Documentation:
-# - OPA Setup: docs/infrastructure/opa-privileged-access.md
+# - OPA Setup: modules/opa/docs/opa-privileged-access.md
 # - AD Infra: modules/ad-domain-controller/README.md
 # =============================================================================
 

@@ -895,7 +895,7 @@ ai-assisted/
 
 **Time to generate:** 5-10 minutes (Tier 1) or 2-3 minutes (Tier 2)
 
-**Important:** Infrastructure goes in `environments/{env}/infrastructure/`, NOT `terraform/` directory
+**Important:** Infrastructure modules are in `modules/` (e.g., `modules/ad-domain-controller/`), NOT in the `terraform/` directory
 
 ### 9. Backup and Restore
 **File:** `prompts/backup_restore.md`

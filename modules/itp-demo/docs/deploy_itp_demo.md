@@ -2,7 +2,7 @@
 
 Use this prompt with **Claude Code** (running inside this repository) to deploy the ITP (Identity Threat Protection) demo automation step by step. Deployment is progressive — Quick mode works immediately, SSF adds signed JWT signals, Real adds browser-based session hijacking simulation. You can stop at any tier.
 
-**Prerequisites:** Complete the checklist at [`docs/guides/itp-demo-prerequisites.md`](../../docs/guides/itp-demo-prerequisites.md) before starting.
+**Prerequisites:** Complete the checklist at [`itp-demo-prerequisites.md`](itp-demo-prerequisites.md) before starting.
 
 ---
 
@@ -361,7 +361,7 @@ Checks what infrastructure already exists and sets up anything missing:
     --user user@example.com --risk-level LOW
   ```
 
-For detailed troubleshooting, see [ITP Demo Guide — Troubleshooting](../../docs/guides/itp-demo.md#troubleshooting).
+For detailed troubleshooting, see [ITP Demo Guide — Troubleshooting](itp-demo.md#troubleshooting).
 
 ---
 
@@ -412,4 +412,4 @@ gh workflow run itp-demo-trigger.yml \
   -f risk_level=HIGH
 ```
 
-For the full CLI reference, see [ITP Demo Guide — CLI Reference](../../docs/guides/itp-demo.md#cli-reference).
+For the full CLI reference, see [ITP Demo Guide — CLI Reference](itp-demo.md#cli-reference).

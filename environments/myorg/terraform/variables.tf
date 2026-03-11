@@ -21,7 +21,7 @@ variable "okta_api_token" {
 # ==============================================================================
 
 variable "scim_environment" {
-  description = "Environment name for SCIM server state lookup (must match infrastructure/scim-server deployment)"
+  description = "Environment name for SCIM server state lookup (must match modules/scim-server deployment)"
   type        = string
   default     = "myorg"
 }

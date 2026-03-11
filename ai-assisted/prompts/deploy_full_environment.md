@@ -331,13 +331,15 @@ gh workflow run tf-apply.yml -f environment={env_name}
 
 #### Create AD Infrastructure Directory
 
+Use the AD module directly, or create a local wrapper:
+
 ```bash
 mkdir -p environments/{env_name}/ad-infrastructure
 ```
 
 #### Generate AD Terraform
 
-Generate `environments/{env_name}/ad-infrastructure/main.tf`:
+Generate `environments/{env_name}/ad-infrastructure/main.tf` (references `modules/ad-domain-controller`):
 
 ```hcl
 module "ad_dc" {
@@ -403,6 +405,8 @@ browser-based activation. Connect via SSM Session Manager and run:
 
 #### Create Infrastructure Directories
 
+Use the modules directly, or create local wrappers:
+
 ```bash
 mkdir -p environments/{env_name}/generic-db-infrastructure
 mkdir -p environments/{env_name}/opc-infrastructure-v2
@@ -410,7 +414,7 @@ mkdir -p environments/{env_name}/opc-infrastructure-v2
 
 #### Generate Generic DB Terraform
 
-Generate `environments/{env_name}/generic-db-infrastructure/main.tf` with:
+Generate `environments/{env_name}/generic-db-infrastructure/main.tf` (references `modules/generic-db-connector`) with:
 - RDS PostgreSQL instance
 - VPC, subnets, security groups
 - Secrets Manager for credentials

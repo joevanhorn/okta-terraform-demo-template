@@ -163,7 +163,7 @@ output "scim_setup_instructions" {
 
     ════════════════════════════════════════════════════════════════════════════
 
-    📖 See: environments/myorg/infrastructure/scim-server/README.md for details
+    📖 See: modules/scim-server/README.md for details
 
   EOT
 }

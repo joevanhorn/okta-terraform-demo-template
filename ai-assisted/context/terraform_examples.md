@@ -415,7 +415,7 @@ resource "okta_policy_rule_mfa" "require_mfa" {
 
 ## Infrastructure Examples (AWS)
 
-**Important:** These go in `environments/{env}/infrastructure/`, NOT `terraform/` directory.
+**Important:** Infrastructure modules are in `modules/` (e.g., `modules/ad-domain-controller/`), NOT in the `terraform/` directory.
 
 ### VPC and Networking
 ```hcl

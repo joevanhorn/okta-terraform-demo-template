@@ -83,7 +83,7 @@ Please generate THREE sets of Terraform configuration following the repository s
 PART 1: SCIM Server Infrastructure (AWS)
 ════════════════════════════════════════════════════════════════════════════
 
-Location: environments/myorg/infrastructure/scim-server/
+Location: modules/scim-server/
 
 Requirements:
 - EC2 instance running Flask SCIM 2.0 server
@@ -181,7 +181,7 @@ After the AI generates the code:
 
 1. **Review the terraform.tfvars file**:
    ```bash
-   cd environments/myorg/infrastructure/scim-server
+   cd modules/scim-server
    cp terraform.tfvars.example terraform.tfvars
    # Edit with your actual values:
    # - domain_name
@@ -209,7 +209,7 @@ After the AI generates the code:
 
 ```bash
 # Navigate to SCIM server directory
-cd environments/myorg/infrastructure/scim-server
+cd modules/scim-server
 
 # Initialize Terraform
 terraform init
@@ -408,7 +408,7 @@ security_group_id = "sg-12345678"
 
 ```bash
 # Check instance status
-cd environments/myorg/infrastructure/scim-server
+cd modules/scim-server
 aws ec2 describe-instance-status --instance-id $(terraform output -raw instance_id)
 
 # Check logs via SSM
@@ -513,7 +513,7 @@ Add to your CI/CD pipeline:
 
 ## Documentation References
 
-- **SCIM Server README**: `environments/myorg/infrastructure/scim-server/README.md`
+- **SCIM Server README**: `modules/scim-server/README.md`
 - **Automation Guide**: `docs/SCIM_OKTA_AUTOMATION.md`
 - **Release Plan**: `upcoming-releases/SCIM_SERVER_INTEGRATION_PLAN.md`
 - **Okta SCIM Docs**: https://developer.okta.com/docs/concepts/scim/

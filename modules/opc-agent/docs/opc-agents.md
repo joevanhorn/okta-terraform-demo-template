@@ -16,7 +16,7 @@ Okta Tenant ←→ OPC Agent (RHEL 8 EC2) ←→ Database (RDS/On-prem)
 ### 1. Deploy OPC Agents
 
 ```bash
-cd environments/myorg/opc-infrastructure
+cd modules/opc-agent/examples
 cp main.tf.example main.tf
 # Edit main.tf: set backend, Okta URL, database host
 terraform init && terraform apply

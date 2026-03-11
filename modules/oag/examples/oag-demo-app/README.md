@@ -45,7 +45,7 @@ docker run -p 8080:8080 oag-demo-app
 
 ### Prerequisites
 
-1. OAG infrastructure deployed (see `environments/myorg/oag-infrastructure/`)
+1. OAG infrastructure deployed (see `modules/oag/examples/oag-infrastructure/`)
 2. AWS CLI configured
 3. Docker installed
 

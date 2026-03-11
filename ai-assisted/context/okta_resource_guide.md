@@ -634,7 +634,7 @@ Some OIG features are API-only (not in Terraform):
 
 ## Infrastructure Resources (AWS)
 
-**Important:** Infrastructure resources are in `environments/{env}/infrastructure/`, NOT in `terraform/` directory.
+**Important:** Infrastructure resources are in `modules/` (e.g., `modules/ad-domain-controller/`, `modules/scim-server/`), NOT in the `terraform/` directory.
 
 ### aws_vpc
 VPC for Active Directory infrastructure
