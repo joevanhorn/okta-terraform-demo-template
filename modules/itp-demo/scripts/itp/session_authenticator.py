@@ -790,67 +790,75 @@ lines.forEach(line => {{
         safe_name = html_mod.escape(cookie_name).replace("'", "\\'")
         safe_domain = html_mod.escape(domain).replace("'", "\\'")
 
-        return f'''
-(function() {{
-  var overlay = document.createElement('div');
-  overlay.id = 'cookie-inspector';
-  overlay.innerHTML = `
-    <div style="position:fixed; bottom:0; left:0; right:0; height:220px; z-index:999999;
-                background:#1e1e1e; border-top:2px solid #ff3333; font-family:'Courier New',monospace;
-                font-size:12px; color:#d4d4d4; display:flex; flex-direction:column;">
-      <div style="background:#2d2d2d; padding:6px 14px; display:flex; align-items:center;
-                  border-bottom:1px solid #404040;">
-        <span style="color:#ff3333; font-weight:bold; margin-right:12px;">🔍 Application</span>
-        <span style="color:#888; margin-right:12px;">› Cookies</span>
-        <span style="color:#fff;">› https://{safe_domain}</span>
-        <span style="margin-left:auto; background:#ff3333; color:#fff; padding:2px 8px;
-               border-radius:3px; font-size:10px;">STOLEN SESSION</span>
-      </div>
-      <div style="flex:1; overflow:auto; padding:0;">
-        <table style="width:100%; border-collapse:collapse; font-size:12px;">
-          <thead>
-            <tr style="background:#2d2d2d; color:#888; text-align:left;">
-              <th style="padding:6px 12px; border-bottom:1px solid #404040; width:80px;">Name</th>
-              <th style="padding:6px 12px; border-bottom:1px solid #404040;">Value</th>
-              <th style="padding:6px 12px; border-bottom:1px solid #404040; width:160px;">Domain</th>
-              <th style="padding:6px 12px; border-bottom:1px solid #404040; width:50px;">Path</th>
-              <th style="padding:6px 12px; border-bottom:1px solid #404040; width:60px;">Secure</th>
-              <th style="padding:6px 12px; border-bottom:1px solid #404040; width:70px;">HttpOnly</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr style="background:#1a2332; border-left:3px solid #ff3333;">
-              <td style="padding:6px 12px; color:#ff3333; font-weight:bold;">{safe_name}</td>
-              <td style="padding:6px 12px; color:#00ccff; word-break:break-all;
-                         max-width:400px; overflow:hidden; text-overflow:ellipsis;">{safe_val}</td>
-              <td style="padding:6px 12px; color:#d4d4d4;">{safe_domain}</td>
-              <td style="padding:6px 12px; color:#d4d4d4;">/</td>
-              <td style="padding:6px 12px; color:#00ff41;">✓</td>
-              <td style="padding:6px 12px; color:#00ff41;">✓</td>
-            </tr>
-            <tr>
-              <td style="padding:6px 12px; color:#888;">JSESSIONID</td>
-              <td style="padding:6px 12px; color:#888;">—</td>
-              <td style="padding:6px 12px; color:#888;">{safe_domain}</td>
-              <td style="padding:6px 12px; color:#888;">/</td>
-              <td style="padding:6px 12px; color:#888;">✓</td>
-              <td style="padding:6px 12px; color:#888;">✓</td>
-            </tr>
-            <tr>
-              <td style="padding:6px 12px; color:#888;">t</td>
-              <td style="padding:6px 12px; color:#888;">—</td>
-              <td style="padding:6px 12px; color:#888;">{safe_domain}</td>
-              <td style="padding:6px 12px; color:#888;">/</td>
-              <td style="padding:6px 12px; color:#888;">✓</td>
-              <td style="padding:6px 12px; color:#888;">✗</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-}})();'''
+        # Return a full HTML page (not JS) — rendered via set_content() after
+        # the attacker visits the dashboard. Overlays on Okta's page don't work
+        # in Playwright video (Okta's CSS strips styles, iframes/shadow DOM
+        # don't render in headless video capture). A separate page gives us full
+        # CSS control and tells a clear "attacker opened DevTools" story.
+        return f'''<!DOCTYPE html>
+<html><head><style>
+* {{ margin:0; padding:0; box-sizing:border-box; }}
+body {{ background:#1e1e1e; font-family:'Courier New',monospace; font-size:13px; color:#d4d4d4; }}
+.toolbar {{ background:#2d2d2d; padding:8px 16px; display:flex; align-items:center;
+            border-bottom:1px solid #404040; font-size:12px; }}
+.toolbar .tab {{ background:#1e1e1e; color:#fff; padding:6px 16px; border-radius:4px 4px 0 0;
+                margin-right:4px; font-size:11px; }}
+.toolbar .tab.active {{ border-bottom:2px solid #3b82f6; }}
+.toolbar .tab.dim {{ color:#666; background:transparent; }}
+.panel-header {{ background:#252525; padding:8px 16px; display:flex; align-items:center;
+                 border-bottom:1px solid #404040; }}
+.panel-header .title {{ color:#ff3333; font-weight:bold; margin-right:10px; font-size:13px; }}
+.panel-header .path {{ color:#888; margin-right:4px; }}
+.panel-header .domain {{ color:#fff; }}
+.badge {{ margin-left:auto; background:#ff3333; color:#fff; padding:3px 10px;
+          border-radius:3px; font-size:11px; font-weight:bold; letter-spacing:0.5px; }}
+.url-bar {{ background:#1a1a1a; padding:6px 16px; color:#888; border-bottom:1px solid #333;
+            font-size:11px; }}
+.url-bar span {{ color:#00ff41; }}
+table {{ width:100%; border-collapse:collapse; margin-top:0; }}
+th {{ padding:8px 14px; border-bottom:1px solid #404040; text-align:left;
+     color:#888; background:#252525; font-weight:normal; font-size:12px; }}
+td {{ padding:8px 14px; color:#777; font-size:12px; }}
+tr.stolen {{ background:#1a2332; border-left:3px solid #ff3333; }}
+tr.stolen td:first-child {{ color:#ff3333; font-weight:bold; }}
+tr.stolen .val {{ color:#00ccff; word-break:break-all; }}
+tr.stolen .dm {{ color:#d4d4d4; }}
+.ok {{ color:#00ff41; }}
+tr:not(.stolen) {{ border-bottom:1px solid #2a2a2a; }}
+</style></head><body>
+<div class="toolbar">
+  <span class="tab dim">Elements</span>
+  <span class="tab dim">Console</span>
+  <span class="tab dim">Network</span>
+  <span class="tab active">Application</span>
+  <span class="tab dim">Security</span>
+</div>
+<div class="panel-header">
+  <span class="title">Cookies</span>
+  <span class="path">https://</span><span class="domain">{safe_domain}</span>
+  <span class="badge">STOLEN SESSION</span>
+</div>
+<div class="url-bar">Accessed <span>https://{safe_domain}/app/UserHome</span> &mdash; no credentials required</div>
+<table>
+  <thead><tr>
+    <th style="width:90px">Name</th><th>Value</th><th style="width:170px">Domain</th>
+    <th style="width:50px">Path</th><th style="width:65px">Secure</th><th style="width:75px">HttpOnly</th>
+  </tr></thead>
+  <tbody>
+    <tr class="stolen">
+      <td>{safe_name}</td><td class="val">{safe_val}</td>
+      <td class="dm">{safe_domain}</td><td class="dm">/</td>
+      <td class="ok">&#10003;</td><td class="ok">&#10003;</td>
+    </tr>
+    <tr><td>JSESSIONID</td><td>&mdash;</td><td>{safe_domain}</td><td>/</td>
+      <td>&#10003;</td><td>&#10003;</td></tr>
+    <tr><td>t</td><td>&mdash;</td><td>{safe_domain}</td><td>/</td>
+      <td>&#10003;</td><td>&#10007;</td></tr>
+    <tr><td>_okta_throttle</td><td>&mdash;</td><td>{safe_domain}</td><td>/</td>
+      <td>&#10003;</td><td>&#10007;</td></tr>
+  </tbody>
+</table>
+</body></html>'''
 
     def open_attacker_session(self, cookie_name: str, cookie_value: str,
                               domain: str,
@@ -911,7 +919,8 @@ lines.forEach(line => {{
                 terminal_html = self._build_terminal_html(
                     cookie_name, cookie_value, domain
                 )
-                page.goto(f"data:text/html,{terminal_html}")
+                # Use set_content — data: URLs truncate large HTML payloads
+                page.set_content(terminal_html, wait_until="domcontentloaded")
                 # Wait for the full animation to play (last line appears at 7.4s)
                 time.sleep(9)
             except Exception as e:
@@ -931,15 +940,25 @@ lines.forEach(line => {{
             else:
                 print(f"  Attacker is IN — no credentials needed!")
 
-                # Show cookie inspector overlay on the dashboard (for video)
+                # Show cookie inspector as a separate page (for video).
+                # Overlays on Okta's page don't render in Playwright video
+                # (Okta's CSS strips styles, iframes/shadow DOM not captured).
+                # Navigating to a DevTools-style page tells a clear story:
+                #   terminal -> dashboard -> "attacker opens DevTools"
                 if record_video:
                     try:
-                        print(f"  Showing cookie inspector overlay...")
-                        inspector_js = self._build_cookie_inspector_js(
+                        # Pause on dashboard so viewer sees the attacker is in
+                        time.sleep(3)
+                        print(f"  Showing cookie inspector (DevTools view)...")
+                        inspector_html = self._build_cookie_inspector_js(
                             cookie_name, cookie_value, domain
                         )
-                        page.evaluate(inspector_js)
-                        time.sleep(3)  # Let viewer see the overlay
+                        # Navigate to about:blank first to clear Okta's CSS,
+                        # then set_content with our own styles
+                        page.goto("about:blank")
+                        page.set_content(inspector_html,
+                                         wait_until="domcontentloaded")
+                        time.sleep(4)  # Let viewer read the cookie details
                     except Exception as e:
                         print(f"  Cookie inspector note: {e}")
         except Exception as e:
