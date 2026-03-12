@@ -24,9 +24,16 @@ The browser stays open (optionally recording video) so we can watch the session 
 
 > **Code**: `scripts/itp/session_authenticator.py`
 
-### Step 2 — Cookie Handoff to the "Attacker"
+### Step 2 — Attacker Receives the Stolen Cookie
 
-The captured session cookie value and domain are passed to the Lambda function in eu-west-1 via a direct invoke. This simulates an attacker exfiltrating the cookie (e.g., via malware, XSS, or a compromised endpoint).
+The captured session cookie value and domain are passed to a second browser and to the Lambda function in eu-west-1. This simulates an attacker exfiltrating the cookie (e.g., via malware, XSS, or a compromised endpoint).
+
+When video recording is enabled, the attacker's browser shows two visual elements that make the attack tangible:
+
+1. **Terminal animation** (~9 seconds) — a hacker-workstation-style terminal types out the cookie arriving from a "C2 callback", echoes the stolen cookie value, and runs the `document.cookie` injection command with a green success checkmark. This is what plays before the browser navigates to Okta.
+2. **Cookie inspector overlay** — after the attacker lands on the Okta dashboard, a DevTools Application-tab-style panel appears at the bottom of the page showing the stolen `idx` cookie highlighted in red as "STOLEN SESSION", alongside its value, domain, and security flags.
+
+These visuals only appear in recorded videos (`--record-video`) — non-video flows are unaffected.
 
 ### Step 3 — Attacker Replays the Cookie (Lambda in Ireland)
 
@@ -102,7 +109,8 @@ python scripts/trigger_itp_demo.py \
 2. **The geographic separation is visible** — US authentication vs. Ireland replay makes the threat obvious.
 3. **End-to-end automated** — one button press, watch the whole chain unfold in ~30 seconds.
 4. **Video proof** — record the victim's browser session getting terminated in real time.
-5. **System log tells the story** — the monitor shows each event as it fires, making the detection-to-response pipeline clear.
+5. **Attacker POV is visceral** — the terminal animation and cookie inspector make the attack feel real, not abstract. Audiences can see the stolen cookie being injected and sitting in the browser.
+6. **System log tells the story** — the monitor shows each event as it fires, making the detection-to-response pipeline clear.
 
 ## The Three Demo Modes (Context)
 
