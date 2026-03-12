@@ -12,15 +12,15 @@ Requirements:
 
 Usage (as module):
     from itp.session_authenticator import SessionAuthenticator
-    auth = SessionAuthenticator("myorg", "okta.com")
+    auth = SessionAuthenticator("taskvantage", "okta.com")
     result = auth.authenticate("user@example.com", "password", totp_secret="BASE32SECRET")
     print(result["cookie"])  # IDX cookie value
 
 Usage (standalone):
     python3 -m itp.session_authenticator \
         --username user@example.com \
-        --password-ssm /{environment}/itp/password \
-        --totp-ssm /{environment}/itp/totp-secret
+        --password-ssm /taskvantage-prod/itp-demo/password \
+        --totp-ssm /taskvantage-prod/itp-demo/totp-secret
 """
 
 import os
@@ -186,15 +186,13 @@ class BrowserSession:
         return False
 
 
-def get_ssm_parameter(name: str, region: str = None, profile: str = None) -> str:
+def get_ssm_parameter(name: str, region: str = "us-east-2", profile: str = None) -> str:
     """Retrieve a parameter from AWS SSM Parameter Store"""
     import boto3
     session_kwargs = {}
-    if region:
-        session_kwargs["region_name"] = region
     if profile:
         session_kwargs["profile_name"] = profile
-    session = boto3.Session(**session_kwargs)
+    session = boto3.Session(region_name=region, **session_kwargs)
     ssm = session.client("ssm")
 
     response = ssm.get_parameter(Name=name, WithDecryption=True)
@@ -713,6 +711,147 @@ class SessionAuthenticator:
                 video_path=str(video_path) if video_path else None,
             )
 
+    def _build_terminal_html(self, cookie_name: str, cookie_value: str,
+                             domain: str) -> str:
+        """Build an HTML page that animates the attacker injecting a stolen cookie.
+
+        Renders a terminal-style UI with typed-out commands showing the cookie
+        being pasted into the browser's cookie jar. Designed to be visually
+        compelling in demo recordings.
+        """
+        # Truncate cookie for display (full value is too long)
+        display_cookie = cookie_value[:40] + "..." + cookie_value[-12:]
+        import html as html_mod
+        safe_cookie = html_mod.escape(display_cookie)
+        safe_domain = html_mod.escape(domain)
+        safe_name = html_mod.escape(cookie_name)
+        safe_full_cookie = html_mod.escape(cookie_value[:60]) + "..."
+
+        return f'''<!DOCTYPE html>
+<html><head><style>
+* {{ margin: 0; padding: 0; box-sizing: border-box; }}
+body {{ background: #0a0a0a; color: #00ff41; font-family: 'Courier New', monospace;
+       font-size: 15px; padding: 30px 40px; line-height: 1.7; }}
+.prompt {{ color: #ff3333; }}
+.cmd {{ color: #00ff41; }}
+.comment {{ color: #666; }}
+.output {{ color: #ccc; }}
+.success {{ color: #00ff41; font-weight: bold; }}
+.warn {{ color: #ffaa00; }}
+.cookie-val {{ color: #00ccff; word-break: break-all; }}
+.cursor {{ display: inline-block; width: 8px; height: 16px; background: #00ff41;
+           animation: blink 0.7s step-end infinite; vertical-align: text-bottom; }}
+@keyframes blink {{ 50% {{ opacity: 0; }} }}
+.line {{ opacity: 0; white-space: pre-wrap; }}
+.line.visible {{ opacity: 1; }}
+.header {{ color: #ff3333; font-size: 13px; margin-bottom: 20px; border-bottom: 1px solid #333;
+           padding-bottom: 10px; }}
+.badge {{ display: inline-block; background: #ff3333; color: #fff; padding: 2px 8px;
+          border-radius: 3px; font-size: 11px; margin-left: 10px; }}
+</style></head><body>
+<div class="header">
+  ATTACKER WORKSTATION<span class="badge">SESSION HIJACK</span>
+  <span style="float:right; color:#666">Firefox 121.0 / Windows 10 / EU-WEST-1</span>
+</div>
+<div id="terminal">
+<div class="line" data-delay="300"><span class="comment"># Stolen session cookie received from malware C2 callback</span></div>
+<div class="line" data-delay="800"><span class="comment"># Target: {safe_domain}</span></div>
+<div class="line" data-delay="1400"><span class="prompt">attacker@eu-west-1:~$ </span><span class="cmd">echo $STOLEN_COOKIE</span></div>
+<div class="line" data-delay="2200"><span class="cookie-val">{safe_cookie}</span></div>
+<div class="line" data-delay="3200">&nbsp;</div>
+<div class="line" data-delay="3400"><span class="comment"># Injecting cookie into browser storage...</span></div>
+<div class="line" data-delay="4000"><span class="prompt">attacker@eu-west-1:~$ </span><span class="cmd">document.cookie = "{safe_name}={safe_full_cookie}; domain={safe_domain}; path=/; secure"</span></div>
+<div class="line" data-delay="5200"><span class="success">✓ Cookie injected successfully</span></div>
+<div class="line" data-delay="5800">&nbsp;</div>
+<div class="line" data-delay="6000"><span class="comment"># Navigating to target — no credentials needed</span></div>
+<div class="line" data-delay="6600"><span class="prompt">attacker@eu-west-1:~$ </span><span class="cmd">open https://{safe_domain}/app/UserHome</span></div>
+<div class="line" data-delay="7400"><span class="warn">⏳ Redirecting to Okta dashboard...</span></div>
+</div>
+<script>
+const lines = document.querySelectorAll('.line');
+lines.forEach(line => {{
+  const delay = parseInt(line.dataset.delay) || 0;
+  setTimeout(() => line.classList.add('visible'), delay);
+}});
+</script>
+</body></html>'''
+
+    def _build_cookie_inspector_js(self, cookie_name: str, cookie_value: str,
+                                    domain: str) -> str:
+        """Build JavaScript that renders a DevTools-style cookie inspector overlay.
+
+        Shown after the attacker lands on the Okta dashboard, proving the
+        stolen cookie is present in the browser.
+        """
+        import html as html_mod
+        # Show enough of the cookie to be recognizable but not overwhelming
+        display_val = cookie_value[:64] + "..." + cookie_value[-16:]
+        safe_val = html_mod.escape(display_val).replace("'", "\\'")
+        safe_name = html_mod.escape(cookie_name).replace("'", "\\'")
+        safe_domain = html_mod.escape(domain).replace("'", "\\'")
+
+        return f'''
+(function() {{
+  var overlay = document.createElement('div');
+  overlay.id = 'cookie-inspector';
+  overlay.innerHTML = `
+    <div style="position:fixed; bottom:0; left:0; right:0; height:220px; z-index:999999;
+                background:#1e1e1e; border-top:2px solid #ff3333; font-family:'Courier New',monospace;
+                font-size:12px; color:#d4d4d4; display:flex; flex-direction:column;">
+      <div style="background:#2d2d2d; padding:6px 14px; display:flex; align-items:center;
+                  border-bottom:1px solid #404040;">
+        <span style="color:#ff3333; font-weight:bold; margin-right:12px;">🔍 Application</span>
+        <span style="color:#888; margin-right:12px;">› Cookies</span>
+        <span style="color:#fff;">› https://{safe_domain}</span>
+        <span style="margin-left:auto; background:#ff3333; color:#fff; padding:2px 8px;
+               border-radius:3px; font-size:10px;">STOLEN SESSION</span>
+      </div>
+      <div style="flex:1; overflow:auto; padding:0;">
+        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+          <thead>
+            <tr style="background:#2d2d2d; color:#888; text-align:left;">
+              <th style="padding:6px 12px; border-bottom:1px solid #404040; width:80px;">Name</th>
+              <th style="padding:6px 12px; border-bottom:1px solid #404040;">Value</th>
+              <th style="padding:6px 12px; border-bottom:1px solid #404040; width:160px;">Domain</th>
+              <th style="padding:6px 12px; border-bottom:1px solid #404040; width:50px;">Path</th>
+              <th style="padding:6px 12px; border-bottom:1px solid #404040; width:60px;">Secure</th>
+              <th style="padding:6px 12px; border-bottom:1px solid #404040; width:70px;">HttpOnly</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:#1a2332; border-left:3px solid #ff3333;">
+              <td style="padding:6px 12px; color:#ff3333; font-weight:bold;">{safe_name}</td>
+              <td style="padding:6px 12px; color:#00ccff; word-break:break-all;
+                         max-width:400px; overflow:hidden; text-overflow:ellipsis;">{safe_val}</td>
+              <td style="padding:6px 12px; color:#d4d4d4;">{safe_domain}</td>
+              <td style="padding:6px 12px; color:#d4d4d4;">/</td>
+              <td style="padding:6px 12px; color:#00ff41;">✓</td>
+              <td style="padding:6px 12px; color:#00ff41;">✓</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 12px; color:#888;">JSESSIONID</td>
+              <td style="padding:6px 12px; color:#888;">—</td>
+              <td style="padding:6px 12px; color:#888;">{safe_domain}</td>
+              <td style="padding:6px 12px; color:#888;">/</td>
+              <td style="padding:6px 12px; color:#888;">✓</td>
+              <td style="padding:6px 12px; color:#888;">✓</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 12px; color:#888;">t</td>
+              <td style="padding:6px 12px; color:#888;">—</td>
+              <td style="padding:6px 12px; color:#888;">{safe_domain}</td>
+              <td style="padding:6px 12px; color:#888;">/</td>
+              <td style="padding:6px 12px; color:#888;">✓</td>
+              <td style="padding:6px 12px; color:#888;">✗</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}})();'''
+
     def open_attacker_session(self, cookie_name: str, cookie_value: str,
                               domain: str,
                               victim_session: "BrowserSession",
@@ -723,13 +862,16 @@ class SessionAuthenticator:
         into a browser and navigate to the target site. No credentials needed.
         The attacker lands directly on the dashboard.
 
+        When recording video, shows a terminal animation of the cookie injection
+        followed by a DevTools-style cookie inspector overlay on the dashboard.
+
         Uses the same Playwright instance as the victim session (Playwright
         only allows one sync instance per process).
 
         Args:
             cookie_name: Name of the stolen cookie (e.g. "idx")
             cookie_value: Value of the stolen cookie
-            domain: Cookie domain (e.g. "myorg.okta.com")
+            domain: Cookie domain (e.g. "taskvantage.okta.com")
             victim_session: The victim's BrowserSession (shares Playwright instance)
             record_video: Directory path for video recording
 
@@ -762,6 +904,19 @@ class SessionAuthenticator:
         page = context.new_page()
         page.set_default_timeout(30000)
 
+        # Show terminal animation of cookie injection (for video recording)
+        if record_video:
+            try:
+                print(f"  Playing cookie injection terminal animation...")
+                terminal_html = self._build_terminal_html(
+                    cookie_name, cookie_value, domain
+                )
+                page.goto(f"data:text/html,{terminal_html}")
+                # Wait for the full animation to play (last line appears at 7.4s)
+                time.sleep(9)
+            except Exception as e:
+                print(f"  Terminal animation note: {e}")
+
         # Navigate to Okta — should land on dashboard without any login
         try:
             print(f"  Attacker navigating to {self.okta_url}/app/UserHome...")
@@ -775,6 +930,18 @@ class SessionAuthenticator:
                 print(f"  Attacker was redirected to login — cookie may already be invalid")
             else:
                 print(f"  Attacker is IN — no credentials needed!")
+
+                # Show cookie inspector overlay on the dashboard (for video)
+                if record_video:
+                    try:
+                        print(f"  Showing cookie inspector overlay...")
+                        inspector_js = self._build_cookie_inspector_js(
+                            cookie_name, cookie_value, domain
+                        )
+                        page.evaluate(inspector_js)
+                        time.sleep(3)  # Let viewer see the overlay
+                    except Exception as e:
+                        print(f"  Cookie inspector note: {e}")
         except Exception as e:
             print(f"  Attacker navigation note: {e}")
 
@@ -896,8 +1063,8 @@ def main():
     )
     parser.add_argument(
         "--aws-region",
-        default=None,
-        help="AWS region for SSM (default: boto3 default)"
+        default="us-east-2",
+        help="AWS region for SSM (default: us-east-2)"
     )
     parser.add_argument("--output", help="Write result JSON to file")
 
