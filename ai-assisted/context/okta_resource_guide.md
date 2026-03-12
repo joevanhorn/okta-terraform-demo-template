@@ -286,7 +286,7 @@ SAML IdP signing keys
 **Recommended:** Use `modules/saml-federation/` for SAML federation scenarios:
 - **Module:** `modules/saml-federation/`
 - **Docs:** `docs/SAML_FEDERATION.md`
-- **AI Prompt:** `ai-assisted/prompts/setup_saml_federation.md`
+- **AI Prompt:** `modules/saml-federation/docs/setup_saml_federation.md`
 - **Use for:** Okta-to-Okta federation, external IdP integration (Azure AD, Google)
 - **Features:** Dual-mode (SP/IdP), remote state coordination, JIT provisioning
 
@@ -346,7 +346,7 @@ User relationship assignments
 **Recommended:** Use `modules/lifecycle-management/` for JML patterns:
 - **Module:** `modules/lifecycle-management/`
 - **Docs:** `docs/LIFECYCLE_MANAGEMENT.md`
-- **AI Prompt:** `ai-assisted/prompts/setup_lifecycle_management.md`
+- **AI Prompt:** `modules/lifecycle-management/docs/setup_lifecycle_management.md`
 - **Use for:** Joiner/Mover/Leaver lifecycle automation
 - **Features:** User types, group rules, contractor lifecycle, OIG bundles, event hooks
 
@@ -634,7 +634,7 @@ Some OIG features are API-only (not in Terraform):
 
 ## Infrastructure Resources (AWS)
 
-**Important:** Infrastructure resources are in `environments/{env}/infrastructure/`, NOT in `terraform/` directory.
+**Important:** Infrastructure resources are in `modules/` (e.g., `modules/ad-domain-controller/`, `modules/scim-server/`), NOT in the `terraform/` directory.
 
 ### aws_vpc
 VPC for Active Directory infrastructure
@@ -678,7 +678,7 @@ Elastic IP for stable public address
 
 **Provider:** `okta/oktapam` (optional, separate from okta/okta)
 **Setup:** See `docs/OPA_SETUP.md`
-**Examples:** `environments/myorg/terraform/opa_resources.tf.example`
+**Examples:** `modules/opa/examples/opa_resources.tf.example`
 
 ### oktapam_resource_group
 Top-level organizational unit for OPA

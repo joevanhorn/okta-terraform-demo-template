@@ -19,7 +19,7 @@ Okta Tenant ←→ OPC Agent (EC2) ←→ PostgreSQL RDS
 ### 1. Deploy the Database
 
 ```bash
-cd environments/myorg/generic-db-infrastructure
+cd modules/generic-db-connector/examples
 cp main.tf.example main.tf
 # Edit main.tf: set backend bucket, environment name, region
 terraform init && terraform apply

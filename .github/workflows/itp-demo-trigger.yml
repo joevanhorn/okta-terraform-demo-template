@@ -167,8 +167,8 @@ jobs:
             ARGS="$ARGS --auto-reset"
           fi
 
-          cd scripts
-          python3 trigger_itp_demo.py $ARGS 2>&1 | tee ../demo.log
+          cd modules/itp-demo/scripts
+          python3 trigger_itp_demo.py $ARGS 2>&1 | tee ../../../demo.log
 
       - name: Run ITP Demo (real mode)
         if: inputs.mode == 'real'
@@ -191,8 +191,8 @@ jobs:
             ARGS="$ARGS --auto-reset"
           fi
 
-          cd scripts
-          python3 trigger_itp_demo.py $ARGS 2>&1 | tee ../demo.log
+          cd modules/itp-demo/scripts
+          python3 trigger_itp_demo.py $ARGS 2>&1 | tee ../../../demo.log
 
       - name: Run ITP Demo (ssf mode)
         if: inputs.mode == 'ssf'
@@ -208,8 +208,8 @@ jobs:
             ARGS="$ARGS --auto-reset"
           fi
 
-          cd scripts
-          python3 trigger_itp_demo.py $ARGS 2>&1 | tee ../demo.log
+          cd modules/itp-demo/scripts
+          python3 trigger_itp_demo.py $ARGS 2>&1 | tee ../../../demo.log
 
       - name: Extract presigned URL from log
         if: inputs.mode == 'real' && inputs.record_video == 'true'

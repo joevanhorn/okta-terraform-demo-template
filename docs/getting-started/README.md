@@ -56,7 +56,7 @@ See also: [GitHub Basic Setup](github-basic.md) (minimal, no CI/CD) | [Local Onl
 | Topic | Location |
 |-------|----------|
 | **Guides** | [Demo Building](../guides/demo-building.md), [Cross-Org Migration](../guides/cross-org-migration.md), [Backup & Restore](../guides/backup-restore.md) |
-| **Infrastructure** | [Active Directory](../infrastructure/active-directory.md), [Generic DB Connector](../infrastructure/generic-db-connector.md), [OPA](../infrastructure/opa-privileged-access.md), [OAG](../infrastructure/oag-deployment.md), [SCIM](../infrastructure/scim-server.md) |
+| **Infrastructure** | [Active Directory](../../modules/ad-domain-controller/docs/active-directory.md), [Generic DB Connector](../../modules/generic-db-connector/docs/generic-db-connector.md), [OPA](../../modules/opa/docs/opa-privileged-access.md), [OAG](../../modules/oag/docs/oag-deployment.md), [SCIM](../../modules/scim-server/docs/scim-server.md) |
 | **Governance** | [Labels](../governance/labels.md), [Entitlements](../governance/entitlements.md), [Risk Rules](../governance/labels.md) |
 | **Reference** | [Terraform Basics](../reference/terraform-basics.md), [Workflow Reference](../reference/workflow-reference.md), [API/Scripts](../reference/api-management.md) |
 | **Troubleshooting** | [General](../troubleshooting/general.md), [Entitlement Bundles](../troubleshooting/entitlement-bundles.md), [Lessons Learned](../troubleshooting/lessons-learned.md) |

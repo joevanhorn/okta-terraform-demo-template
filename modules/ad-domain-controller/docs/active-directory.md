@@ -68,7 +68,7 @@ gh workflow run ad-deploy.yml \
 ### 2. Deploy via CLI
 
 ```bash
-cd environments/myorg/ad-infrastructure
+cd modules/ad-domain-controller/examples
 
 # Initialize
 terraform init

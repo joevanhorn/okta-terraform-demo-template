@@ -394,7 +394,7 @@ playwright install --dry-run chromium 2>&1 | head -3
 
 ## What Claude Code Can vs. Cannot Do
 
-The deployment prompt (`ai-assisted/prompts/deploy_itp_demo.md`) can handle most of the setup, but some things require human action first.
+The deployment prompt (`modules/itp-demo/docs/deploy_itp_demo.md`) can handle most of the setup, but some things require human action first.
 
 ### Must Be Done Manually (before starting Claude Code)
 
@@ -439,5 +439,5 @@ Everything else — GitHub Environment setup, AWS backend, test user creation, T
 Once all prerequisites for your chosen mode(s) are met:
 
 1. Open Claude Code in this repository root
-2. Follow the deployment prompt: [`ai-assisted/prompts/deploy_itp_demo.md`](../../ai-assisted/prompts/deploy_itp_demo.md)
+2. Follow the deployment prompt: [`modules/itp-demo/docs/deploy_itp_demo.md`](../../modules/itp-demo/docs/deploy_itp_demo.md)
 3. Or see the full setup guide: [ITP Demo Guide](itp-demo.md)

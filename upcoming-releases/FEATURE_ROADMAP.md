@@ -54,7 +54,7 @@ Reusable module for org-to-org SAML federation, enabling hub-and-spoke identity 
 - [x] IdP discovery routing rules
 - [x] User attribute mapping templates
 - [x] Documentation: `docs/SAML_FEDERATION.md`
-- [x] AI prompt: `ai-assisted/prompts/setup_saml_federation.md`
+- [x] AI prompt: `modules/saml-federation/docs/setup_saml_federation.md`
 
 **Technical Implementation:**
 - Dual-mode module (`federation_mode = "sp"` or `"idp"`)
@@ -86,7 +86,7 @@ Reusable Terraform module for comprehensive JML (Joiner/Mover/Leaver) lifecycle 
 - [x] Contractor lifecycle: end-date tracking, expiration groups, access tiers
 - [x] OIG integration: entitlement bundles, review campaigns
 - [x] Documentation: `docs/LIFECYCLE_MANAGEMENT.md`
-- [x] AI prompt: `ai-assisted/prompts/setup_lifecycle_management.md`
+- [x] AI prompt: `modules/lifecycle-management/docs/setup_lifecycle_management.md`
 
 **Technical Implementation:**
 - Group rules for automatic assignment (`okta_group_rule`)

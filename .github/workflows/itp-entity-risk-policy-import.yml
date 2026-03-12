@@ -67,7 +67,7 @@ jobs:
         run: |
           OUTPUT_FILE="environments/${{ inputs.environment }}/config/entity_risk_policy.json"
 
-          python3 scripts/import_entity_risk_policy.py \
+          python3 modules/itp-demo/scripts/import_entity_risk_policy.py \
             --output "$OUTPUT_FILE" \
             2>&1 | tee import.log
 

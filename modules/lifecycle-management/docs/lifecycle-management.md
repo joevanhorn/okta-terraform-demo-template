@@ -542,7 +542,7 @@ Create Okta Workflow or external script for contractor expiration.
 ## Related Documentation
 
 - [Module README](../modules/lifecycle-management/README.md)
-- [AI Prompt Template](../ai-assisted/prompts/setup_lifecycle_management.md)
+- [AI Prompt Template](setup_lifecycle_management.md)
 - [OIG Prerequisites](../OIG_PREREQUISITES.md)
 - [Okta Group Rules API](https://developer.okta.com/docs/reference/api/groups/#group-rule-operations)
 

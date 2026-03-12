@@ -277,7 +277,7 @@ When `enable_oig_integration = true`:
 ## Related Documentation
 
 - [Lifecycle Management Guide](../../docs/LIFECYCLE_MANAGEMENT.md)
-- [AI Prompt Template](../../ai-assisted/prompts/setup_lifecycle_management.md)
+- [AI Prompt Template](docs/setup_lifecycle_management.md)
 - [OIG Prerequisites](../../OIG_PREREQUISITES.md)
 
 ## Authors

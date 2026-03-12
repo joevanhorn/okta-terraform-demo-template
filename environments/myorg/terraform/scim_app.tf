@@ -18,7 +18,7 @@
 # Two-Step Process:
 # -----------------
 # 1. Terraform: Creates the Okta app (this file)
-# 2. Python: Configures SCIM connection (scripts/configure_scim_app.py)
+# 2. Python: Configures SCIM connection (modules/scim-server/scripts/configure_scim_app.py)
 #
 # ==============================================================================
 
@@ -38,7 +38,7 @@ data "terraform_remote_state" "scim_server" {
 # ==============================================================================
 
 # Note: We use okta_app_auto_login as it's the closest match for a custom SCIM app
-# The actual SCIM configuration must be done via API (see scripts/configure_scim_app.py)
+# The actual SCIM configuration must be done via API (see modules/scim-server/scripts/configure_scim_app.py)
 resource "okta_app_auto_login" "scim_demo" {
   label = var.scim_app_label
 
@@ -108,7 +108,7 @@ output "scim_server_dashboard" {
 output "scim_configuration_command" {
   description = "Command to configure SCIM connection via Python script"
   value       = <<-EOT
-    python3 scripts/configure_scim_app.py \
+    python3 modules/scim-server/scripts/configure_scim_app.py \
       --app-id ${okta_app_auto_login.scim_demo.id} \
       --scim-url ${data.terraform_remote_state.scim_server.outputs.scim_base_url} \
       --test-connection
@@ -137,7 +137,7 @@ output "scim_setup_instructions" {
     ════════════════════════════════════════════════════════════════════════════
 
     cd environments/${var.scim_environment}
-    python3 ../../scripts/configure_scim_app.py \
+    python3 ../../modules/scim-server/scripts/configure_scim_app.py \
       --app-id ${okta_app_auto_login.scim_demo.id} \
       --scim-url ${data.terraform_remote_state.scim_server.outputs.scim_base_url} \
       --test-connection
@@ -163,7 +163,7 @@ output "scim_setup_instructions" {
 
     ════════════════════════════════════════════════════════════════════════════
 
-    📖 See: environments/myorg/infrastructure/scim-server/README.md for details
+    📖 See: modules/scim-server/README.md for details
 
   EOT
 }

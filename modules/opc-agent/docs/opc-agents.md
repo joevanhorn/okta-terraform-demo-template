@@ -16,7 +16,7 @@ Okta Tenant ←→ OPC Agent (RHEL 8 EC2) ←→ Database (RDS/On-prem)
 ### 1. Deploy OPC Agents
 
 ```bash
-cd environments/myorg/opc-infrastructure
+cd modules/opc-agent/examples
 cp main.tf.example main.tf
 # Edit main.tf: set backend, Okta URL, database host
 terraform init && terraform apply
@@ -94,7 +94,7 @@ module "opc_agents" {
 Build a pre-configured AMI with Packer to speed up OPC agent deployment:
 
 ```bash
-cd packer/opc-agent
+cd modules/opc-agent/packer
 cp variables.pkrvars.hcl.example variables.pkrvars.hcl
 # Edit variables
 packer build -var-file=variables.pkrvars.hcl opc-agent.pkr.hcl

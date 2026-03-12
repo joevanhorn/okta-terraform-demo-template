@@ -561,7 +561,7 @@ terraform output okta_configuration
 | `log_retention_days` | number | | `7` | CloudWatch log retention |
 | `root_volume_size` | number | | `8` | Root EBS volume size (GB) |
 | `github_repo` | string | | `joevanhorn/okta-terraform-demo-template` | Source code repository |
-| `scim_server_path` | string | | `main/environments/myorg/infrastructure/scim-server` | Path to SCIM server code |
+| `scim_server_path` | string | | `main/modules/scim-server` | Path to SCIM server code |
 | `entitlements_file` | string | | `"entitlements.json"` | Path to entitlements JSON file (e.g., "examples/entitlements-salesforce.json") |
 | `custom_entitlements` | string | | `""` | **DEPRECATED:** Use `entitlements_file` instead |
 | **Network Configuration** | | | | |
@@ -654,7 +654,7 @@ Create a new JSON file in the repository:
 }
 ```
 
-Save to: `environments/myorg/infrastructure/scim-server/custom/my-app-entitlements.json`
+Save to: `modules/scim-server/custom/my-app-entitlements.json`
 
 Then deploy with:
 
@@ -831,7 +831,7 @@ terraform destroy
 ## File Structure
 
 ```
-environments/myorg/infrastructure/scim-server/
+modules/scim-server/
 ├── provider.tf              # AWS provider and backend config
 ├── variables.tf             # Input variables with validation
 ├── main.tf                  # Infrastructure resources

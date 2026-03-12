@@ -108,7 +108,7 @@ jobs:
             ARGS="$ARGS --delete-removed"
           fi
 
-          python3 scripts/apply_entity_risk_policy.py $ARGS 2>&1 | tee apply.log
+          python3 modules/itp-demo/scripts/apply_entity_risk_policy.py $ARGS 2>&1 | tee apply.log
 
           APPLY_STATUS=$?
           echo "apply_status=$APPLY_STATUS" >> $GITHUB_OUTPUT

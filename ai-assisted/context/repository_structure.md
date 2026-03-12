@@ -20,25 +20,6 @@ okta-terraform-complete-demo/
 │   │   │   ├── scim_app.tf     # SCIM application (connects to scim-server) ⭐ NEW!
 │   │   │   ├── oig_entitlements.tf  # OIG entitlement bundles
 │   │   │   └── oig_reviews.tf  # OIG access reviews
-│   │   ├── infrastructure/     # Terraform configurations (AWS infrastructure)
-│   │   │   ├── active-directory/  # Active Directory Domain Controller (optional)
-│   │   │   │   ├── provider.tf     # AWS provider with S3 backend
-│   │   │   │   ├── variables.tf    # Infrastructure variables
-│   │   │   │   ├── vpc.tf          # VPC and networking
-│   │   │   │   ├── security-groups.tf  # Security groups (AD ports)
-│   │   │   │   ├── ad-domain-controller.tf  # EC2 Domain Controller
-│   │   │   │   ├── outputs.tf      # Infrastructure outputs
-│   │   │   │   ├── scripts/        # PowerShell automation scripts
-│   │   │   │   └── terraform.tfvars.example  # Example variables
-│   │   │   └── scim-server/    # Custom SCIM 2.0 Server (optional) ⭐ NEW!
-│   │   │       ├── provider.tf     # AWS provider with S3 backend
-│   │   │       ├── variables.tf    # SCIM server variables
-│   │   │       ├── main.tf         # EC2, security groups, Route53
-│   │   │       ├── outputs.tf      # SCIM URLs, connection info
-│   │   │       ├── user-data.sh    # Server initialization (Caddy + Flask)
-│   │   │       ├── demo_scim_server.py  # Flask SCIM 2.0 server
-│   │   │       ├── requirements.txt     # Python dependencies
-│   │   │       └── README.md       # Deployment guide
 │   │   ├── imports/            # Imported JSON data
 │   │   └── config/             # Configuration files
 │   │       ├── owner_mappings.json    # Resource owners (API-managed)
@@ -47,6 +28,41 @@ okta-terraform-complete-demo/
 │   ├── production/             # Production environment (template)
 │   ├── staging/                # Staging environment (template)
 │   └── development/            # Development environment (template)
+├── modules/                    # Self-contained feature packages
+│   ├── ad-domain-controller/  # Active Directory Domain Controller (optional)
+│   │   ├── examples/          # Example configurations
+│   │   ├── scripts/           # PowerShell automation scripts
+│   │   └── docs/              # AD-specific documentation
+│   ├── scim-server/           # Custom SCIM 2.0 Server (optional)
+│   │   ├── app/               # SCIM server application code
+│   │   ├── scripts/           # Configuration and helper scripts
+│   │   ├── examples/          # Example configurations
+│   │   └── docs/              # SCIM-specific documentation
+│   ├── oag/                   # Okta Access Gateway
+│   │   ├── examples/          # Example configurations (oag-infrastructure, oag-demo-app)
+│   │   ├── scripts/           # OAG helper scripts
+│   │   └── docs/              # OAG-specific documentation
+│   ├── opc-agent/             # On-Premises Connector Agent
+│   │   ├── examples/          # Example configurations
+│   │   ├── scripts/           # OPC helper scripts
+│   │   └── docs/              # OPC-specific documentation
+│   ├── generic-db-connector/  # Generic Database Connector
+│   │   ├── examples/          # Example configurations
+│   │   ├── scripts/           # DB connector scripts
+│   │   └── docs/              # Generic DB documentation
+│   ├── opa/                   # Okta Privileged Access
+│   │   ├── examples/          # Example configurations
+│   │   ├── scripts/           # OPA helper scripts
+│   │   └── docs/              # OPA-specific documentation
+│   ├── itp-demo/              # Identity Threat Protection demo
+│   │   ├── scripts/           # ITP trigger and monitor scripts
+│   │   ├── examples/          # Example configurations
+│   │   ├── lambda/            # Lambda function for session replay
+│   │   └── docs/              # ITP demo documentation
+│   ├── lifecycle-management/  # Lifecycle Management
+│   │   └── docs/              # LCM documentation
+│   └── saml-federation/       # SAML Federation
+│       └── docs/              # SAML documentation
 ├── backup-restore/             # Backup and restore solutions
 │   ├── README.md               # Choose your approach guide
 │   ├── resource-based/         # Full resource export/import approach
@@ -72,12 +88,10 @@ okta-terraform-complete-demo/
 │   ├── apply_admin_labels.py       # Auto-label admin resources
 │   ├── import_risk_rules.py        # Import risk rules (SOD policies)
 │   ├── apply_risk_rules.py         # Apply risk rules to Okta
-│   ├── configure_scim_app.py       # Configure SCIM connection (API-only)
 │   ├── manage_entitlement_settings.py  # Enable/disable entitlement mgmt
 │   ├── export_groups_to_terraform.py   # Groups → Terraform (cross-org)
 │   ├── copy_group_memberships.py       # Export/import memberships (cross-org)
-│   ├── copy_grants_between_orgs.py     # Export/import grants (cross-org)
-│   └── import_opa_resources.py         # Import OPA resources
+│   └── copy_grants_between_orgs.py     # Export/import grants (cross-org)
 ├── docs/                       # Documentation
 ├── testing/                    # Testing and validation guides
 └── .github/workflows/          # GitHub Actions workflows
@@ -126,9 +140,11 @@ Each resource type has its own file:
 - `oig_entitlements.tf` - OIG entitlement bundles
 - `oig_reviews.tf` - OIG access review campaigns
 
-### Infrastructure Files (Optional)
+### Infrastructure Modules (Optional)
 
-**Active Directory** infrastructure files (in `infrastructure/active-directory/` subdirectory):
+Infrastructure features are organized as self-contained modules under `modules/`:
+
+**Active Directory** module (`modules/ad-domain-controller/`):
 - `provider.tf` - AWS provider with S3 backend configuration
 - `variables.tf` - Infrastructure input variables (passwords, domain names)
 - `vpc.tf` - VPC, subnets, internet gateway, routing tables
@@ -137,30 +153,31 @@ Each resource type has its own file:
 - `outputs.tf` - Connection info, next steps instructions
 - `scripts/userdata.ps1` - PowerShell script for automated DC setup
 - `terraform.tfvars.example` - Example configuration template
-- `.gitignore` - Protect sensitive files (*.tfvars, *.tfstate)
-- `README.md` - Comprehensive deployment guide
+- `examples/` - Example configurations
+- `docs/` - AD-specific documentation
 
-**SCIM Server** infrastructure files (in `infrastructure/scim-server/` subdirectory):
+**SCIM Server** module (`modules/scim-server/`):
 - `provider.tf` - AWS provider with S3 backend configuration
-- `variables.tf` - SCIM server variables (domain, tokens, network config, entitlements_file)
+- `variables.tf` - SCIM server variables (domain, tokens, network config)
 - `main.tf` - EC2 instance, security groups, Elastic IP, Route53 DNS
 - `outputs.tf` - SCIM URLs, Okta configuration values, setup instructions
-- `user-data.sh` - Server initialization (Caddy + Flask, downloads entitlements.json)
-- `demo_scim_server.py` - Flask SCIM 2.0 server (loads entitlements from JSON file)
-- `entitlements.json` - Default entitlement/role definitions (5 standard roles)
-- `examples/entitlements-salesforce.json` - Salesforce-style roles (6 roles)
-- `examples/entitlements-aws.json` - AWS IAM-style permissions (7 roles)
-- `examples/entitlements-generic.json` - Generic application roles (7 roles)
-- `requirements.txt` - Python dependencies
-- `.gitignore` - Protect sensitive files
-- `README.md` - Complete deployment and configuration guide
+- `app/` - SCIM server application code (Flask SCIM 2.0 server)
+- `scripts/` - Configuration and helper scripts
+- `examples/` - Example configurations and entitlement files
+- `docs/` - SCIM-specific documentation
+
+**Other infrastructure modules:**
+- `modules/oag/` - Okta Access Gateway (examples in `modules/oag/examples/oag-infrastructure/`)
+- `modules/opc-agent/` - On-Premises Connector Agent (examples in `modules/opc-agent/examples/`)
+- `modules/generic-db-connector/` - Generic Database Connector (examples in `modules/generic-db-connector/examples/`)
+- `modules/opa/` - Okta Privileged Access (examples in `modules/opa/examples/`)
 
 **SCIM Application** (in `terraform/` directory - Okta side):
 - `scim_app.tf` - Okta SCIM application resource
   - Data source to read SCIM server state from S3
   - Creates Okta app for SCIM provisioning
   - Outputs app ID and configuration commands
-- `scripts/configure_scim_app.py` - Python script to configure SCIM connection via API
+- `modules/scim-server/scripts/configure_scim_app.py` - Python script to configure SCIM connection via API
   - Enables SCIM provisioning
   - Configures connection (base URL, authentication)
   - Tests connection
@@ -206,13 +223,14 @@ resource "okta_group_memberships" "example" {
 
 When generating code for a specific environment, use:
 - Okta Terraform files: `environments/{env}/terraform/`
-- Infrastructure files: `environments/{env}/infrastructure/`
+- Infrastructure modules: `modules/{module-name}/` (with examples in `modules/{module-name}/examples/`)
 - Imports: `environments/{env}/imports/`
 - Config: `environments/{env}/config/`
 
 Example for myorg:
 - `environments/myorg/terraform/users.tf` (Okta resources)
-- `environments/myorg/infrastructure/vpc.tf` (AWS resources)
+- `modules/ad-domain-controller/` (AD infrastructure module)
+- `modules/scim-server/` (SCIM server infrastructure module)
 
 ## Infrastructure Patterns
 
@@ -222,12 +240,14 @@ Generate infrastructure code when the user requests:
 - Windows Server deployment
 - VPC or AWS networking setup
 - "AD Agent" or "Okta AD integration" infrastructure
+- SCIM server, OPC agent, OAG, Generic DB connector infrastructure
 
-### Infrastructure Directory Structure
-Infrastructure is SEPARATE from Okta Terraform:
-- **Location:** `environments/{env}/infrastructure/`
+### Infrastructure Module Structure
+Infrastructure is organized as modules, SEPARATE from Okta Terraform:
+- **Location:** `modules/{module-name}/` (e.g., `modules/ad-domain-controller/`, `modules/scim-server/`)
+- **Examples:** `modules/{module-name}/examples/`
 - **Provider:** AWS (not Okta)
-- **State:** Separate S3 backend (`{env}/infrastructure/terraform.tfstate`)
+- **State:** Separate S3 backend per module
 - **Purpose:** Supporting infrastructure for Okta integrations
 
 ### Infrastructure vs Okta Resources
@@ -235,12 +255,12 @@ Infrastructure is SEPARATE from Okta Terraform:
 
 ```
 terraform/           → Okta provider (okta_user, okta_group, etc.)
-infrastructure/      → AWS provider (aws_vpc, aws_instance, etc.)
+modules/             → AWS provider (aws_vpc, aws_instance, etc.)
 ```
 
 Each has its own provider, state, and backend configuration.
 
-### SCIM Server Integration (NEW!)
+### SCIM Server Integration
 
 When to generate SCIM server infrastructure:
 - User requests "SCIM server", "custom SCIM", or "API-only entitlements" demo
@@ -249,7 +269,7 @@ When to generate SCIM server infrastructure:
 
 **Two-Phase SCIM Automation:**
 
-1. **Infrastructure** (`infrastructure/scim-server/`):
+1. **Infrastructure** (`modules/scim-server/`):
    - Deploys AWS EC2 with Flask SCIM 2.0 server
    - Automatic HTTPS via Caddy + Let's Encrypt
    - Custom entitlements/roles
@@ -284,7 +304,7 @@ cd environments/myorg/terraform
 terraform apply
 
 # Step 4: Configure SCIM connection (Python - API only)
-python3 ../../scripts/configure_scim_app.py \
+python3 ../../modules/scim-server/scripts/configure_scim_app.py \
   --app-id $(terraform output -raw scim_app_id) \
   --scim-url https://scim.demo-myorg.example.com/scim/v2 \
   --scim-token <from-github-secret-SCIM_AUTH_TOKEN> \
@@ -294,7 +314,7 @@ python3 ../../scripts/configure_scim_app.py \
 **Alternative: Manual Terraform Deployment**
 ```bash
 # For local development/testing
-cd environments/myorg/infrastructure/scim-server
+cd modules/scim-server
 cp terraform.tfvars.example terraform.tfvars
 vim terraform.tfvars  # Edit with your values
 terraform init
@@ -307,9 +327,9 @@ These settings must be configured via Okta Admin API (Python script handles this
 
 **Documentation:**
 - GitHub Workflow: `.github/workflows/deploy-scim-server.yml`
-- SCIM Server README: `environments/myorg/infrastructure/scim-server/README.md`
+- SCIM Server README: `modules/scim-server/README.md`
 - Automation Guide: `docs/SCIM_OKTA_AUTOMATION.md`
-- Secrets Migration: `environments/myorg/infrastructure/scim-server/GITHUB_SECRETS_MIGRATION.md`
+- Secrets Migration: `modules/scim-server/GITHUB_SECRETS_MIGRATION.md`
 
 ## Backup and Restore
 

@@ -257,4 +257,4 @@ jobs:
           echo "3. Add GitHub secrets: \`OKTAPAM_KEY\`, \`OKTAPAM_SECRET\`, \`OKTAPAM_TEAM\`" >> $GITHUB_STEP_SUMMARY
           echo "4. Copy \`opa_resources.tf.example\` to \`opa_resources.tf\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "See \`docs/infrastructure/opa-privileged-access.md\` for complete setup instructions." >> $GITHUB_STEP_SUMMARY
+          echo "See \`modules/opa/docs/opa-privileged-access.md\` for complete setup instructions." >> $GITHUB_STEP_SUMMARY

@@ -73,8 +73,8 @@ jobs:
             ARGS="$ARGS --app '${{ inputs.app_name }}'"
           fi
 
-          echo "Running: python scripts/manage_oag_apps.py $ARGS"
-          python scripts/manage_oag_apps.py $ARGS
+          echo "Running: python modules/oag/scripts/manage_oag_apps.py $ARGS"
+          python modules/oag/scripts/manage_oag_apps.py $ARGS
 
       - name: List deployed applications
         if: inputs.dry_run == false
@@ -84,7 +84,7 @@ jobs:
           OAG_PRIVATE_KEY_PATH: ~/.oag/private_key.pem
         run: |
           CONFIG_PATH="environments/${{ inputs.environment }}/${{ inputs.config_file }}"
-          python scripts/manage_oag_apps.py --config $CONFIG_PATH --action list
+          python modules/oag/scripts/manage_oag_apps.py --config $CONFIG_PATH --action list
 
       - name: Cleanup
         if: always()

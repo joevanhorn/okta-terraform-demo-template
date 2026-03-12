@@ -10,12 +10,12 @@
 #   - SSM parameters for SSF provider config and private key
 #
 # Prerequisites:
-#   1. Add AWS provider to your provider.tf (see docs/infrastructure/itp-aws-requirements.md)
-#   2. Store ITP demo credentials in SSM (see docs/guides/itp-demo.md)
+#   1. Add AWS provider to your provider.tf (see modules/itp-demo/docs/itp-aws-requirements.md)
+#   2. Store ITP demo credentials in SSM (see modules/itp-demo/docs/itp-demo.md)
 #   3. terraform init && terraform apply
 #   4. Run setup_ssf_provider.py to register the SSF provider with Okta
 #
-# For full setup guide, see: docs/guides/itp-demo.md
+# For full setup guide, see: modules/itp-demo/docs/itp-demo.md
 # ==============================================================================
 
 # # --- AWS Provider (add to provider.tf if not already present) ---
