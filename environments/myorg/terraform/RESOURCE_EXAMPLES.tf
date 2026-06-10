@@ -26,7 +26,7 @@
 #   status     = "ACTIVE"
 # }
 
-# resource "okta_user_schema" "example" {
+# resource "okta_user_schema_property" "example" {
 #   index       = "customAttribute"
 #   title       = "Custom Attribute"
 #   type        = "string"
@@ -35,7 +35,7 @@
 #   scope       = "NONE"
 # }
 
-# resource "okta_user_base_schema" "example" {
+# resource "okta_user_base_schema_property" "example" {
 #   index  = "email"
 #   title  = "Primary email"
 #   type   = "string"
@@ -95,7 +95,7 @@
 #   description = "Engineering department group"
 # }
 
-# resource "okta_group_schema" "example" {
+# resource "okta_group_schema_property" "example" {
 #   index       = "department"
 #   title       = "Department"
 #   type        = "string"
@@ -250,7 +250,7 @@
 #   }
 # }
 
-# resource "okta_app_user_schema" "example" {
+# resource "okta_app_user_schema_property" "example" {
 #   app_id      = okta_app_oauth.example.id
 #   index       = "customField"
 #   title       = "Custom Field"
@@ -259,7 +259,7 @@
 #   master      = "OKTA"
 # }
 
-# resource "okta_app_user_base_schema" "example" {
+# resource "okta_app_user_base_schema_property" "example" {
 #   app_id = okta_app_oauth.example.id
 #   index  = "email"
 #   title  = "Email"
@@ -679,171 +679,151 @@
 # }
 
 # =============================================================================
-# OKTA IDENTITY GOVERNANCE (OIG) - v6.1.0+ (9 resources)
+# OKTA IDENTITY GOVERNANCE (OIG)
 # =============================================================================
-
-# -----------------------------------------------------------------------------
-# Access Reviews (Campaigns)
-# -----------------------------------------------------------------------------
-
-# resource "okta_reviews" "example" {
-#   name        = "Quarterly Access Review"
-#   description = "Review user access every quarter"
-#   start_date  = "2025-01-01"
-#   end_date    = "2025-03-31"
+# Verified against the okta/okta provider v6.12.0 (constraint >= 6.4.0, < 7.0.0).
+# Every resource/data-source name + attribute below is real (from `terraform
+# providers schema`), not a guess. All examples are commented; uncomment and fill
+# in IDs to use. Requires an Okta Identity Governance license.
 #
-#   # Note: Exact schema may vary - check official docs
-#   # This is the new OIG access certification campaign resource
-# }
+# Name corrections from earlier drafts: okta_request_conditions -> okta_request_condition
+# (singular); okta_request_sequences -> okta_request_sequence; okta_request_settings ->
+# okta_request_setting_resource + okta_request_setting_organization; okta_reviews ->
+# okta_campaign (+ okta_review); okta_catalog_entry_* and okta_principal_entitlements are
+# DATA SOURCES, not resources.
 
 # -----------------------------------------------------------------------------
-# Entitlement Bundles
+# Entitlements (resource) — https://registry.terraform.io/providers/okta/okta/latest/docs/resources/entitlement
 # -----------------------------------------------------------------------------
-
-# Entitlement bundles define collections of access rights
-# Documentation: https://registry.terraform.io/providers/okta/okta/latest/docs/resources/entitlement_bundle
-#
-# IMPORTANT: Bundles require Okta-generated value IDs, not external_value strings.
-# Use dynamic blocks with for expressions to look up IDs by external_value.
-
-# Example: Define account groupings in locals for reusability
-# locals {
-#   standard_accounts = ["DEMO38", "26DEMO26", "26DEMO14", "DEMO42"]
-#   limited_accounts  = ["DEMO38", "DEMO42"]
-#   all_accounts      = ["DEMO38", "26DEMO26", "26DEMO14", "DEMO2", "149259"]
-# }
-
-# Example: Basic bundle (hardcoded IDs - not recommended)
-# resource "okta_entitlement_bundle" "basic_example" {
-#   name        = "Sales Team Access"
-#   description = "Standard access for sales team members"
-#   status      = "ACTIVE"
-#
-#   target {
+# resource "okta_entitlement" "roles" {
+#   name           = "Roles"
+#   external_value = "roles"
+#   multi_value    = true
+#   data_type      = "array"
+#   parent {
 #     external_id = okta_app_oauth.my_app.id
 #     type        = "APPLICATION"
 #   }
-#
-#   entitlements {
-#     id = okta_entitlement.my_entitlement.id
-#     values {
-#       id = "val..."  # Hardcoded Okta-generated ID
-#     }
-#   }
+#   values { name = "Admin",  external_value = "admin" }
+#   values { name = "Viewer", external_value = "viewer" }
 # }
 
-# Example: Bundle with dynamic value lookups (RECOMMENDED)
-# resource "okta_entitlement_bundle" "dynamic_example" {
+# -----------------------------------------------------------------------------
+# Entitlement bundle (resource) — https://registry.terraform.io/providers/okta/okta/latest/docs/resources/entitlement_bundle
+# Bundles need Okta-generated value IDs, not external_value strings. Use dynamic
+# blocks to look up IDs by external_value (creates proper same-apply dependencies).
+# -----------------------------------------------------------------------------
+# resource "okta_entitlement_bundle" "standard" {
 #   name        = "Standard Access Bundle"
-#   description = "Standard 4-account access"
+#   description = "Standard account access"
 #   status      = "ACTIVE"
-#
 #   target {
 #     external_id = okta_app_oauth.my_app.id
 #     type        = "APPLICATION"
 #   }
-#
 #   entitlements {
-#     id = okta_entitlement.app_accounts.id
+#     id = okta_entitlement.roles.id
 #     dynamic "values" {
-#       for_each = [
-#         for v in okta_entitlement.app_accounts.values : v.id
-#         if contains(local.standard_accounts, v.external_value)
-#       ]
-#       content {
-#         id = values.value
-#       }
+#       for_each = [for v in okta_entitlement.roles.values : v.id if v.external_value == "admin"]
+#       content { id = values.value }
 #     }
 #   }
-#
-#   # This approach:
-#   # - Uses dynamic blocks (values is a block type, not an argument)
-#   # - Filters values by external_value string
-#   # - Returns the Okta-generated value ID
-#   # - Creates proper resource dependencies for same-apply creation
 # }
-
-# Note: This resource manages the BUNDLE DEFINITION only
-# Principal assignments (which users/groups have this bundle) should be
-# managed via Okta Admin UI or direct API calls, not in Terraform
+# Note: this manages the bundle DEFINITION only. Principal assignments (which users/
+# groups hold the bundle) are read-only via the okta_principal_entitlements DATA SOURCE.
 
 # -----------------------------------------------------------------------------
-# Principal Entitlements (Assignments)
+# Access requests (resources) — names are SINGULAR
 # -----------------------------------------------------------------------------
-
-# resource "okta_principal_entitlements" "example" {
-#   # WARNING: This resource manages principal ASSIGNMENTS to entitlement bundles
-#   # It is NOT recommended to manage assignments in Terraform due to complexity
-#   # and drift issues. Manage assignments in Okta Admin UI or via API instead.
-#   #
-#   # This resource is for assigning specific users/groups to entitlement bundles
-#   # Only use if you have a strong requirement for IaC-managed assignments
-#   #
-#   # Documentation: https://registry.terraform.io/providers/okta/okta/latest/docs/resources/principal_entitlements
-#
-#   # Note: Schema TBD - this is a NEW resource in v6.1.0
+# okta_request_condition — makes a resource requestable: who may request it, which
+# approval sequence runs, and the granted duration.
+# https://registry.terraform.io/providers/okta/okta/latest/docs/resources/request_condition
+# resource "okta_request_condition" "crm_admin" {
+#   name                 = "Request CRM Admin"
+#   resource_id          = okta_app_oauth.my_app.id        # the governed app/group/bundle
+#   approval_sequence_id = okta_request_sequence.manager.id
+#   priority             = 1
+#   status               = "ACTIVE"
+#   requester_settings       { type = "EVERYONE" }          # or "GROUPS"
+#   access_scope_settings    { type = "RESOURCE_DEFAULT" }  # or "GROUPS"
+#   access_duration_settings { type = "ADMIN_FIXED_DURATION"  duration = "PT8H" }
+#   # For request-on-behalf-of, also set okta_request_setting_resource (below).
 # }
-
-# -----------------------------------------------------------------------------
-# Access Request Management
-# -----------------------------------------------------------------------------
-
-# resource "okta_request_conditions" "example" {
-#   # Conditions for access requests (e.g., manager approval required)
-#   # Part of the access request workflow system
 #
-#   # Note: Exact schema TBD - NEW in v6.1.0
+# okta_request_sequence — binds an approval sequence to a resource (id + resource_id
+# are the inputs; name/description/compatible_resource_types are read back).
+# https://registry.terraform.io/providers/okta/okta/latest/docs/resources/request_sequence
+# resource "okta_request_sequence" "manager" {
+#   id          = "<approval-sequence-id>"     # an existing approval sequence
+#   resource_id = okta_app_oauth.my_app.id
 # }
-
-# resource "okta_request_sequences" "example" {
-#   # Multi-stage approval workflows for access requests
-#   # Define who approves requests and in what order
 #
-#   # Note: Exact schema TBD - NEW in v6.1.0
+# okta_request_setting_resource — per-resource request settings (e.g. allow an
+# admin/agent to request on behalf of another user).
+# https://registry.terraform.io/providers/okta/okta/latest/docs/resources/request_setting_resource
+# resource "okta_request_setting_resource" "crm" {
+#   id = okta_app_oauth.my_app.id
+#   request_on_behalf_of_settings { allowed = true }
 # }
-
-# resource "okta_request_settings" "example" {
-#   # Global settings for access request system
-#   # Configure request expiration, notifications, etc.
 #
-#   # Note: Exact schema TBD - NEW in v6.1.0
+# okta_request_setting_organization — org-wide access-request settings.
+# https://registry.terraform.io/providers/okta/okta/latest/docs/resources/request_setting_organization
+# resource "okta_request_setting_organization" "org" {
+#   id                         = "default"
+#   subprocessors_acknowledged = true
 # }
-
-# resource "okta_request_v2" "example" {
-#   # Programmatic access requests
-#   # Request access to resources on behalf of users
 #
-#   # Note: Exact schema TBD - NEW in v6.1.0
-# }
+# okta_request_v2 — create an access request programmatically. See the docs for the
+# requested / requested_for schema.
+# https://registry.terraform.io/providers/okta/okta/latest/docs/resources/request_v2
 
 # -----------------------------------------------------------------------------
-# Resource Catalog
+# Access certification (resources)
 # -----------------------------------------------------------------------------
-
-# resource "okta_catalog_entry_default" "example" {
-#   # Make resources (apps, groups, entitlements) requestable
-#   # Users can request access through self-service portal
+# okta_campaign — an access certification campaign (this replaces the old guessed
+# "okta_reviews"). Real block names shown; fill enum values per the docs.
+# https://registry.terraform.io/providers/okta/okta/latest/docs/resources/campaign
+# resource "okta_campaign" "quarterly" {
+#   name          = "Quarterly Access Review"
+#   description   = "Review user access every quarter"
+#   campaign_type = "RESOURCE"            # see docs for allowed values
+#   schedule_settings {
+#     type             = "ONE_OFF"        # see docs
+#     start_date       = "2026-01-01T00:00:00Z"
+#     duration_in_days = 30
+#     time_zone        = "America/Los_Angeles"
+#   }
+#   resource_settings        { type = "..."  include_entitlements = true }
+#   reviewer_settings        { type = "..."  reviewer_id = okta_user.manager.id }
+#   principal_scope_settings { type = "..."  group_ids   = [okta_group.dept.id] }
+#   remediation_settings     { access_approved = "NO_ACTION"  access_revoked = "DENY"  no_response = "DENY" }
+#   notification_settings {
+#     notify_reviewer_when_review_assigned       = true
+#     notify_reviewer_during_midpoint_of_review  = true
+#     notify_reviewer_when_overdue               = true
+#     notify_review_period_end                   = true
+#     notify_reviewer_at_campaign_end            = true
+#   }
+# }
 #
-#   # Note: Exact schema TBD - NEW in v6.1.0
+# okta_review — a reviewer's decision on items within a campaign.
+# https://registry.terraform.io/providers/okta/okta/latest/docs/resources/review
+# resource "okta_review" "example" {
+#   campaign_id = okta_campaign.quarterly.id
+#   reviewer_id = okta_user.manager.id
+#   review_ids  = ["<review-item-id>"]
+#   note        = "Reviewed"
 # }
 
-# resource "okta_catalog_entry_user_access_request_fields" "example" {
-#   # Custom fields shown when users request access
-#   # Collect additional information during request (e.g., business justification)
-#
-#   # Note: Exact schema TBD - NEW in v6.1.0
-# }
-
 # -----------------------------------------------------------------------------
-# End User Views
+# Catalog & end-user views — these are DATA SOURCES (read-only), NOT resources
 # -----------------------------------------------------------------------------
+# data "okta_catalog_entry_default" "all" {}                         # requestable catalog entries
+# data "okta_catalog_entry_user_access_request_fields" "fields" {}   # request fields for an entry
+# data "okta_principal_entitlements" "user" {}                       # a principal's entitlement assignments
+# data "okta_end_user_my_requests" "mine" {}                         # the caller's access requests
+# data "okta_campaign" "c" {}  ·  data "okta_request_condition" "rc" {}  ·  data "okta_entitlement_bundle" "b" {}
 
-# data "okta_end_user_my_requests" "example" {
-#   # Data source to query user's access requests
-#   # Used for building custom dashboards/UIs
-#
-#   # Note: This is a DATA SOURCE, not a resource
-# }
 
 # =============================================================================
 # FEATURES & ADMIN (5 resources)
