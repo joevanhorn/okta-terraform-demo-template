@@ -26,7 +26,7 @@
 #   status     = "ACTIVE"
 # }
 
-# resource "okta_user_schema" "example" {
+# resource "okta_user_schema_property" "example" {
 #   index       = "customAttribute"
 #   title       = "Custom Attribute"
 #   type        = "string"
@@ -35,7 +35,7 @@
 #   scope       = "NONE"
 # }
 
-# resource "okta_user_base_schema" "example" {
+# resource "okta_user_base_schema_property" "example" {
 #   index  = "email"
 #   title  = "Primary email"
 #   type   = "string"
@@ -95,7 +95,7 @@
 #   description = "Engineering department group"
 # }
 
-# resource "okta_group_schema" "example" {
+# resource "okta_group_schema_property" "example" {
 #   index       = "department"
 #   title       = "Department"
 #   type        = "string"
@@ -250,7 +250,7 @@
 #   }
 # }
 
-# resource "okta_app_user_schema" "example" {
+# resource "okta_app_user_schema_property" "example" {
 #   app_id      = okta_app_oauth.example.id
 #   index       = "customField"
 #   title       = "Custom Field"
@@ -259,7 +259,7 @@
 #   master      = "OKTA"
 # }
 
-# resource "okta_app_user_base_schema" "example" {
+# resource "okta_app_user_base_schema_property" "example" {
 #   app_id = okta_app_oauth.example.id
 #   index  = "email"
 #   title  = "Email"
