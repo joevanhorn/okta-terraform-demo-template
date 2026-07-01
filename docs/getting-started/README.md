@@ -59,6 +59,7 @@ See also: [GitHub Basic Setup](github-basic.md) (minimal, no CI/CD) | [Local Onl
 | **Infrastructure** | [Active Directory](../../modules/ad-domain-controller/docs/active-directory.md), [Generic DB Connector](../../modules/generic-db-connector/docs/generic-db-connector.md), [OPA](../../modules/opa/docs/opa-privileged-access.md), [OAG](../../modules/oag/docs/oag-deployment.md), [SCIM](../../modules/scim-server/docs/scim-server.md) |
 | **Governance** | [Labels](../governance/labels.md), [Entitlements](../governance/entitlements.md), [Risk Rules](../governance/labels.md) |
 | **Reference** | [Terraform Basics](../reference/terraform-basics.md), [Workflow Reference](../reference/workflow-reference.md), [API/Scripts](../reference/api-management.md) |
+| **AI / Bedrock** | [Getting Started with Amazon Bedrock](bedrock.md) -- enable model access, first Claude call, troubleshooting |
 | **Troubleshooting** | [General](../troubleshooting/general.md), [Entitlement Bundles](../troubleshooting/entitlement-bundles.md), [Lessons Learned](../troubleshooting/lessons-learned.md) |
 
 ---
