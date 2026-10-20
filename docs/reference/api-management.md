@@ -4,12 +4,14 @@ This guide explains how to manage **Resource Owners** and **Labels** using the O
 
 ## 📋 Overview
 
-While the Okta Terraform Provider v6.1.0 adds support for many OIG features, some capabilities are only available via REST API:
+The Okta Terraform Provider covers most OIG features, and since v6.13.0 it also has `okta_resource_owner` (owner assignments) and `okta_label` (label definitions). What is still REST-API-only:
 
-- **Resource Owners API** - Assign owners to apps, groups, and entitlements
-- **Labels API** - Create and assign governance labels to resources
+- **Label assignment** - attaching label values to resources (`/governance/api/v1/resource-labels/assign`)
+- **Risk rules / SOD policies** - `scripts/apply_risk_rules.py`
 
-**Note:** Entitlements should be managed via Terraform using the `okta_principal_entitlements` resource, not via this API management script.
+The owner and label-definition scripts below still work and remain the path for forks that keep this configuration in `config/*.json` rather than Terraform.
+
+**Note:** Entitlements should be managed via Terraform using `okta_entitlement` / `okta_entitlement_bundle` (`okta_principal_entitlements` is a read-only data source), not via this API management script.
 
 This implementation uses the `okta_api_manager.py` script with **modular export functionality** that gracefully handles partial OIG availability.
 

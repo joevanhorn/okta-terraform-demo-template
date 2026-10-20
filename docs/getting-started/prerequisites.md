@@ -239,18 +239,20 @@ Before running `terraform apply` with OIG resources, verify:
 ### Requires Entitlement Management Enabled
 
 These resources/features **require** Entitlement Management:
-- ✅ `okta_principal_entitlements`
+- ✅ `okta_entitlement` / `okta_entitlement_bundle`
+- ✅ `okta_principal_entitlements` (data source)
 - ✅ Entitlement-based access requests
 - ✅ Entitlement catalog
 
 ### Does NOT Require Entitlement Management
 
 These OIG resources work **without** Entitlement Management:
-- ✅ `okta_reviews` (Access Reviews)
-- ✅ `okta_request_settings` (Access Request settings)
-- ✅ `okta_request_conditions` (Request conditions)
-- ✅ `okta_request_sequences` (Approval workflows)
-- ✅ `okta_catalog_entry_*` (Catalog configuration)
+- ✅ `okta_campaign` (Access certification campaigns)
+- ✅ `okta_request_setting_organization` / `okta_request_setting_resource` (Access Request settings)
+- ✅ `okta_request_condition` (Request conditions)
+- ✅ `okta_request_sequence` (Approval sequence bindings)
+- ✅ `okta_resource_owner`, `okta_label` (Resource owners, label definitions)
+- ✅ `okta_catalog_entry_*` data sources (Catalog lookups)
 
 **Note:** All still require OIG license, just not the Entitlement Management feature specifically.
 

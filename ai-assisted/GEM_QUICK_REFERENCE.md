@@ -73,7 +73,7 @@ resource "okta_group" "engineering" {
 ```hcl
 resource "okta_group_memberships" "engineering" {
   group_id = okta_group.engineering.id
-  members = [
+  users = [
     okta_user.john_doe.id,
     okta_user.jane_smith.id,
   ]
@@ -86,7 +86,7 @@ resource "okta_group_memberships" "engineering" {
 
 **Key fields:**
 - `group_id` (required, reference)
-- `members` (required, list of user IDs)
+- `users` (required, set of user IDs; the attribute is `users`, not `members`)
 - `depends_on` (recommended for reliability)
 
 ---
@@ -224,40 +224,81 @@ resource "okta_entitlement_bundle" "marketing_access" {
   name        = "Marketing Access Bundle"
   description = "Complete access package for marketing team"
   status      = "ACTIVE"
+
+  target {
+    external_id = okta_app_oauth.salesforce.id
+    type        = "APPLICATION"
+  }
 }
 ```
 
 **Key fields:**
 - `name` (required, string)
-- `description` (required, string)
-- `status` (required, always "ACTIVE")
+- `description` (optional, string)
+- `status` (optional, use "ACTIVE")
+- `target` block (REQUIRED: `external_id` = app ID, `type = "APPLICATION"`)
 
 **CRITICAL:** This creates the bundle DEFINITION only. Assigning bundles to users/groups is done in Okta Admin UI, NOT in Terraform.
 
 ---
 
-### Access Review Campaigns (OIG)
+### Access Certification Campaigns (OIG)
+
+The resource is `okta_campaign`. There is NO `okta_reviews` resource.
 
 ```hcl
-resource "okta_reviews" "q1_2025_review" {
-  name        = "Quarterly Access Review - Q1 2025"
-  description = "Review of all user access"
+resource "okta_campaign" "q1_2027_review" {
+  name          = "Quarterly Access Review - Q1 2027"
+  description   = "Review of all user access"
+  campaign_type = "RESOURCE"
 
-  start_date = "2025-01-15T00:00:00Z"
-  end_date   = "2025-02-15T23:59:59Z"
+  schedule_settings {
+    type             = "ONE_OFF"
+    start_date       = "2027-01-15T08:00:00.000Z"
+    duration_in_days = 30
+    time_zone        = "America/Los_Angeles"
+  }
 
-  review_type   = "USER_ACCESS_REVIEW"
-  reviewer_type = "MANAGER"
+  resource_settings {
+    type = "APPLICATION"
+    target_resources {
+      resource_id   = okta_app_oauth.salesforce.id
+      resource_type = "APPLICATION"
+    }
+  }
+
+  principal_scope_settings {
+    type = "USERS"
+  }
+
+  reviewer_settings {
+    type                 = "RESOURCE_OWNER"
+    fallback_reviewer_id = okta_user.john_doe.id
+  }
+
+  remediation_settings {
+    access_approved = "NO_ACTION"
+    access_revoked  = "DENY"
+    no_response     = "DENY"
+  }
+
+  notification_settings {
+    notify_reviewer_when_review_assigned      = true
+    notify_reviewer_during_midpoint_of_review = true
+    notify_reviewer_when_overdue              = true
+    notify_review_period_end                  = true
+    notify_reviewer_at_campaign_end           = true
+  }
 }
 ```
 
 **Key fields:**
-- `name` (required, string)
-- `description` (required, string)
-- `start_date` (required, ISO 8601 format with Z timezone)
-- `end_date` (required, ISO 8601 format with Z timezone)
-- `review_type` (required, usually "USER_ACCESS_REVIEW")
-- `reviewer_type` (required, "MANAGER" or "APPLICATION_OWNER")
+- `name` (required), `campaign_type` ("RESOURCE" or "USER")
+- `schedule_settings` (required: `type` ONE_OFF/RECURRING, `start_date` ISO 8601, `duration_in_days`, `time_zone`)
+- `resource_settings` (required: `type` APPLICATION/GROUP/APPLICATION_AND_GROUP + `target_resources`)
+- `principal_scope_settings` (required: `type` USERS/GROUPS)
+- `reviewer_settings` (required: `type` GROUP/MULTI_LEVEL/RESOURCE_OWNER/REVIEWER_EXPRESSION/USER; RESOURCE_OWNER needs `fallback_reviewer_id`, USER needs `reviewer_id`)
+- `remediation_settings` and `notification_settings` (required, all fields)
 
 ---
 
@@ -356,7 +397,7 @@ resource "okta_group" "team" {
 # Memberships
 resource "okta_group_memberships" "team" {
   group_id = okta_group.team.id
-  members  = [
+  users = [
     okta_user.user1.id,
     okta_user.user2.id,
   ]
@@ -396,26 +437,65 @@ resource "okta_app_group_assignment" "app_team" {
 }
 ```
 
-### OIG Bundle + Review Campaign
+### OIG Bundle + Certification Campaign
 
 ```hcl
-# Entitlement bundle
+# Entitlement bundle (target app required)
 resource "okta_entitlement_bundle" "access_bundle" {
   name        = "Department Access Bundle"
   description = "Access package for department employees"
   status      = "ACTIVE"
+
+  target {
+    external_id = okta_app_oauth.app.id
+    type        = "APPLICATION"
+  }
 }
 
-# Access review campaign
-resource "okta_reviews" "quarterly_review" {
-  name        = "Q1 2025 Access Review"
-  description = "Quarterly review of user access"
+# Access certification campaign (see the okta_campaign section above for the
+# required settings blocks)
+resource "okta_campaign" "quarterly_review" {
+  name          = "Q1 2027 Access Review"
+  description   = "Quarterly review of user access"
+  campaign_type = "RESOURCE"
 
-  start_date = "2025-01-01T00:00:00Z"
-  end_date   = "2025-01-31T23:59:59Z"
+  schedule_settings {
+    type             = "ONE_OFF"
+    start_date       = "2027-01-01T08:00:00.000Z"
+    duration_in_days = 30
+    time_zone        = "America/Los_Angeles"
+  }
 
-  review_type   = "USER_ACCESS_REVIEW"
-  reviewer_type = "MANAGER"
+  resource_settings {
+    type = "APPLICATION"
+    target_resources {
+      resource_id   = okta_app_oauth.app.id
+      resource_type = "APPLICATION"
+    }
+  }
+
+  principal_scope_settings {
+    type = "USERS"
+  }
+
+  reviewer_settings {
+    type                 = "RESOURCE_OWNER"
+    fallback_reviewer_id = okta_user.user1.id
+  }
+
+  remediation_settings {
+    access_approved = "NO_ACTION"
+    access_revoked  = "DENY"
+    no_response     = "DENY"
+  }
+
+  notification_settings {
+    notify_reviewer_when_review_assigned      = true
+    notify_reviewer_during_midpoint_of_review = true
+    notify_reviewer_when_overdue              = true
+    notify_review_period_end                  = true
+    notify_reviewer_at_campaign_end           = true
+  }
 }
 ```
 
@@ -520,9 +600,9 @@ Generate infrastructure when user requests:
 
 **Don't generate Terraform for:**
 
-1. **Resource owners** - Use Python scripts (`apply_resource_owners.py`)
-2. **Governance labels** - Use Python scripts (`apply_governance_labels.py`)
-3. **Entitlement assignments** - Managed in Okta Admin UI
+1. **Label-to-resource assignment** - Use Python scripts (`apply_admin_labels.py`). Label definitions themselves are fine as `okta_label`.
+2. **Risk rules / SOD policies** - Use Python scripts (`apply_risk_rules.py`)
+3. **Entitlement assignments (grants)** - Managed in Okta Admin UI
 4. **System apps** - Okta-managed, can't be in Terraform:
    - `okta-iga-reviewer`
    - `okta-flow-sso`
@@ -627,22 +707,21 @@ resource "okta_app_group_assignment" "salesforce_revenue" {
 
 ---
 
-## Date Format for OIG Reviews
+## Date Format for OIG Campaigns
 
-**ISO 8601 format with Z timezone:**
+`okta_campaign.schedule_settings` takes an ISO 8601 `start_date` plus `duration_in_days` (there is no `end_date`):
 
 ```hcl
-start_date = "2025-01-15T00:00:00Z"  # ✅ Correct
-end_date   = "2025-02-15T23:59:59Z"  # ✅ Correct
+start_date       = "2027-01-15T08:00:00.000Z"  # ✅ Correct
+duration_in_days = 30
 
-start_date = "2025-01-15"            # ❌ Wrong - missing time
-start_date = "01/15/2025"            # ❌ Wrong - wrong format
+start_date = "2027-01-15"            # ❌ Wrong - missing time
+start_date = "01/15/2027"            # ❌ Wrong - wrong format
 ```
 
 **Pattern:**
-- `YYYY-MM-DDTHH:MM:SSZ`
-- Start dates usually: `T00:00:00Z`
-- End dates usually: `T23:59:59Z`
+- `YYYY-MM-DDTHH:MM:SS.sssZ`, in the future at apply time
+- `time_zone` is an IANA name such as `America/Los_Angeles`
 
 ---
 

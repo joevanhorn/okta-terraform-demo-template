@@ -6,7 +6,8 @@ on:
       - main
     paths:
       - 'environments/*/terraform/**/*.tf'
-      - '.github/workflows/terraform-validate.yml'
+      - 'modules/**/*.tf'
+      - '.github/workflows/tf-validate.yml'
   workflow_dispatch:
     inputs:
       environment:
@@ -451,3 +452,98 @@ jobs:
               repo: context.repo.repo,
               body: output
             });
+
+  validate-modules:
+    name: Validate Okta modules
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module:
+          - modules/lifecycle-management
+          - modules/saml-federation
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Terraform Format Check
+        working-directory: ${{ matrix.module }}
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init (no backend)
+        working-directory: ${{ matrix.module }}
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform Validate
+        working-directory: ${{ matrix.module }}
+        run: terraform validate -no-color
+
+  validate-resource-examples:
+    name: Validate RESOURCE_EXAMPLES.tf against the pinned provider
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Uncomment examples into a scratch module
+        run: |
+          mkdir -p /tmp/examples && cd /tmp/examples
+          cp "$GITHUB_WORKSPACE/environments/myorg/terraform/provider.tf" providers.tf
+          # drop the s3 backend block; validation runs with -backend=false anyway
+          python3 - "$GITHUB_WORKSPACE/environments/myorg/terraform/RESOURCE_EXAMPLES.tf" <<'EOF'
+          import re, sys
+          src = open(sys.argv[1]).read().split("\n")
+          out, inblk, depth = [], False, 0
+          start = re.compile(r'^#\s?((resource|data)\s+"|locals\s*\{|output\s+")')
+          for line in src:
+              if not inblk and start.match(line):
+                  inblk, depth = True, 0
+              if inblk:
+                  s = re.sub(r'^#\s?', '', line, count=1)
+                  out.append(s)
+                  depth += s.count("{") - s.count("}")
+                  if depth <= 0 and ("{" in s or s.strip() == "}"):
+                      inblk = False
+              else:
+                  out.append(line)
+          open("examples.tf", "w").write("\n".join(out))
+          EOF
+          cat > stubs.tf <<'EOF'
+          variable "hook_secret" { default = "x" }
+          variable "okta_org_name" { default = "x" }
+          variable "okta_base_url" { default = "okta.com" }
+          variable "okta_api_token" { default = "x" }
+          variable "scim_bearer_token" { default = "x" }
+          variable "shared_app_password" { default = "x" }
+          variable "apns_signing_key" { default = "x" }
+          variable "smtp_password" { default = "x" }
+          resource "okta_user" "another_user" {
+            first_name = "a"
+            last_name  = "b"
+            login      = "n@example.com"
+            email      = "n@example.com"
+          }
+          EOF
+          touch saml.crt cert.pem key.pem chain.pem signin_page.html
+          mkdir -p email_templates && touch email_templates/activation.html
+          printf 'email,first_name,last_name,login,status,department,title,manager_email,groups,custom_profile_attributes\n' > users.csv
+
+      - name: Terraform Init (no backend)
+        working-directory: /tmp/examples
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform Validate
+        working-directory: /tmp/examples
+        run: terraform validate -no-color

@@ -389,8 +389,8 @@ jobs:
           echo "📋 Planning OIG restore..."
           terraform plan -out=restore_oig.tfplan \
             -target=okta_entitlement_bundle \
-            -target=okta_reviews \
-            -target=okta_request_sequences || true
+            -target=okta_campaign \
+            -target=okta_request_sequence || true
 
           if [ "${{ env.DRY_RUN }}" == "true" ]; then
             echo "✅ DRY RUN - OIG resources would be restored"

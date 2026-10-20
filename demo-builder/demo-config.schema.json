@@ -437,6 +437,10 @@
           "type": "string",
           "enum": ["ACTIVE", "INACTIVE"],
           "default": "ACTIVE"
+        },
+        "app": {
+          "type": "string",
+          "description": "Label of an application from the applications list that this bundle targets (okta_entitlement_bundle requires a target). Defaults to the first application."
         }
       }
     },
@@ -469,7 +473,23 @@
         "reviewer_type": {
           "type": "string",
           "enum": ["MANAGER", "APPLICATION_OWNER"],
-          "default": "MANAGER"
+          "default": "MANAGER",
+          "description": "MANAGER renders okta_campaign reviewer_settings type REVIEWER_EXPRESSION (user.profile.managerId); APPLICATION_OWNER renders RESOURCE_OWNER. Both need a fallback reviewer."
+        },
+        "duration_in_days": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Campaign length. Defaults to the number of days between start_date and end_date."
+        },
+        "time_zone": {
+          "type": "string",
+          "default": "America/Los_Angeles",
+          "description": "IANA time zone for okta_campaign schedule_settings."
+        },
+        "fallback_reviewer": {
+          "type": "string",
+          "format": "email",
+          "description": "Email of a user from the users list used as fallback_reviewer_id. Defaults to the first manager."
         }
       }
     },

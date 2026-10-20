@@ -34,11 +34,11 @@ Understanding what goes where is critical:
 
 **Layer 1: Terraform Provider (Full CRUD)**
 - Standard Okta resources: users, groups, apps, policies
-- OIG resources: entitlement bundles, access reviews, approval sequences, catalog entries
+- OIG resources: `okta_entitlement`, `okta_entitlement_bundle`, `okta_campaign`, `okta_request_condition`, `okta_request_sequence`, `okta_request_setting_*`, `okta_resource_owner`, `okta_label` (definitions)
 - Managed in `environments/{env}/terraform/*.tf` files
 
 **Layer 2: Python API Scripts (Read/Write)**
-- Resource Owners, Governance Labels, Risk Rules / SOD Policies (not in Terraform provider yet)
+- Label-to-resource assignment, Risk Rules / SOD Policies (not in Terraform provider yet)
 - Entitlement Settings - enable/disable on apps (Beta API - December 2025)
 - Managed in `environments/{env}/config/*.json` files
 - Applied via `scripts/*.py` or GitHub Actions
@@ -186,7 +186,7 @@ See `docs/reference/api-management.md` for the complete Python scripts reference
 └── .github/workflows/          # GitHub Actions
 ```
 
-**Terraform Provider:** Okta provider v6.4.0+ required for OIG resources. See `environments/myorg/terraform/provider.tf`.
+**Terraform Provider:** Okta provider `>= 7.0.0, < 8.0.0` (see `environments/myorg/terraform/provider.tf`). `RESOURCE_EXAMPLES.tf` is verified against v7.0.0 with `terraform validate`; its header lists the v7 breaking changes.
 
 ---
 
@@ -240,14 +240,28 @@ resource "okta_app_oauth" "invalid" {
 # VALID - for user-facing apps: show both, login SPEC with login_uri set
 ```
 
-### 6. Resource Owners and Labels Are API-Only
+### 6. Resource Owners and Labels: Terraform vs API
 
-These resources don't exist in the Terraform provider. Manage via Python scripts:
+Since provider v6.13.0, `okta_resource_owner` (owner assignments) and `okta_label` (label definitions + values) are Terraform resources. What is still API-only is **assigning labels to resources** and risk rules:
+
+```hcl
+resource "okta_label" "data_classification" {
+  name = "Data Classification"
+  values { name = "Confidential" }
+}
+
+resource "okta_resource_owner" "crm" {
+  resource_orns  = ["orn:okta:idp:${data.okta_org_metadata.current.id}:apps:${okta_app_oauth.crm.name}:${okta_app_oauth.crm.id}"]
+  principal_orns = ["orn:okta:directory:${data.okta_org_metadata.current.id}:users:${okta_user.owner.id}"]
+}
+```
 
 ```bash
-python3 scripts/apply_resource_owners.py --config config/owner_mappings.json
-python3 scripts/apply_admin_labels.py
+python3 scripts/apply_admin_labels.py          # label -> resource assignment (API-only)
+python3 scripts/apply_risk_rules.py --config config/risk_rules.json
 ```
+
+The owner scripts (`apply_resource_owners.py`, `oig-owners.yml`) still work and remain the path for forks that keep owners in `config/owner_mappings.json`.
 
 ### 7. Environment Secrets Must Match Directory Names
 
@@ -450,7 +464,7 @@ When working in this repository:
 7. **State is in S3** - not local files, use DynamoDB locking
 8. **Use AI-assisted generation for demos** - faster and more consistent
 9. **Import from Okta regularly** - detect drift from manual changes
-10. **Resource owners and labels need Python scripts** - not in Terraform provider
+10. **Label assignment and risk rules need Python scripts** - owners and label definitions are Terraform (`okta_resource_owner`, `okta_label`)
 11. **Label workflows use two-phase validation** - PR syntax check (no secrets) + deployment (with secrets)
 12. **Always create PRs for label changes** - automatic validation catches errors early
 13. **Review dry-run before apply** - automatic on merge, manual apply required

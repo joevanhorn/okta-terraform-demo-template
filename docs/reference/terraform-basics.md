@@ -123,13 +123,11 @@ resource "okta_app_oauth" "webapp" {
   post_logout_redirect_uris = ["https://app.example.com/logout"]
   response_types            = ["code"]
 
-  # Visible on user dashboard
-  hide_ios = false
-  hide_web = false
-
-  lifecycle {
-    ignore_changes = [groups]
-  }
+  # Visible on user dashboard (login_mode must then be set; see CLAUDE.md gotcha #5)
+  hide_ios   = false
+  hide_web   = false
+  login_mode = "SPEC"
+  login_uri  = "https://app.example.com/login"
 }
 
 # Assign group to app
@@ -207,10 +205,16 @@ resource "okta_policy_password" "strong" {
 ### Entitlement Bundle
 
 ```hcl
+# target is required: the app (with Entitlement Management enabled) the bundle belongs to
 resource "okta_entitlement_bundle" "admin_access" {
   name        = "Admin Access Bundle"
   description = "Administrative access to systems"
   status      = "ACTIVE"
+
+  target {
+    external_id = okta_app_oauth.my_app.id
+    type        = "APPLICATION"
+  }
 }
 ```
 
@@ -247,36 +251,106 @@ resource "okta_entitlement_bundle" "admin_bundle" {
 
 **Note:** `values` is a block type, not an argument. See `RESOURCE_EXAMPLES.tf` for complete examples.
 
-### Access Review Campaign
+### Access Certification Campaign
 
 ```hcl
-resource "okta_reviews" "quarterly_review" {
-  name        = "Quarterly Access Review"
-  description = "Review all access quarterly"
+resource "okta_campaign" "quarterly_review" {
+  name          = "Quarterly Access Review"
+  description   = "Review all access quarterly"
+  campaign_type = "RESOURCE"
 
-  # Schedule and scope must be configured in Okta Admin UI
-  # See REQUIRED TODO in generated files
+  schedule_settings {
+    type             = "RECURRING"
+    start_date       = "2027-01-01T08:00:00.000Z"
+    duration_in_days = 30
+    time_zone        = "America/Los_Angeles"
+    recurrence {
+      interval       = "P3M"
+      repeat_on_type = "SAME_DAY_AS_START_DATE"
+    }
+  }
 
-  lifecycle {
-    ignore_changes = [schedule, scope]
+  resource_settings {
+    type = "APPLICATION"
+    target_resources {
+      resource_id   = okta_app_oauth.my_app.id
+      resource_type = "APPLICATION"
+    }
+  }
+
+  principal_scope_settings {
+    type = "USERS"
+  }
+
+  reviewer_settings {
+    type                 = "RESOURCE_OWNER"
+    fallback_reviewer_id = okta_user.employee.id
+  }
+
+  remediation_settings {
+    access_approved = "NO_ACTION"
+    access_revoked  = "DENY"
+    no_response     = "DENY"
+  }
+
+  notification_settings {
+    notify_reviewer_when_review_assigned      = true
+    notify_reviewer_during_midpoint_of_review = true
+    notify_reviewer_when_overdue              = true
+    notify_review_period_end                  = true
+    notify_reviewer_at_campaign_end           = true
   }
 }
 ```
 
-### Approval Sequence
+### Access Requests (condition + approval sequence)
+
+Approval sequences are authored in the Access Requests admin UI; Terraform binds an existing sequence to a resource and defines who can request it:
 
 ```hcl
-resource "okta_request_sequences" "manager_approval" {
-  name        = "Manager Approval"
-  description = "Requires manager approval"
-  conditions  = jsonencode({
-    type = "ALWAYS"
-  })
+resource "okta_request_sequence" "manager_approval" {
+  id          = "<approval-sequence-id>"
+  resource_id = okta_app_oauth.my_app.id
+}
 
-  approval {
-    type = "MANAGER"
+resource "okta_request_condition" "my_app" {
+  name                 = "Request My App"
+  resource_id          = okta_app_oauth.my_app.id
+  approval_sequence_id = okta_request_sequence.manager_approval.id
+  status               = "ACTIVE"
+
+  requester_settings {
+    type = "EVERYONE"
+  }
+
+  access_scope_settings {
+    type = "RESOURCE_DEFAULT"
+  }
+
+  access_duration_settings {
+    type     = "ADMIN_FIXED_DURATION"
+    duration = "PT8H"
   }
 }
+```
+
+### Resource Owners and Labels (provider v6.13.0+)
+
+```hcl
+data "okta_org_metadata" "current" {}
+
+resource "okta_resource_owner" "my_app" {
+  resource_orns  = ["orn:okta:idp:${data.okta_org_metadata.current.id}:apps:${okta_app_oauth.my_app.name}:${okta_app_oauth.my_app.id}"]
+  principal_orns = ["orn:okta:directory:${data.okta_org_metadata.current.id}:users:${okta_user.employee.id}"]
+}
+
+resource "okta_label" "data_classification" {
+  name = "Data Classification"
+  values {
+    name = "Confidential"
+  }
+}
+# Attaching label values to resources is still API-only: scripts/apply_admin_labels.py
 ```
 
 ---
@@ -300,12 +374,12 @@ user_name_template = "$${source.login}"
 For attributes managed elsewhere (UI, API):
 
 ```hcl
-resource "okta_app_oauth" "app" {
+resource "okta_app_saml" "app" {
   label = "My App"
   # ...
 
   lifecycle {
-    ignore_changes = [groups, users]
+    ignore_changes = [logo] # e.g. logo uploaded through the Admin Console
   }
 }
 ```

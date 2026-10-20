@@ -42,6 +42,7 @@ module "lifecycle" {
   enable_leaver_patterns      = true
   enable_contractor_lifecycle = true
   enable_oig_integration      = true  # Requires OIG license
+  oig_target_app_id           = "0oa1234567890abcdef" # App the bundles target (Entitlement Management enabled)
 
   # User types
   user_types = [
@@ -121,7 +122,7 @@ module "lifecycle" {
 | Name | Version |
 |------|---------|
 | terraform | >= 1.9.0 |
-| okta | >= 6.4.0, < 7.0.0 |
+| okta | >= 7.0.0, < 8.0.0 |
 
 ## Inputs
 
@@ -134,6 +135,7 @@ module "lifecycle" {
 | `enable_leaver_patterns` | Enable offboarding patterns | `bool` | `true` |
 | `enable_contractor_lifecycle` | Enable contractor patterns | `bool` | `true` |
 | `enable_oig_integration` | Enable OIG features | `bool` | `false` |
+| `oig_target_app_id` | App ID that module-created entitlement bundles target (required by the provider; bundles without a target are skipped) | `string` | `""` |
 
 ### Core Configuration
 
@@ -150,7 +152,9 @@ module "lifecycle" {
 |------|-------------|------|---------|
 | `joiner_config.auto_assign_rules` | Custom group assignment rules | `list(object)` | `[]` |
 | `joiner_config.default_employee_bundle` | Default bundle for employees | `string` | `""` |
+| `joiner_config.default_employee_bundle_app_id` | Target app for the employee bundle (overrides `oig_target_app_id`) | `string` | `""` |
 | `joiner_config.default_contractor_bundle` | Default bundle for contractors | `string` | `""` |
+| `joiner_config.default_contractor_bundle_app_id` | Target app for the contractor bundle (overrides `oig_target_app_id`) | `string` | `""` |
 | `joiner_config.enable_staged_users` | Track staged users | `bool` | `true` |
 | `joiner_config.create_new_hires_group` | Create new hires group | `bool` | `true` |
 
@@ -270,9 +274,9 @@ The module uses these Okta expressions:
 
 When `enable_oig_integration = true`:
 
-1. **Entitlement bundles** are created as definitions only
+1. **Entitlement bundles** are created as definitions only, each targeting `oig_target_app_id` (or a per-bundle `target_app_id` / `entitlement_bundle_app_id`). The provider requires a target, so bundles with no resolvable app are skipped.
 2. **Principal assignments** must be managed in Okta Admin UI
-3. **Access reviews** are commented out (uncomment based on provider support)
+3. **Access certification campaigns** (`okta_campaign`) are provided as a commented example in `oig.tf`; they need a reviewer and target resource IDs that the module does not know about
 
 ## Related Documentation
 

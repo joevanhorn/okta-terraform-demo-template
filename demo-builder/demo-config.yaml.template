@@ -303,10 +303,13 @@ oig:
   # Entitlement Bundles
   # -------------------------------------------------------------------------
   # Define access packages. Note: Bundle ASSIGNMENTS (who gets them) are
-  # managed in Okta Admin UI, not Terraform.
+  # managed in Okta Admin UI, not Terraform. Every bundle targets an
+  # application (okta_entitlement_bundle requires it): set `app:` to the label
+  # of an entry in the applications list, or the first application is used.
   entitlement_bundles:
     - name: "Basic Employee Access"
       description: "Standard access package for all employees"
+      # app: "Employee Portal"
       # status defaults to "ACTIVE"
 
     - name: "Engineering Tools Bundle"
@@ -321,16 +324,19 @@ oig:
   # -------------------------------------------------------------------------
   # Access Review Campaigns
   # -------------------------------------------------------------------------
-  # Schedule periodic access certifications
+  # Schedule periodic access certifications (rendered as okta_campaign over
+  # every generated application)
   access_reviews:
-    - name: "Q1 2025 Access Review"
-      description: "Quarterly access certification - Q1 2025"
-      # ISO 8601 date format
-      start_date: "2025-01-15T00:00:00Z"
-      end_date: "2025-02-15T23:59:59Z"
-      # USER_ACCESS_REVIEW or ENTITLEMENT_ACCESS_REVIEW
+    - name: "Q1 2027 Access Review"
+      description: "Quarterly access certification - Q1 2027"
+      # ISO 8601 date format; start_date must be in the future at apply time
+      start_date: "2027-01-15T00:00:00Z"
+      end_date: "2027-02-15T23:59:59Z"
+      # Optional: duration_in_days (default: end_date - start_date), time_zone
+      # (default America/Los_Angeles), fallback_reviewer (email, default: first manager)
+      # USER_ACCESS_REVIEW or ENTITLEMENT_ACCESS_REVIEW (includes entitlements/bundles)
       review_type: "USER_ACCESS_REVIEW"
-      # MANAGER, APPLICATION_OWNER, or specific user
+      # MANAGER (reviewer expression user.profile.managerId) or APPLICATION_OWNER (resource owner)
       reviewer_type: "MANAGER"
 
     - name: "Q2 2025 Access Review"

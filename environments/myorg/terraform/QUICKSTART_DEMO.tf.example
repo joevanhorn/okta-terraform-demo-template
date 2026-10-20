@@ -177,12 +177,14 @@
 # #   description = "Standard access for demo employees"
 # #   status      = "ACTIVE"
 # #
-# #   entitlements = [
-# #     {
-# #       resource_orn = okta_app_oauth.demo_app.id
-# #       entitlement_type = "APP_RESOURCE"
-# #     }
-# #   ]
+# #   # The target app is required and must have Entitlement Management enabled
+# #   target {
+# #     external_id = okta_app_oauth.demo_app.id
+# #     type        = "APPLICATION"
+# #   }
+# #
+# #   # Add entitlements { id = ... values { id = ... } } once the app's
+# #   # entitlements exist (see RESOURCE_EXAMPLES.tf for the dynamic lookup pattern)
 # # }
 #
 # # ------------------------------------------------------------------------------

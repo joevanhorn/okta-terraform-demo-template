@@ -249,7 +249,7 @@ terraform {
   required_providers {
     okta = {
       source  = "okta/okta"
-      version = ">= 6.4.0, < 7.0.0"
+      version = ">= 7.0.0, < 8.0.0"
     }
   }
 }
@@ -334,7 +334,7 @@ terraform {
   required_providers {
     okta = {
       source  = "okta/okta"
-      version = ">= 6.4.0, < 7.0.0"
+      version = ">= 7.0.0, < 8.0.0"
     }
   }
 }

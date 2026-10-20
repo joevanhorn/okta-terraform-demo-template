@@ -352,44 +352,92 @@ user.userType=="contractor" AND user.managerId==null
 
 ### Entitlement Bundles
 
-When `enable_oig_integration = true`, the module creates bundle definitions:
+When `enable_oig_integration = true`, the module creates bundle definitions. Every `okta_entitlement_bundle` must target an application with Entitlement Management enabled, so set `oig_target_app_id` (or a per-bundle override):
 
 ```hcl
+# App that bundles target by default
+oig_target_app_id = okta_app_oauth.hr_system.id
+
 # Default bundles
 joiner_config = {
   default_employee_bundle   = "Standard Employee Access"
   default_contractor_bundle = "Contractor Limited Access"
+  # default_employee_bundle_app_id / default_contractor_bundle_app_id override oig_target_app_id
 }
 
 # Department bundles
 departments = [
   {
-    name               = "Engineering"
-    entitlement_bundle = "Engineering Tools"
+    name                      = "Engineering"
+    entitlement_bundle        = "Engineering Tools"
+    entitlement_bundle_app_id = okta_app_saml.engineering_tools.id # optional override
   }
 ]
 
 # Custom bundles
 entitlement_bundles = [
   {
-    name        = "IT Admin Access"
-    description = "Administrative access for IT team"
+    name          = "IT Admin Access"
+    description   = "Administrative access for IT team"
+    target_app_id = okta_app_oauth.it_admin.id # optional override
   }
 ]
 ```
 
-**Important:** Bundle definitions only. Assign principals via Okta Admin UI.
+**Important:** Bundle definitions only. Assign principals via Okta Admin UI. Bundles with no resolvable target app are skipped.
 
-### Access Reviews
+### Access Certification Campaigns
 
-Access review campaigns are commented in the module. Enable based on provider support:
+Campaigns use the `okta_campaign` resource. A full commented example lives in `oig.tf`; the shape is:
 
 ```hcl
-# Example: Quarterly contractor review
-resource "okta_reviews" "contractor_quarterly" {
-  name        = "Quarterly Contractor Review"
-  description = "Review all contractor access"
-  # Configure based on provider schema
+resource "okta_campaign" "contractor_quarterly" {
+  name          = "Quarterly Contractor Review"
+  description   = "Review all contractor access"
+  campaign_type = "RESOURCE"
+
+  schedule_settings {
+    type             = "RECURRING"
+    start_date       = "2027-01-01T08:00:00.000Z"
+    duration_in_days = 14
+    time_zone        = "America/Los_Angeles"
+    recurrence {
+      interval       = "P3M"
+      repeat_on_type = "SAME_DAY_AS_START_DATE"
+    }
+  }
+
+  resource_settings {
+    type = "GROUP"
+    target_resources {
+      resource_id   = module.lifecycle.base_groups.all_contractors
+      resource_type = "GROUP"
+    }
+  }
+
+  principal_scope_settings {
+    type      = "GROUPS"
+    group_ids = [module.lifecycle.base_groups.all_contractors]
+  }
+
+  reviewer_settings {
+    type                 = "RESOURCE_OWNER"
+    fallback_reviewer_id = okta_user.security_lead.id
+  }
+
+  remediation_settings {
+    access_approved = "NO_ACTION"
+    access_revoked  = "DENY"
+    no_response     = "DENY"
+  }
+
+  notification_settings {
+    notify_reviewer_when_review_assigned      = true
+    notify_reviewer_during_midpoint_of_review = true
+    notify_reviewer_when_overdue              = true
+    notify_review_period_end                  = true
+    notify_reviewer_at_campaign_end           = true
+  }
 }
 ```
 

@@ -4,7 +4,7 @@ terraform {
   required_providers {
     okta = {
       source  = "okta/okta"
-      version = ">= 6.4.0, < 7.0.0" # Auto-update to latest 6.x
+      version = ">= 7.0.0, < 8.0.0" # Auto-update to latest 7.x (v7.0.0 breaking changes: see RESOURCE_EXAMPLES.tf header)
     }
 
     # Okta Privileged Access (OPA) Provider - Optional

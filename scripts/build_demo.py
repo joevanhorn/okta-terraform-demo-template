@@ -469,7 +469,7 @@ def render_memberships_tf(groups: list[dict], config: dict, config_file: str) ->
 
         content += f'''resource "okta_group_memberships" "{group['resource_name']}" {{
   group_id = okta_group.{group['resource_name']}.id
-  members = [
+  users = [
     {members_list},
   ]
   depends_on = [
@@ -598,46 +598,137 @@ def render_oig_tf(config: dict, config_file: str) -> str:
 
 '''
 
-    # Entitlement bundles
+    # Bundles and campaigns both reference the generated apps and users
+    apps = generate_applications(config)
+    users = generate_users(config)
+    app_by_label = {app['label']: app for app in apps}
+    default_app = apps[0] if apps else None
+    default_reviewer = next((u for u in users if u.get('is_manager')), users[0] if users else None)
+
+    # Entitlement bundles (okta_entitlement_bundle requires a target application)
     for bundle in oig_config.get('entitlement_bundles', []):
         bundle_name = bundle.get('name', 'Bundle')
         resource_name = sanitize_name(bundle_name)
         description = bundle.get('description', '')
         status = bundle.get('status', 'ACTIVE')
+        target_app = app_by_label.get(bundle.get('app', '')) or default_app
 
         if include_comments:
             content += f"# {bundle_name}\n"
+
+        if not target_app:
+            content += f'''# resource "okta_entitlement_bundle" "{resource_name}" {{
+#   name        = "{bundle_name}"
+#   description = "{description}"
+#   status      = "{status}"
+#   # TODO: bundles need a target application. Add an application to the
+#   # config (or set `app:` on this bundle) and uncomment.
+# }}
+
+'''
+            continue
 
         content += f'''resource "okta_entitlement_bundle" "{resource_name}" {{
   name        = "{bundle_name}"
   description = "{description}"
   status      = "{status}"
+
+  target {{
+    external_id = okta_app_oauth.{target_app['resource_name']}.id
+    type        = "APPLICATION"
+  }}
 }}
 
 '''
 
-    # Access reviews
+    # Access certification campaigns (okta_campaign)
+    def days_between(start: str, end: str) -> int:
+        try:
+            start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(end.replace('Z', '+00:00'))
+            return max(1, (end_dt - start_dt).days)
+        except (ValueError, AttributeError):
+            return 30
+
     for review in oig_config.get('access_reviews', []):
         review_name = review.get('name', 'Access Review')
         resource_name = sanitize_name(review_name)
         description = review.get('description', '')
         start_date = review.get('start_date', '')
         end_date = review.get('end_date', '')
+        duration = review.get('duration_in_days') or days_between(start_date, end_date)
+        time_zone = review.get('time_zone', 'America/Los_Angeles')
         review_type = review.get('review_type', 'USER_ACCESS_REVIEW')
         reviewer_type = review.get('reviewer_type', 'MANAGER')
+        include_entitlements = 'true' if review_type == 'ENTITLEMENT_ACCESS_REVIEW' else 'false'
+
+        fallback_user = next(
+            (u for u in users if u.get('email') == review.get('fallback_reviewer')),
+            default_reviewer,
+        )
+        fallback_ref = (
+            f"okta_user.{fallback_user['resource_name']}.id" if fallback_user
+            else '"<fallback-reviewer-user-id>" # TODO: set fallback_reviewer'
+        )
+
+        if reviewer_type == 'APPLICATION_OWNER':
+            reviewer_block = f'''    type                 = "RESOURCE_OWNER"
+    fallback_reviewer_id = {fallback_ref}'''
+        else:  # MANAGER
+            reviewer_block = f'''    type                      = "REVIEWER_EXPRESSION"
+    reviewer_scope_expression = "user.profile.managerId"
+    fallback_reviewer_id      = {fallback_ref}'''
+
+        targets = ''.join(f'''
+    target_resources {{
+      resource_id                          = okta_app_oauth.{app['resource_name']}.id
+      resource_type                        = "APPLICATION"
+      include_all_entitlements_and_bundles = {include_entitlements}
+    }}''' for app in apps)
+        if not apps:
+            targets = '\n    # TODO: add target_resources blocks (no applications in config)'
 
         if include_comments:
             content += f"# {review_name}\n"
 
-        content += f'''resource "okta_reviews" "{resource_name}" {{
-  name        = "{review_name}"
-  description = "{description}"
+        content += f'''resource "okta_campaign" "{resource_name}" {{
+  name          = "{review_name}"
+  description   = "{description}"
+  campaign_type = "RESOURCE"
 
-  start_date = "{start_date}"
-  end_date   = "{end_date}"
+  schedule_settings {{
+    type             = "ONE_OFF"
+    start_date       = "{start_date}"
+    duration_in_days = {duration}
+    time_zone        = "{time_zone}"
+  }}
 
-  review_type   = "{review_type}"
-  reviewer_type = "{reviewer_type}"
+  resource_settings {{
+    type                 = "APPLICATION"
+    include_entitlements = {include_entitlements}{targets}
+  }}
+
+  principal_scope_settings {{
+    type = "USERS"
+  }}
+
+  reviewer_settings {{
+{reviewer_block}
+  }}
+
+  remediation_settings {{
+    access_approved = "NO_ACTION"
+    access_revoked  = "DENY"
+    no_response     = "DENY"
+  }}
+
+  notification_settings {{
+    notify_reviewer_when_review_assigned      = true
+    notify_reviewer_during_midpoint_of_review = true
+    notify_reviewer_when_overdue              = true
+    notify_review_period_end                  = true
+    notify_reviewer_at_campaign_end           = true
+  }}
 }}
 
 '''

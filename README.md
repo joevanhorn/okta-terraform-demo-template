@@ -92,8 +92,8 @@ Production-grade workflow with PRs, approval gates, and CI/CD.
 
 This repository uses a three-layer resource management model:
 
-- **Layer 1 -- Terraform** manages the core Okta resources: users, groups, apps, entitlement bundles, access reviews, approval sequences, and catalog entries. All configuration lives in `environments/{env}/terraform/*.tf` files.
-- **Layer 2 -- Python API Scripts** handle governance features not yet in the Terraform provider: resource owners, governance labels, risk rules (SOD policies), and entitlement settings. Configuration lives in `environments/{env}/config/*.json` files.
+- **Layer 1 -- Terraform** manages the core Okta resources: users, groups, apps, entitlements and bundles, access certification campaigns, request conditions/sequences, resource owners, and label definitions. All configuration lives in `environments/{env}/terraform/*.tf` files.
+- **Layer 2 -- Python API Scripts** handle governance features still missing from the Terraform provider: assigning labels to resources, risk rules (SOD policies), and entitlement settings. Configuration lives in `environments/{env}/config/*.json` files.
 - **Layer 3 -- Manual (Okta Admin UI)** covers entitlement bundle assignments (which users/groups have which bundles), access review decisions, and certain advanced OIG configurations.
 
 **GitOps workflow:**
@@ -111,7 +111,7 @@ Each environment maintains independent Terraform state in S3 with DynamoDB locki
 | Requirement | Details |
 |---|---|
 | **Okta tenant** | With API token (Super Admin or equivalent). OIG features require Identity Governance license. |
-| **Terraform** | >= 1.9.0 with Okta provider >= 6.4.0 |
+| **Terraform** | >= 1.9.0 with Okta provider >= 7.0.0 (see `docs/reference/provider-coverage.md` for the v7 upgrade notes) |
 | **Python** | >= 3.8 with `requests`, `pyyaml`, `python-dotenv` (see `requirements.txt`) |
 | **GitHub account** | For GitOps workflows (optional for local-only usage) |
 | **AWS account** | Optional -- for S3/DynamoDB state backend and infrastructure modules |

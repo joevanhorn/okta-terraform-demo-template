@@ -233,7 +233,7 @@ resource "okta_group" "marketing_team" {
 # Users must exist before group memberships
 resource "okta_group_memberships" "engineering" {
   group_id = okta_group.engineering.id
-  members = [
+  users = [
     okta_user.john_doe.id,
     okta_user.jane_smith.id,
   ]
@@ -300,35 +300,45 @@ environments/
 # Define entitlement with values on an application
 # Values MUST be in alphabetical order by external_value
 resource "okta_entitlement" "app_accounts" {
-  app_id         = okta_app_oauth.my_app.id
-  key            = "accounts"
-  type           = "array<string>"
-  display_name   = "Account Access"
+  name           = "Account Access"
+  external_value = "accounts"
+  multi_value    = true
+  data_type      = "array"
+
+  parent {
+    external_id = okta_app_oauth.my_app.id
+    type        = "APPLICATION"
+  }
 
   # Alphabetical: 26DEMO26 < DEMO38
   values {
-    value          = "CASH MANAGEMENT III"
+    name           = "CASH MANAGEMENT III"
     external_value = "26DEMO26"
   }
   values {
-    value          = "ANCHOR CHECKING II"
+    name           = "ANCHOR CHECKING II"
     external_value = "DEMO38"
   }
 }
 
 # For yes/no entitlements: "no" < "yes" alphabetically
 resource "okta_entitlement" "app_approval" {
-  app_id         = okta_app_oauth.my_app.id
-  key            = "canApprove"
-  type           = "string"
-  display_name   = "Can Approve"
+  name           = "Can Approve"
+  external_value = "canApprove"
+  multi_value    = false
+  data_type      = "string"
+
+  parent {
+    external_id = okta_app_oauth.my_app.id
+    type        = "APPLICATION"
+  }
 
   values {
-    value          = "No"
+    name           = "No"
     external_value = "no"
   }
   values {
-    value          = "Yes"
+    name           = "Yes"
     external_value = "yes"
   }
 }
@@ -336,12 +346,17 @@ resource "okta_entitlement" "app_approval" {
 
 ### Entitlement Bundles
 
-**Basic bundle (without entitlement values):**
+**Basic bundle (without entitlement values). The `target` block is REQUIRED:**
 ```hcl
 resource "okta_entitlement_bundle" "marketing_access" {
   name        = "Marketing Access Bundle"
   description = "Complete access package for marketing team members"
   status      = "ACTIVE"
+
+  target {
+    external_id = okta_app_oauth.my_app.id
+    type        = "APPLICATION"
+  }
 }
 ```
 
@@ -390,20 +405,76 @@ resource "okta_entitlement_bundle" "standard_access" {
 # Assigning bundles to users/groups is done in Okta Admin UI
 # NOT managed by Terraform!
 
-### Access Review Campaigns
+### Access Certification Campaigns
+
+The resource is `okta_campaign` (there is no `okta_reviews`). All five settings blocks are required.
 
 ```hcl
 # ✅ CORRECT - Quarterly review campaign
-resource "okta_reviews" "q1_2025_access_review" {
-  name        = "Quarterly Access Review - Q1 2025"
-  description = "Quarterly review of all user access to applications and entitlements"
+resource "okta_campaign" "q1_2027_access_review" {
+  name          = "Quarterly Access Review - Q1 2027"
+  description   = "Quarterly review of all user access to applications and entitlements"
+  campaign_type = "RESOURCE"
 
-  start_date = "2025-01-01T00:00:00Z"
-  end_date   = "2025-01-31T23:59:59Z"
+  schedule_settings {
+    type             = "ONE_OFF"
+    start_date       = "2027-01-01T08:00:00.000Z"
+    duration_in_days = 30
+    time_zone        = "America/Los_Angeles"
+  }
 
-  review_type   = "USER_ACCESS_REVIEW"
-  reviewer_type = "MANAGER"
+  resource_settings {
+    type                 = "APPLICATION"
+    include_entitlements = true
+    target_resources {
+      resource_id                          = okta_app_oauth.my_app.id
+      resource_type                        = "APPLICATION"
+      include_all_entitlements_and_bundles = true
+    }
+  }
+
+  principal_scope_settings {
+    type = "USERS"
+  }
+
+  reviewer_settings {
+    type                 = "RESOURCE_OWNER" # GROUP, MULTI_LEVEL, RESOURCE_OWNER, REVIEWER_EXPRESSION, USER
+    fallback_reviewer_id = okta_user.john_doe.id
+  }
+
+  remediation_settings {
+    access_approved = "NO_ACTION"
+    access_revoked  = "DENY"
+    no_response     = "DENY"
+  }
+
+  notification_settings {
+    notify_reviewer_when_review_assigned      = true
+    notify_reviewer_during_midpoint_of_review = true
+    notify_reviewer_when_overdue              = true
+    notify_review_period_end                  = true
+    notify_reviewer_at_campaign_end           = true
+  }
 }
+```
+
+### Resource Owners and Labels (provider v6.13.0+)
+
+```hcl
+data "okta_org_metadata" "current" {}
+
+resource "okta_resource_owner" "my_app" {
+  resource_orns  = ["orn:okta:idp:${data.okta_org_metadata.current.id}:apps:${okta_app_oauth.my_app.name}:${okta_app_oauth.my_app.id}"]
+  principal_orns = ["orn:okta:directory:${data.okta_org_metadata.current.id}:users:${okta_user.john_doe.id}"]
+}
+
+resource "okta_label" "data_classification" {
+  name = "Data Classification"
+  values {
+    name = "Confidential"
+  }
+}
+# Attaching label values to resources is still API-only (scripts/apply_admin_labels.py)
 ```
 
 ---
@@ -514,7 +585,7 @@ resource "okta_group" "engineering" {
 ```hcl
 resource "okta_group_memberships" "engineering" {
   group_id = okta_group.engineering.id
-  members = [
+  users = [
     okta_user.john_doe.id,
     okta_user.jane_smith.id,
   ]
@@ -1781,7 +1852,7 @@ resource "okta_group" "engineering" {
 # Engineering group memberships
 resource "okta_group_memberships" "engineering" {
   group_id = okta_group.engineering.id
-  members = [
+  users = [
     okta_user.alice_engineer.id,
     okta_user.bob_developer.id,
     okta_user.charlie_devops.id,

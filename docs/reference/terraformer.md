@@ -6,19 +6,19 @@ Complete guide for importing existing Okta configurations using Terraformer (rev
 
 ### OIG Resources Not Supported
 
-**Terraformer does NOT support the OIG resources** introduced in Terraform Provider v6.1.0. These must be managed separately:
+**Terraformer does NOT support the OIG resources** introduced in Terraform Provider v6.x. These must be managed separately:
 
 ❌ **Not Imported by Terraformer:**
-- `okta_reviews` - Access review campaigns
-- `okta_principal_entitlements` - Entitlements
-- `okta_request_conditions` - Request conditions
-- `okta_request_sequences` - Approval workflows
-- `okta_request_settings` - Request settings
+- `okta_campaign` - Access certification campaigns
+- `okta_entitlement` / `okta_entitlement_bundle` - Entitlements and bundles
+- `okta_request_condition` - Request conditions
+- `okta_request_sequence` - Approval sequence bindings
+- `okta_request_setting_organization` / `okta_request_setting_resource` - Request settings
 - `okta_request_v2` - Access requests
-- `okta_catalog_entry_default` - Catalog entries
-- `okta_catalog_entry_user_access_request_fields` - Custom fields
-- Resource Owners (API only)
-- Labels (API only)
+- `okta_resource_owner` - Resource owners (provider v6.13.0+)
+- `okta_label` - Label definitions (provider v6.13.0+)
+- Data sources such as `okta_catalog_entry_default`, `okta_catalog_entry_user_access_request_fields`, `okta_principal_entitlements` are read-only and never imported
+- Label-to-resource assignment and risk rules (API only, no Terraform resource)
 
 ✅ **Fully Supported by Terraformer:**
 - All standard Okta resources (users, groups, apps, policies, etc.)
@@ -373,17 +373,18 @@ Terraformer supports these Okta resource types:
 
 ### Not Yet Supported by Terraformer
 
-These resources require the Terraform provider v6.1.0 but aren't in Terraformer yet:
+These resources exist in the Terraform provider (v6.x/v7.x) but aren't in Terraformer yet:
 
-- ❌ `okta_reviews` - Access review campaigns
-- ❌ `okta_principal_entitlements` - Entitlements
-- ❌ `okta_request_conditions` - Request conditions
-- ❌ `okta_request_sequences` - Approval workflows
-- ❌ `okta_request_settings` - Request settings
+- ❌ `okta_campaign` - Access certification campaigns
+- ❌ `okta_entitlement` / `okta_entitlement_bundle` - Entitlements and bundles
+- ❌ `okta_request_condition` - Request conditions
+- ❌ `okta_request_sequence` - Approval sequence bindings
+- ❌ `okta_request_setting_organization` / `okta_request_setting_resource` - Request settings
 - ❌ `okta_request_v2` - Access requests
-- ❌ `okta_catalog_entry_default` - Catalog entries
-- ❌ Resource Owners (API only)
-- ❌ Labels (API only)
+- ❌ `okta_resource_owner` - Resource owners
+- ❌ `okta_label` - Label definitions
+- ❌ `okta_realm` / `okta_realm_assignment`, `okta_app_connection`, `okta_app_features`, `okta_group_owners` - newer resources
+- ❌ Label-to-resource assignment and risk rules (API only)
 
 > **Note**: For OIG resources, you'll need to create these manually or use our Python API management scripts.
 
@@ -580,10 +581,17 @@ resource "okta_app_oauth" "custom_app" {
    cd terraform
    
    # Use imported resources in OIG config
-   # Reference imported apps in catalog entries
-   resource "okta_catalog_entry_default" "imported_app" {
-     app_id = okta_app_oauth.existing_app.id  # From import
-     # ... OIG config
+   # Make an imported app requestable (catalog entries are read-only data sources)
+   resource "okta_request_condition" "imported_app" {
+     name                 = "Request ${okta_app_oauth.existing_app.label}"
+     resource_id          = okta_app_oauth.existing_app.id  # From import
+     approval_sequence_id = "<approval-sequence-id>"
+     requester_settings {
+       type = "EVERYONE"
+     }
+     access_scope_settings {
+       type = "RESOURCE_DEFAULT"
+     }
    }
    ```
 
@@ -702,7 +710,7 @@ terraformer import okta --resources=okta_group
 
 **Error:**
 ```
-Resource type 'okta_reviews' is not supported
+Resource type 'okta_campaign' is not supported
 ```
 
 **Solution:**
