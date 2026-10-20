@@ -41,10 +41,10 @@ This document provides a comprehensive manual validation plan for testing the Ok
   ```bash
   cd environments/myorg/terraform
   terraform version
-  # Expected: provider registry.terraform.io/okta/okta v6.4.0+
+  # Expected: provider registry.terraform.io/okta/okta v7.0.0+
   ```
-  - ✅ Pass: Provider v6.4.0 or higher (required for OIG resources)
-  - ❌ Fail: Version < 6.4.0 or missing
+  - ✅ Pass: Provider v7.0.0 or higher (required for OIG resources)
+  - ❌ Fail: Version < 7.0.0 or missing
 
 - [ ] **Python 3.8+ Installed**
   ```bash
@@ -167,7 +167,7 @@ This document provides a comprehensive manual validation plan for testing the Ok
   cd environments/myorg/terraform
   ls *.tf
   # Expected core files:
-  # - provider.tf (with provider >= 6.4.0)
+  # - provider.tf (with provider >= 7.0.0, < 8.0.0)
   # - variables.tf
   # - backend.tf (optional)
   # - oig_entitlements.tf (OIG resources)
@@ -627,7 +627,7 @@ This document provides a comprehensive manual validation plan for testing the Ok
 
 - [ ] **Check Terraform Configuration**
   ```bash
-  grep -c "resource \"okta_reviews\"" oig_reviews.tf
+  grep -c "resource \"okta_campaign\"" oig_reviews.tf
   # Expected: 200 (or current count)
   ```
   - ✅ Pass: Count matches

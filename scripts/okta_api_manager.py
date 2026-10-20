@@ -2,18 +2,21 @@
 """
 okta_api_manager.py
 
-Manages Okta OIG API-only resources (Labels and Resource Owners).
+Manages Okta OIG governance Labels and Resource Owners via the API.
 
-API-ONLY Resources (No Terraform Support):
-- Labels - Governance labels for resources
-- Resource Owners - Assign owners to resources
+API-ONLY operations (no Terraform resource as of okta/okta v7.0.0):
+- Assigning labels to resources (/governance/api/v1/resource-labels/assign)
+
+ALSO AVAILABLE IN TERRAFORM (provider v6.13.0+), kept here for config-driven forks:
+- Label definitions - okta_label
+- Resource Owners - okta_resource_owner
 
 TERRAFORM-MANAGED Resources (NOT in this script):
-- Entitlements - Use okta_principal_entitlements
-- Access Reviews - Use okta_reviews
-- Request Workflows - Use okta_request_*
-- Resource Catalog - Use okta_catalog_*
-- Resource Sets - Use okta_resource_set
+- Entitlements - okta_entitlement / okta_entitlement_bundle (okta_principal_entitlements is a read-only data source)
+- Access Certification - okta_campaign / okta_review
+- Access Requests - okta_request_condition / okta_request_sequence / okta_request_setting_*
+- Resource Catalog - okta_catalog_entry_* data sources (read-only)
+- Resource Sets - okta_resource_set
 
 Usage:
   # Export API-only resources (Labels and Resource Owners)

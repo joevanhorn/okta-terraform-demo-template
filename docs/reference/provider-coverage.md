@@ -1,34 +1,52 @@
 # Okta Terraform Provider - Coverage & Analysis
 
-**Last Updated:** 2025-11-19
-**Provider Version:** v6.4.0
+**Last Updated:** 2026-10-20
+**Provider Version:** okta/okta v7.0.0 (repo constraint `>= 7.0.0, < 8.0.0`)
 **Purpose:** Track which Okta features are available in Terraform vs API-only vs Manual
+
+Numbers and names below come from `terraform providers schema -json` for v7.0.0, not from memory. `environments/myorg/terraform/RESOURCE_EXAMPLES.tf` carries a validated example for most of them.
 
 ---
 
 ## Summary
 
-The Okta Terraform Provider (v6.4.0) includes **103 resources** and **47 data sources** across 28 categories. Key highlights:
+The Okta Terraform Provider v7.0.0 ships **162 resources** and **109 data sources**. Key points for this template:
 
-- **OIG support** added in v6.0.0-v6.4.0: 10 resources and 13 data sources for entitlements, reviews, requests, and approvals
-- **3 CRITICAL gaps** remain: resource owners, governance labels, and risk rules (SOD policies) -- managed via Python scripts
-- **95% OIG coverage**, 100% Users & Groups, 90% Applications, 95% Auth & Policies
-- **~37% of resources** lack comprehensive examples in the demo template
+- **OIG coverage is now near-complete**: entitlements, bundles, campaigns, request conditions/sequences/settings, requests, and (since v6.13.0) `okta_resource_owner` and `okta_label`.
+- **Still API-only** (Python scripts in `scripts/`): assigning label values to resources, risk rules / SOD policies, entitlement bundle grants (who holds a bundle), and per-app entitlement management enablement.
+- **Provisioning** gained `okta_app_connection` (SCIM base URL + auth) and `okta_app_features` (provisioning capabilities); the "App Provisioning Connection: not available" gap from earlier versions is closed for OIN apps.
+- **New areas since 6.4.0**: realms, group owners, ITP policy rules, Security Events Providers (SSF receivers), app sign-on policy bulk rules, `okta_oauth2_v1_clients_role_*`, identity sources, push providers, custom sign-in pages.
 
-### OIG Resources Added in v6.x
+### Upgrading from 6.x to 7.0.0
 
-| Resource | Version | Purpose |
-|----------|---------|---------|
-| `okta_campaign` | v6.0.0 | Access review campaigns |
-| `okta_entitlement` | v6.0.0 | Individual entitlements |
-| `okta_entitlement_bundle` | v6.2.0 | Entitlement bundles |
-| `okta_review` | v6.1.0 | Access reviews |
-| `okta_principal_entitlements` | v6.1.0 | Principal entitlement assignments |
-| `okta_request_condition` | v6.1.0 | Access request conditions |
-| `okta_request_sequence` | v6.1.0 | Approval workflows |
-| `okta_request_setting_organization` | v6.1.0 | Org-level request settings |
-| `okta_request_setting_resource` | v6.1.0 | Resource-level request settings |
-| `okta_request_v2` | v6.1.0 | Access requests |
+v7.0.0 migrated several resources to the Plugin Framework with breaking schema changes. None of them are used by this template's modules, but check your own environment code for:
+
+| Resource | Change |
+|----------|--------|
+| `okta_trusted_origin` | `scopes = ["CORS"]` → repeated `scopes { type = "CORS" }` blocks (min 1); `active` → `status = "ACTIVE"/"INACTIVE"` |
+| `okta_threat_insight_settings` | `network_excludes` → `exclude_zones` |
+| `okta_template_sms` | `translations` is now `map(string)` keyed by language code |
+| `okta_role_subscription` | `role_type` → `role_ref`; `status` removed |
+| `okta_captcha` | `name`, `type`, `site_key`, `secret_key` now optional; `type` updates in place |
+| `okta_captcha_org_wide_settings` | Deprecated → `okta_org_captcha` (`enabled_for` → `enabled_pages`) |
+| `okta_email_template_settings` | `recipients` now optional; `brand_id`/`template_name` force replacement |
+
+Run `terraform init -upgrade` after bumping the constraint, then `terraform plan` and fix any of the above.
+
+### OIG Resources by Provider Version
+
+| Resource | Added | Purpose |
+|----------|-------|---------|
+| `okta_campaign` / `okta_review` | v6.0 / v6.1 | Access certification campaigns, review reassignment |
+| `okta_entitlement` / `okta_entitlement_bundle` | v6.0 / v6.2 | App entitlements and bundles |
+| `okta_request_condition` / `okta_request_sequence` | v6.1 | Requestable resources, approval sequence bindings |
+| `okta_request_setting_organization` / `okta_request_setting_resource` | v6.1 | Org and per-resource request settings |
+| `okta_request_v2` / `okta_end_user_my_requests` | v6.1 | Create access requests |
+| `okta_resource_owner` | v6.13.0 | Owner assignment by ORN |
+| `okta_label` | v6.13.0 | Label definitions and values |
+| `okta_group_owners` / `okta_group_owner` | v6.x | Group ownership |
+
+Data sources: `okta_catalog_entry_default`, `okta_catalog_entry_user_access_request_fields`, `okta_principal_entitlements`, `okta_resource_owner`, `okta_resource_owners_catalog_resource`, `okta_label`, `okta_resource_label`, `okta_campaign`, `okta_review`, `okta_entitlement`, `okta_entitlement_bundle`, `okta_request_condition`, `okta_request_sequence`, `okta_request_setting_*`, `okta_request_v2`, `okta_iam_resource_set`.
 
 ---
 
@@ -46,329 +64,121 @@ The Okta Terraform Provider (v6.4.0) includes **103 resources** and **47 data so
 
 ## Identity Governance (OIG) Features
 
-| Feature | Provider Resource | Demo Template | Notes | Priority |
-|---------|-------------------|---------------|-------|----------|
-| **Entitlement Bundles (Definitions)** | ✅ `okta_entitlement_bundle` | ✅ `oig_entitlements.tf` | Bundle definitions only | - |
-| **Entitlement Bundles (Assignments)** | 👤 Manual Only | 👤 Okta Admin UI | WHO has bundles - NOT in Terraform | HIGH |
-| **Individual Entitlements** | ✅ `okta_entitlement` | ✅ Auto-generated | Low-level entitlements | - |
-| **Principal Entitlements** | ✅ `okta_principal_entitlements` | ✅ Data source | Query assignments | - |
-| **Access Review Campaigns** | ✅ `okta_campaign` | ✅ `oig_reviews.tf` | Full CRUD support | - |
-| **Access Reviews** | ✅ `okta_review` | ✅ `oig_reviews.tf` | Campaign-based reviews | - |
-| **Approval Workflows** | ✅ `okta_request_sequence` | ✅ `oig_request_sequences.tf` | Multi-step approvals | - |
-| **Catalog Entries** | ✅ `okta_catalog_entry_default` | ✅ Data source | Self-service catalog | - |
-| **Request Settings (Org)** | ✅ `okta_request_setting_organization` | ✅ `oig_request_settings.tf` | Org-wide settings | - |
-| **Request Settings (Resource)** | ✅ `okta_request_setting_resource` | ✅ `oig_request_settings.tf` | Per-resource settings | - |
-| **Access Requests** | ✅ `okta_request_v2` | ✅ Data source | Query requests | - |
-| **Request Conditions** | ✅ `okta_request_condition` | ✅ `oig_request_settings.tf` | Conditional access | - |
-| **Resource Owners** | 🔧 `scripts/apply_resource_owners.py` | 🔧 `config/owner_mappings.json` | NOT in provider | **CRITICAL** |
-| **Governance Labels** | 🔧 `scripts/apply_admin_labels.py` | 🔧 `config/label_mappings.json` | NOT in provider | **CRITICAL** |
-| **Risk Rules (SOD Policies)** | 🔧 `scripts/apply_risk_rules.py` | 🔧 `config/risk_rules.json` | NOT in provider | **CRITICAL** |
+| Feature | Provider Resource | Demo Template | Notes |
+|---------|-------------------|---------------|-------|
+| **Entitlements** | ✅ `okta_entitlement` | ✅ `RESOURCE_EXAMPLES.tf` | Values must be alphabetical by `external_value` |
+| **Entitlement Bundles (definitions)** | ✅ `okta_entitlement_bundle` | ✅ `RESOURCE_EXAMPLES.tf`, lifecycle module | `target` block is required |
+| **Entitlement Bundle grants** | 👤 Manual / 🔧 `copy_grants_between_orgs.py` | 👤 Okta Admin UI | WHO holds a bundle; read-only via `okta_principal_entitlements` |
+| **Access Certification Campaigns** | ✅ `okta_campaign` | ✅ `RESOURCE_EXAMPLES.tf` | Five settings blocks required |
+| **Review reassignment** | ✅ `okta_review` | ✅ | Reassign review items |
+| **Request Conditions** | ✅ `okta_request_condition` | ✅ | Makes a resource requestable |
+| **Approval Sequences** | ⚠️ `okta_request_sequence` | ✅ | Binds an existing sequence; stages authored in Admin UI |
+| **Request Settings (Org / Resource)** | ✅ `okta_request_setting_organization`, `okta_request_setting_resource` | ✅ | |
+| **Access Requests** | ✅ `okta_request_v2` | ✅ | Create a request |
+| **Catalog Entries** | ⚠️ data sources only | ✅ | Read-only |
+| **Resource Owners** | ✅ `okta_resource_owner` | ✅ (+ `scripts/apply_resource_owners.py`) | v6.13.0; ORN based |
+| **Governance Labels (definitions)** | ✅ `okta_label` | ✅ | v6.13.0 |
+| **Governance Labels (assignment)** | 🔧 `scripts/apply_admin_labels.py` | 🔧 `config/label_mappings.json` | `/resource-labels/assign` has no resource |
+| **Risk Rules (SOD Policies)** | 🔧 `scripts/apply_risk_rules.py` | 🔧 `config/risk_rules.json` | NOT in provider |
+| **Entitlement Management enablement** | 🔧 `scripts/manage_entitlement_settings.py` | 🔧 | Beta API |
 
 ---
 
 ## Applications
 
-| Feature | Provider Resource | Demo Template | Notes | Priority |
-|---------|-------------------|---------------|-------|----------|
-| **OAuth 2.0 Apps** | ✅ `okta_app_oauth` | ✅ Examples available | Full support | - |
-| **SAML Apps** | ✅ `okta_app_saml` | ✅ Examples available | Full support | - |
-| **SWA Apps** | ✅ `okta_app_swa` | ✅ Examples available | Template-based | - |
-| **Bookmark Apps** | ✅ `okta_app_bookmark` | ✅ Examples available | Simple links | - |
-| **Basic Auth Apps** | ✅ `okta_app_basic_auth` | ✅ Examples available | HTTP Basic | - |
-| **Auto Login Apps** | ✅ `okta_app_auto_login` | ✅ Examples available | Auto-submit forms | - |
-| **Three-Field Apps** | ✅ `okta_app_three_field` | ✅ Examples available | Extra field support | - |
-| **Secure Password Store** | ✅ `okta_app_secure_password_store` | ⚠️ Limited examples | SWA variant | LOW |
-| **Shared Credentials** | ✅ `okta_app_shared_credentials` | ⚠️ Limited examples | Shared login | LOW |
-| **App Logos** | ❌ Not Available | 👤 Manual Only | Logo upload | MEDIUM |
-| **App Provisioning Connection** | ❌ Not Available | 👤 Manual Only | SCIM config | **HIGH** |
-| **App Group Assignments** | ✅ `okta_app_group_assignment` | ✅ Examples available | Single assignment | - |
-| **App Group Assignments (Bulk)** | ✅ `okta_app_group_assignments` | ✅ Examples available | Multiple assignments | - |
-| **App User Assignments** | ✅ `okta_app_user` | ✅ Examples available | Individual users | - |
-| **App Sign-On Policies** | ✅ `okta_app_signon_policy` | ✅ Examples available | App-level policies | - |
-| **App Sign-On Policy Rules** | ✅ `okta_app_signon_policy_rule` | ✅ Examples available | Conditional access | - |
-| **OAuth API Scopes** | ✅ `okta_app_oauth_api_scope` | ✅ Examples available | Grant scopes | - |
-| **OAuth Redirect URIs** | ✅ `okta_app_oauth_redirect_uri` | ✅ Examples available | Callback URLs | - |
-| **OAuth Post Logout URIs** | ✅ `okta_app_oauth_post_logout_redirect_uri` | ✅ Examples available | Logout URLs | - |
-| **OAuth Role Assignments** | ✅ `okta_app_oauth_role_assignment` | ⚠️ Limited examples | Admin roles | LOW |
+| Feature | Provider Resource | Notes |
+|---------|-------------------|-------|
+| **OAuth 2.0 / SAML / SWA / Bookmark / Basic Auth / Auto Login / Three-Field / Secure Password Store / Shared Credentials** | ✅ `okta_app_*` | Examples for all |
+| **App Logos** | ⚠️ `logo` attribute on each `okta_app_*` | Local file path |
+| **Provisioning Connection (SCIM)** | ✅ `okta_app_connection` | Base URL + TOKEN/OAUTH2 auth, activate/deactivate |
+| **Provisioning Features** | ⚠️ `okta_app_features` | OIN apps exposing the Application Features API only; cannot be destroyed |
+| **Group Push** | ✅ `okta_push_group` | |
+| **App assignments** | ✅ `okta_app_group_assignment(s)`, `okta_app_user` | |
+| **App Sign-On Policies** | ✅ `okta_app_signon_policy`, `_rule`, `_rules` | `office365_client_include` since v6.14.0 |
+| **OAuth API scopes / role assignments** | ✅ `okta_app_oauth_api_scope`, `okta_app_oauth_role_assignment`, `okta_oauth2_v1_clients_role_*` | 13 role-type variants |
+| **Federated claims** | ✅ `okta_app_federated_claim` | |
+| **App user schema** | ✅ `okta_app_user_schema_property`, `okta_app_user_base_schema_property` | |
+| **API service integrations** | ✅ `okta_api_service_integration` | |
 
 ---
 
-## Users & Groups
+## Users, Groups & Realms
 
-| Feature | Provider Resource | Demo Template | Notes | Priority |
-|---------|-------------------|---------------|-------|----------|
-| **Users** | ✅ `okta_user` | ✅ `users.tf` | Full CRUD | - |
-| **User Types** | ✅ `okta_user_type` | ⚠️ Limited examples | Custom types | LOW |
-| **User Base Schema** | ✅ `okta_user_base_schema_property` | ⚠️ Limited examples | Modify base attrs | LOW |
-| **User Custom Schema** | ✅ `okta_user_custom_schema_property` | ✅ Examples available | Custom attributes | - |
-| **User Admin Roles** | ✅ `okta_user_admin_roles` | ⚠️ Limited examples | Assign admin roles | LOW |
-| **User Group Memberships** | ✅ `okta_user_group_memberships` | ✅ Examples available | Bulk group assignment | - |
-| **User Factor Question** | ✅ `okta_user_factor_question` | ⚠️ Limited examples | Security questions | LOW |
-| **Groups** | ✅ `okta_group` | ✅ `groups.tf` | Full CRUD | - |
-| **Group Memberships** | ✅ `okta_group_memberships` | ✅ Examples available | Bulk user assignment | - |
-| **Group Owners** | ✅ `okta_group_owner` | ⚠️ Limited examples | Group ownership | MEDIUM |
-| **Group Rules** | ✅ `okta_group_rule` | ✅ Examples available | Dynamic groups | - |
-| **Group Roles** | ✅ `okta_group_role` | ⚠️ Limited examples | Admin roles | LOW |
-| **Group Custom Schema** | ✅ `okta_group_custom_schema_property` | ⚠️ Limited examples | Custom attributes | LOW |
+| Feature | Provider Resource | Notes |
+|---------|-------------------|-------|
+| **Users / User types / Schema** | ✅ `okta_user`, `okta_user_type`, `okta_user_schema_property`, `okta_user_base_schema_property` | |
+| **Admin roles on users** | ✅ `okta_user_admin_roles`, `okta_admin_role_targets` | |
+| **User risk (ITP)** | ✅ `okta_user_risk` | Demo trigger |
+| **User notification subscriptions** | ✅ `okta_user_subscription` | v7.0.0 |
+| **Groups / Rules / Memberships** | ✅ `okta_group`, `okta_group_rule`, `okta_group_memberships` (`users`), `okta_user_group_memberships` | |
+| **Group owners** | ✅ `okta_group_owners` (authoritative), `okta_group_owner` | |
+| **Group admin roles** | ✅ `okta_group_role` | |
+| **Group schema** | ✅ `okta_group_schema_property` | |
+| **Realms** | ✅ `okta_realm`, `okta_realm_assignment` | |
+| **Linked objects** | ✅ `okta_link_definition`, `okta_link_value` | Manager relationships |
+| **Identity sources (anything-as-a-source)** | ✅ `okta_identity_source_user`, `_group`, `_group_membership`, `_import` | |
 
 ---
 
-## Authentication & Authorization
+## Authentication, Policies & Security
 
-| Feature | Provider Resource | Demo Template | Notes | Priority |
-|---------|-------------------|---------------|-------|----------|
-| **Auth Servers** | ✅ `okta_auth_server` | ✅ Examples available | Custom AS | - |
-| **Auth Server Default** | ✅ `okta_auth_server_default` | ⚠️ Limited examples | Default AS config | LOW |
-| **Auth Server Claims** | ✅ `okta_auth_server_claim` | ✅ Examples available | Custom claims | - |
-| **Auth Server Default Claims** | ✅ `okta_auth_server_claim_default` | ⚠️ Limited examples | Modify default claims | LOW |
-| **Auth Server Scopes** | ✅ `okta_auth_server_scope` | ✅ Examples available | Custom scopes | - |
-| **Auth Server Policies** | ✅ `okta_auth_server_policy` | ✅ Examples available | Access policies | - |
-| **Auth Server Policy Rules** | ✅ `okta_auth_server_policy_rule` | ✅ Examples available | Policy rules | - |
-| **Authenticators** | ✅ `okta_authenticator` | ⚠️ Limited examples | MFA config | MEDIUM |
-| **MFA Factors** | ✅ `okta_factor` | ⚠️ Limited examples | Factor config | MEDIUM |
-| **TOTP Factors** | ✅ `okta_factor_totp` | ⚠️ Limited examples | TOTP config | LOW |
-
----
-
-## Policies
-
-| Feature | Provider Resource | Demo Template | Notes | Priority |
-|---------|-------------------|---------------|-------|----------|
-| **Sign-On Policies** | ✅ `okta_policy_sign_on` | ✅ Examples available | Global sign-on | - |
-| **Sign-On Policy Rules** | ✅ `okta_policy_rule_sign_on` | ✅ Examples available | Conditional access | - |
-| **MFA Policies** | ✅ `okta_policy_mfa` | ✅ Examples available | MFA requirements | - |
-| **MFA Policy Default** | ✅ `okta_policy_mfa_default` | ⚠️ Limited examples | Default MFA policy | LOW |
-| **MFA Policy Rules** | ✅ `okta_policy_rule_mfa` | ✅ Examples available | MFA rules | - |
-| **Password Policies** | ✅ `okta_policy_password` | ✅ Examples available | Password requirements | - |
-| **Password Policy Default** | ✅ `okta_policy_password_default` | ⚠️ Limited examples | Default password policy | LOW |
-| **Password Policy Rules** | ✅ `okta_policy_rule_password` | ✅ Examples available | Password rules | - |
-| **Profile Enrollment Policies** | ✅ `okta_policy_profile_enrollment` | ⚠️ Limited examples | Self-service registration | MEDIUM |
-| **Profile Enrollment Apps** | ✅ `okta_policy_profile_enrollment_apps` | ⚠️ Limited examples | App-level enrollment | MEDIUM |
-| **Profile Enrollment Rules** | ✅ `okta_policy_rule_profile_enrollment` | ⚠️ Limited examples | Enrollment rules | MEDIUM |
-| **IdP Discovery Policies** | ✅ Implied in rules | ✅ Examples available | Routing rules | - |
-| **IdP Discovery Rules** | ✅ `okta_policy_rule_idp_discovery` | ✅ Examples available | IdP routing | - |
-| **Session Policies** | ❌ Not Available | 👤 Manual Only | Global session config | MEDIUM |
-| **Device Assurance (Android)** | ✅ `okta_policy_device_assurance_android` | ⚠️ Limited examples | Device trust | MEDIUM |
-| **Device Assurance (ChromeOS)** | ✅ `okta_policy_device_assurance_chromeos` | ⚠️ Limited examples | Device trust | MEDIUM |
-| **Device Assurance (iOS)** | ✅ `okta_policy_device_assurance_ios` | ⚠️ Limited examples | Device trust | MEDIUM |
-| **Device Assurance (macOS)** | ✅ `okta_policy_device_assurance_macos` | ⚠️ Limited examples | Device trust | MEDIUM |
-| **Device Assurance (Windows)** | ✅ `okta_policy_device_assurance_windows` | ⚠️ Limited examples | Device trust | MEDIUM |
+| Feature | Provider Resource | Notes |
+|---------|-------------------|-------|
+| **Authorization servers** | ✅ `okta_auth_server*`, `okta_trusted_server` | 8 resources |
+| **Global session / MFA / password policies** | ✅ `okta_policy_signon`, `okta_policy_mfa`, `okta_policy_password` + `_rule_*` + `_default` | |
+| **Profile enrollment** | ✅ `okta_policy_profile_enrollment`, `_apps`, `okta_policy_rule_profile_enrollment`, `okta_ui_schema` | |
+| **IdP discovery** | ✅ `okta_policy_rule_idp_discovery` | `idp_providers` block |
+| **Device assurance** | ✅ `okta_policy_device_assurance_{android,chromeos,ios,macos,windows}` | ChromeOS uses `tpsp_*` only |
+| **ITP policies** | ✅ `okta_entity_risk_policy_rule`, `okta_session_violation_policy_rule`, `okta_post_auth_session_policy_rule` | System policies via data sources |
+| **Security Events Provider (SSF)** | ✅ `okta_security_events_provider` | |
+| **Authenticators** | ✅ `okta_authenticator`, `okta_authenticator_method_webauthn`, `okta_authenticator_webauthn_custom_aaguid`, `okta_factor`, `okta_factor_totp` | |
+| **Push providers** | ✅ `okta_push_provider` | APNS / FCM |
+| **Network zones / Trusted origins / Behaviors / ThreatInsight** | ✅ | v7 schema changes above |
+| **CAPTCHA** | ✅ `okta_captcha`, `okta_org_captcha` | `okta_captcha_org_wide_settings` deprecated |
+| **Rate limiting** | ✅ `okta_rate_limiting`, `okta_principal_rate_limits`, `okta_rate_limit_admin_notification_settings`, `okta_rate_limit_warning_threshold_percentage` | |
+| **Security notification emails** | ✅ `okta_security_notification_emails` | SSWS token only |
+| **Devices** | ⚠️ `okta_device` | Lifecycle action on an existing device |
 
 ---
 
-## Identity Providers
+## Identity Providers, Branding, Email, Domains, Hooks
 
-| Feature | Provider Resource | Demo Template | Notes | Priority |
-|---------|-------------------|---------------|-------|----------|
-| **OIDC IdP** | ✅ `okta_idp_oidc` | ✅ Examples available | OpenID Connect | - |
-| **SAML IdP** | ✅ `okta_idp_saml` | ✅ Examples available | SAML 2.0 | - |
-| **SAML IdP Keys** | ✅ `okta_idp_saml_key` | ⚠️ Limited examples | Signing certificates | LOW |
-| **Social IdP** | ✅ `okta_idp_social` | ✅ Examples available | Google, Facebook, etc. | - |
-
----
-
-## Organization & Settings
-
-| Feature | Provider Resource | Demo Template | Notes | Priority |
-|---------|-------------------|---------------|-------|----------|
-| **Org Configuration** | ✅ `okta_org_configuration` | ⚠️ Limited examples | Global org settings | MEDIUM |
-| **Org Support** | ✅ `okta_org_support` | ⚠️ Limited examples | Support settings | LOW |
-| **Org Contacts** | ❌ Not Available | 👤 Manual Only | Technical/billing | LOW |
-| **Rate Limiting** | ✅ `okta_rate_limiting` | ⚠️ Limited examples | DEPRECATED - use new resources | - |
-| **Principal Rate Limits** | ✅ `okta_principal_rate_limits` | ❌ No examples | Per-user/app limits (v6.3.0+) | MEDIUM |
-| **Rate Limit Admin Notification** | ✅ `okta_rate_limit_admin_notification` | ❌ No examples | Notification settings (v6.3.0+) | LOW |
-| **Rate Limit Warning Threshold** | ✅ `okta_rate_limit_warning_threshold` | ❌ No examples | Warning thresholds (v6.3.0+) | LOW |
-| **Security Notification Emails** | ✅ `okta_security_notification_emails` | ⚠️ Limited examples | Security alerts | MEDIUM |
-| **Threat Insight Settings** | ✅ `okta_threat_insight_settings` | ⚠️ Limited examples | Threat detection | MEDIUM |
-| **Feature Flags** | ⚠️ Partial via org_configuration | ⚠️ Limited examples | EA/Beta features | MEDIUM |
+| Feature | Provider Resource | Notes |
+|---------|-------------------|-------|
+| **IdPs** | ✅ `okta_idp_saml` (+ `okta_idp_saml_key`, `kid` required), `okta_idp_oidc`, `okta_idp_social` | |
+| **Profile mappings** | ✅ `okta_profile_mapping` | |
+| **Brands / Themes** | ✅ `okta_brand`, `okta_theme`, `okta_customized_signin_page`, `okta_preview_signin_page` | |
+| **Email** | ✅ `okta_email_customization`, `okta_email_template_settings`, `okta_email_domain(+_verification)`, `okta_email_sender(+_verification)`, `okta_email_smtp_server` | |
+| **Domains** | ✅ `okta_domain` (`name`, `certificate_source_type`), `okta_domain_verification`, `okta_domain_certificate` | |
+| **SMS templates** | ✅ `okta_template_sms` | map translations in v7 |
+| **Hooks** | ✅ `okta_event_hook`, `okta_event_hook_verification`, `okta_inline_hook`, `okta_hook_key` | `channel`/`auth` are map attributes |
+| **Log streams** | ✅ `okta_log_stream` | `settings` block |
 
 ---
 
-## Admin & Roles
+## Admin & Org
 
-| Feature | Provider Resource | Demo Template | Notes | Priority |
-|---------|-------------------|---------------|-------|----------|
-| **Custom Admin Roles** | ✅ `okta_admin_role_custom` | ⚠️ Limited examples | Custom permissions | MEDIUM |
-| **Custom Admin Role Assignments** | ✅ `okta_admin_role_custom_assignments` | ⚠️ Limited examples | Assign custom roles | MEDIUM |
-| **Admin Role Targets** | ✅ `okta_admin_role_targets` | ⚠️ Limited examples | Scope admin roles | MEDIUM |
-| **Resource Sets** | ✅ `okta_resource_set` | ⚠️ Limited examples | Admin resources | MEDIUM |
-| **Role Subscriptions** | ✅ `okta_role_subscription` | ❌ No examples | Role notifications | LOW |
-
----
-
-## Security & Networks
-
-| Feature | Provider Resource | Demo Template | Notes | Priority |
-|---------|-------------------|---------------|-------|----------|
-| **Network Zones** | ✅ `okta_network_zone` | ✅ Examples available | IP allowlists | - |
-| **Trusted Origins** | ✅ `okta_trusted_origin` | ✅ Examples available | CORS config | - |
-| **Trusted Servers** | ✅ `okta_trusted_server` | ⚠️ Limited examples | Server trust | LOW |
-| **Behaviors** | ✅ `okta_behavior` | ⚠️ Limited examples | Risk behaviors | MEDIUM |
-| **CAPTCHA** | ✅ `okta_captcha` | ⚠️ Limited examples | Bot protection | MEDIUM |
-| **CAPTCHA Org Settings** | ✅ `okta_captcha_org_wide_settings` | ⚠️ Limited examples | Global CAPTCHA | MEDIUM |
+| Feature | Provider Resource | Notes |
+|---------|-------------------|-------|
+| **Custom admin roles** | ✅ `okta_admin_role_custom`, `okta_admin_role_custom_assignments`, `okta_resource_set` | Resource sets take endpoints or ORNs |
+| **Role notification subscriptions** | ✅ `okta_role_subscription` | `role_ref` in v7 |
+| **API tokens / app tokens** | ⚠️ `okta_api_token`, `okta_app_token` | Mostly read/revoke |
+| **Agent pool updates** | ✅ `okta_agent_pool_update` | |
+| **Org configuration / support** | ✅ `okta_org_configuration`, `okta_org_support` | |
+| **Feature flags** | ✅ `okta_feature` | `feature_id` + `life_cycle` |
+| **Session policies (global)** | ✅ `okta_policy_signon` | Classic naming; OIE uses app sign-on policies |
 
 ---
 
-## Customization & Branding
+## Still Missing from the Provider
 
-| Feature | Provider Resource | Demo Template | Notes | Priority |
-|---------|-------------------|---------------|-------|----------|
-| **Brands** | ✅ `okta_brand` | ⚠️ Limited examples | Brand identity | MEDIUM |
-| **Themes** | ✅ `okta_theme` | ⚠️ Limited examples | Visual themes | MEDIUM |
-| **Customized Sign-In Page** | ✅ `okta_customized_signin_page` | ⚠️ Limited examples | Custom HTML/CSS | MEDIUM |
-| **Preview Sign-In Page** | ✅ `okta_preview_signin_page` | ⚠️ Limited examples | Preview changes | LOW |
-| **Email Templates** | ✅ `okta_email_template_settings` | ⚠️ Limited examples | Email customization | MEDIUM |
-| **Email Customizations** | ✅ `okta_email_customization` | ⚠️ Limited examples | Custom emails | MEDIUM |
-| **SMS Templates** | ✅ `okta_template_sms` | ⚠️ Limited examples | SMS messages | LOW |
-
----
-
-## Domains & Email
-
-| Feature | Provider Resource | Demo Template | Notes | Priority |
-|---------|-------------------|---------------|-------|----------|
-| **Custom Domains** | ✅ `okta_domain` | ⚠️ Limited examples | Custom URLs | MEDIUM |
-| **Domain Certificates** | ✅ `okta_domain_certificate` | ⚠️ Limited examples | TLS certs | MEDIUM |
-| **Domain Verification** | ✅ `okta_domain_verification` | ⚠️ Limited examples | DNS verification | MEDIUM |
-| **Email Domains** | ✅ `okta_email_domain` | ⚠️ Limited examples | Custom email domains | MEDIUM |
-| **Email Domain Verification** | ✅ `okta_email_domain_verification` | ⚠️ Limited examples | DNS verification | MEDIUM |
-| **Email Senders** | ✅ `okta_email_sender` | ⚠️ Limited examples | From addresses | MEDIUM |
-| **Email Sender Verification** | ✅ `okta_email_sender_verification` | ⚠️ Limited examples | Email verification | MEDIUM |
-| **Email SMTP Server** | ✅ `okta_email_smtp_server` | ⚠️ Limited examples | Custom SMTP (v4.19.0+) | MEDIUM |
-
----
-
-## Integrations & Hooks
-
-| Feature | Provider Resource | Demo Template | Notes | Priority |
-|---------|-------------------|---------------|-------|----------|
-| **Event Hooks** | ✅ `okta_event_hook` | ✅ Examples available | Webhook events | - |
-| **Event Hook Verification** | ✅ `okta_event_hook_verification` | ⚠️ Limited examples | Verify ownership | LOW |
-| **Inline Hooks** | ✅ `okta_inline_hook` | ✅ Examples available | Real-time hooks | - |
-| **Log Streams** | ✅ `okta_log_stream` | ⚠️ Limited examples | Log forwarding | MEDIUM |
-
----
-
-## Profile & Schema
-
-| Feature | Provider Resource | Demo Template | Notes | Priority |
-|---------|-------------------|---------------|-------|----------|
-| **Profile Mappings** | ✅ `okta_profile_mapping` | ✅ Examples available | Attribute mapping | - |
-| **App User Base Schema** | ✅ `okta_app_user_base_schema_property` | ⚠️ Limited examples | Modify base attrs | LOW |
-| **App User Custom Schema** | ✅ `okta_app_user_custom_schema_property` | ⚠️ Limited examples | Custom app attrs | LOW |
-| **SAML App Settings** | ✅ `okta_app_saml_app_settings` | ⚠️ Limited examples | SAML config | LOW |
-
----
-
-## Links & Metadata
-
-| Feature | Provider Resource | Demo Template | Notes | Priority |
-|---------|-------------------|---------------|-------|----------|
-| **Link Definitions** | ✅ `okta_link_definition` | ❌ No examples | Link types | LOW |
-| **Link Values** | ✅ `okta_link_value` | ❌ No examples | Link instances | LOW |
-
----
-
-## Summary Statistics
-
-### Overall Coverage
-
-- **Total Provider Resources:** 103
-- **Total Data Sources:** 47
-- **Resources with Examples:** ~65 (63%)
-- **Resources without Examples:** ~38 (37%)
-- **Critical Missing Features:** 3 (Resource Owners, Labels, Risk Rules)
-
-### Priority Breakdown
-
-| Priority | Count | Description |
-|----------|-------|-------------|
-| **CRITICAL** | 3 | Blocks full OIG automation (owners, labels, SOD policies) |
-| **HIGH** | 2 | Significant workflow improvement (provisioning, assignments) |
-| **MEDIUM** | 25+ | Nice to have, improves automation |
-| **LOW** | 50+ | Edge cases, rarely used |
-
-### Coverage by Category
-
-| Category | Coverage | Notes |
-|----------|----------|-------|
-| **OIG Core** | 95% | Missing: owners, labels, risk rules, principal assignments |
-| **Applications** | 90% | Missing: logos, provisioning connection |
-| **Users & Groups** | 100% | Fully covered |
-| **Auth & Policies** | 95% | Missing: session policies |
-| **Customization** | 80% | Most features available, limited examples |
-| **Admin & Security** | 85% | Good coverage, some advanced features missing |
-
----
-
-## Recommendations
-
-### For Immediate Action
-
-1. **Add Examples for Medium Priority Resources**
-   - Rate limiting (new v6.3.0 resources)
-   - Device assurance policies
-   - Email SMTP server
-   - Profile enrollment policies
-   - Admin roles and resource sets
-
-2. **Request Critical Missing Resources from Okta**
-   - `okta_resource_owner` (CRITICAL)
-   - `okta_governance_label` (CRITICAL)
-   - `okta_risk_rule` (CRITICAL)
-   - `okta_app_provisioning_connection` (HIGH)
-
-3. **Document Python Workarounds**
-   - Clear guide on when to use Terraform vs Python scripts
-   - Migration path when resources are added to provider
-   - API-only features reference
-
-### For Demo Template Enhancement
-
-1. **Create comprehensive RESOURCE_EXAMPLES.tf**
-   - One example per resource
-   - Real-world scenarios
-   - Integration patterns
-
-2. **Build example demo scenarios**
-   - Healthcare compliance demo
-   - Financial SOD demo
-   - SaaS tiered access demo
-
-3. **Add validation for all resource types**
-   - Extend terraform-validate.yml workflow
-   - Add resource-specific checks
-   - Create validation library
-
----
-
-## Missing Resources -- Priority Request List
-
-These resources are not yet available in the Terraform provider.
-
-### Tier 1 -- CRITICAL (Blocks Full OIG Automation)
-
-| Resource | Current Workaround | Impact |
-|----------|-------------------|--------|
-| `okta_resource_owner` | `scripts/apply_resource_owners.py` | Cannot assign owners in Terraform |
-| `okta_governance_label` | `scripts/apply_admin_labels.py` | Cannot categorize resources in Terraform |
-| `okta_risk_rule` / `okta_sod_policy` | `scripts/apply_risk_rules.py` | Cannot define SOD policies in code |
-
-### Tier 2 -- HIGH (Reduces Manual Work)
-
-| Resource | Current Workaround | Impact |
-|----------|-------------------|--------|
-| `okta_app_provisioning_connection` | Manual UI | Cannot automate SCIM provisioning setup |
-| `okta_bundle_grant` | Manual UI | Cannot assign bundles to users/groups in Terraform |
-| `okta_app_logo` | Manual UI | Cannot automate app branding |
-
-### Tier 3 -- Nice to Have
-
-| Resource | Priority |
-|----------|----------|
-| `okta_session_policy` | MEDIUM |
-| `okta_feature_flag` | MEDIUM |
-| `okta_org_contact` | LOW |
+| Need | Current Workaround |
+|------|-------------------|
+| Label-to-resource assignment | `scripts/apply_admin_labels.py`, `labels-apply*.yml` |
+| Risk rules / SOD policies | `scripts/apply_risk_rules.py`, `oig-risk-rules-*.yml` |
+| Entitlement bundle grants | Okta Admin UI; `scripts/copy_grants_between_orgs.py` for migration |
+| Entitlement management enablement per app | `scripts/manage_entitlement_settings.py` |
+| Approval sequence stages | Access Requests admin UI (`okta_request_sequence` only binds) |
 
 ---
 
@@ -377,9 +187,10 @@ These resources are not yet available in the Terraform provider.
 - **[API Management](./api-management.md)** -- Python API scripts reference
 - **[Terraform Basics](./terraform-basics.md)** -- Resource examples and HCL patterns
 - **[Workflow Reference](./workflow-reference.md)** -- GitHub Actions workflows
+- **Provider changelog** -- https://github.com/okta/terraform-provider-okta/releases
 
 ---
 
-**Document Version:** 2.0
-**Last Updated:** 2025-11-19
+**Document Version:** 3.0
+**Last Updated:** 2026-10-20
 **Maintained By:** okta-terraform-demo-template maintainers

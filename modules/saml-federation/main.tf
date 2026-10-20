@@ -43,26 +43,26 @@ resource "okta_idp_saml_key" "federation" {
 resource "okta_idp_saml" "federation" {
   count = local.create_idp_saml ? 1 : 0
 
-  name                     = local.idp_name
-  acs_type                 = "INSTANCE"
-  sso_url                  = local.idp_sso_url
-  sso_destination          = local.idp_sso_url
-  sso_binding              = "HTTP-POST"
-  issuer                   = local.idp_issuer
-  issuer_mode              = "ORG_URL"
-  kid                      = local.idp_certificate != "" ? okta_idp_saml_key.federation[0].id : null
-  status                   = var.status
-  request_signature_scope  = var.request_signature_scope
+  name                        = local.idp_name
+  acs_type                    = "INSTANCE"
+  sso_url                     = local.idp_sso_url
+  sso_destination             = local.idp_sso_url
+  sso_binding                 = "HTTP-POST"
+  issuer                      = local.idp_issuer
+  issuer_mode                 = "ORG_URL"
+  kid                         = local.idp_certificate != "" ? okta_idp_saml_key.federation[0].id : null
+  status                      = var.status
+  request_signature_scope     = var.request_signature_scope
   request_signature_algorithm = var.request_signature_algorithm
 
   # User provisioning settings
-  provisioning_action = var.provisioning_action
+  provisioning_action  = var.provisioning_action
   deprovisioned_action = "NONE"
   suspended_action     = "NONE"
   profile_master       = var.profile_master
 
   # Account linking
-  account_link_action      = var.account_link_action
+  account_link_action        = var.account_link_action
   account_link_group_include = []
 
   # Subject matching
@@ -96,14 +96,19 @@ resource "okta_idp_saml" "federation" {
 resource "okta_policy_rule_idp_discovery" "federation" {
   count = local.create_routing_rule && var.routing_policy_id != "" ? 1 : 0
 
-  name                  = "${var.federation_name} Routing"
-  policy_id             = var.routing_policy_id
-  priority              = var.routing_rule_priority
-  status                = var.status
-  idp_type              = "SAML2"
-  idp_id                = okta_idp_saml.federation[0].id
-  user_identifier_type  = "IDENTIFIER"
+  name                      = "${var.federation_name} Routing"
+  policy_id                 = var.routing_policy_id
+  priority                  = var.routing_rule_priority
+  status                    = var.status
+  user_identifier_type      = "IDENTIFIER"
   user_identifier_attribute = "login"
+
+  # The target IdP is an idp_providers block; the old idp_type/idp_id
+  # arguments do not exist in the provider schema.
+  idp_providers {
+    type = "SAML2"
+    id   = okta_idp_saml.federation[0].id
+  }
 
   user_identifier_patterns {
     match_type = "SUFFIX"
@@ -144,11 +149,11 @@ resource "okta_app_saml" "federation" {
   subject_name_id_format   = "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
 
   # Signature settings
-  response_signed          = true
-  assertion_signed         = var.assertion_signed
-  signature_algorithm      = var.response_signature_algorithm
-  digest_algorithm         = var.digest_algorithm
-  honor_force_authn        = var.honor_force_authn
+  response_signed     = true
+  assertion_signed    = var.assertion_signed
+  signature_algorithm = var.response_signature_algorithm
+  digest_algorithm    = var.digest_algorithm
+  honor_force_authn   = var.honor_force_authn
 
   # Attribute statements
   dynamic "attribute_statements" {
@@ -177,10 +182,10 @@ resource "okta_app_saml" "federation" {
   accessibility_self_service = false
 
   lifecycle {
-    # Ignore changes to client-side settings
+    # Ignore changes to client-side settings (logo_url is computed-only and
+    # cannot be listed here)
     ignore_changes = [
       logo,
-      logo_url,
     ]
   }
 }

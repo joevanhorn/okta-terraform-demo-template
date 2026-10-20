@@ -767,7 +767,7 @@ ai-assisted/
 
 **Generates:**
 - okta_entitlement_bundle resources
-- okta_reviews resources
+- okta_campaign resources
 
 **Time to generate:** 3-5 minutes (Tier 1) or 1-2 minutes (Tier 2)
 

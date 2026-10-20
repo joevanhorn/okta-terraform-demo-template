@@ -1,8 +1,8 @@
 # =============================================================================
 # LIFECYCLE MANAGEMENT MODULE - Provider Requirements
 # =============================================================================
-# This module requires the Okta Terraform provider v6.4.0 or higher for
-# OIG features (entitlement bundles, access reviews).
+# This module requires the Okta Terraform provider v7.0.0 or higher for
+# OIG features (entitlement bundles, access certification campaigns).
 # =============================================================================
 
 terraform {
@@ -11,7 +11,7 @@ terraform {
   required_providers {
     okta = {
       source  = "okta/okta"
-      version = ">= 6.4.0, < 7.0.0"
+      version = ">= 7.0.0, < 8.0.0"
     }
   }
 }

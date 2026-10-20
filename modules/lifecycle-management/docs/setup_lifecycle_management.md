@@ -183,6 +183,7 @@ module "lifecycle" {
   enable_leaver_patterns      = true
   enable_contractor_lifecycle = true
   enable_oig_integration      = true
+  oig_target_app_id           = okta_app_oauth.hr_system.id # App the bundles target (required)
 
   # Departments with entitlement bundles
   departments = [

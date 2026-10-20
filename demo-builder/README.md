@@ -220,7 +220,7 @@ environments/myorg/terraform/
 ├── group_memberships.tf  # okta_group_memberships resources
 ├── apps.tf               # okta_app_oauth resources
 ├── app_assignments.tf    # okta_app_group_assignment resources
-└── oig.tf                # okta_entitlement_bundle, okta_reviews
+└── oig.tf                # okta_entitlement_bundle, okta_campaign
 ```
 
 ## Examples

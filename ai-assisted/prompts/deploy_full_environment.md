@@ -174,7 +174,7 @@ gh run list --workflow=tf-apply.yml --limit 1
 
 Generate from Section 5:
 
-- `okta_access_review_campaign` for each campaign in the table
+- `okta_campaign` for each campaign in the table (see `RESOURCE_EXAMPLES.tf` for the required settings blocks)
 
 NOTE: Entitlement bundles are NOT generated at this stage. Bundles are per-app and
 reference specific entitlement values that must first be synced into each application.

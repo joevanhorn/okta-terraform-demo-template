@@ -5,6 +5,26 @@ All notable changes to this template will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-10-20
+
+### Changed
+
+#### Okta Terraform provider v7 (okta/okta `>= 7.0.0, < 8.0.0`)
+- Provider constraint bumped from `>= 6.4.0, < 7.0.0` to `>= 7.0.0, < 8.0.0` in `environments/myorg/terraform/provider.tf`, both Okta modules, and the Terraformer bootstrap script. Run `terraform init -upgrade` in each environment.
+- v7.0.0 breaking changes that affect example code: `okta_trusted_origin` (`scopes` is now a repeated block, `active` became `status`), `okta_threat_insight_settings` (`network_excludes` -> `exclude_zones`), `okta_template_sms` (`translations` is a map), `okta_role_subscription` (`role_type` -> `role_ref`), `okta_captcha_org_wide_settings` deprecated in favour of `okta_org_captcha`. None of the resources used by the modules are affected.
+- `environments/myorg/terraform/RESOURCE_EXAMPLES.tf` re-verified against v7.0.0 with `terraform validate` (the previous OIG examples used multi-argument single-line blocks that HCL rejects, and 12 other examples carried attributes that no longer exist). New sections cover `okta_label`, `okta_resource_owner`, `okta_group_owners`, `okta_app_connection` / `okta_app_features`, `okta_realm` / `okta_realm_assignment`, ITP policy rules and `okta_security_events_provider`, app sign-on policies, rate limits, and the v7 replacements above.
+- `docs/reference/provider-coverage.md` rewritten for v7.0.0 (162 resources, 109 data sources): resource owners and label definitions are now Terraform; label assignment, risk rules and bundle grants remain API-only.
+
+### Fixed
+
+- `modules/lifecycle-management`: `okta_event_hook.channel` is a map attribute, not a block, and every `okta_entitlement_bundle` needs a `target` (new `oig_target_app_id` input plus per-bundle overrides). The module did not pass `terraform validate` on any 6.x provider.
+- `modules/saml-federation`: `okta_policy_rule_idp_discovery` takes an `idp_providers` block, not `idp_type`/`idp_id`.
+- Stale resource names (`okta_reviews`, `okta_request_sequences`, `okta_request_conditions`, `okta_request_settings`, `okta_access_review_campaign`, `okta_group_memberships.members`) and the wrong `okta_entitlement` schema corrected across docs, AI context files, `scripts/import_oig_resources.py`, `scripts/build_demo.py`, and the restore workflow.
+
+### Added
+
+- `tf-validate.yml` now validates both Okta modules and the uncommented `RESOURCE_EXAMPLES.tf` against the pinned provider on every PR.
+
 ## [2.0.0] - 2025-11-12
 
 ### Added

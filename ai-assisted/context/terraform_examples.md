@@ -245,54 +245,72 @@ resource "okta_app_group_assignment" "salesforce_marketing" {
 
 ```hcl
 resource "okta_entitlement" "app_accounts" {
-  app_id         = okta_app_oauth.money_movement.id
-  key            = "accounts"
-  type           = "array<string>"
-  display_name   = "Account Access"
+  name           = "Account Access"
+  external_value = "accounts"
+  multi_value    = true
+  data_type      = "array"
+
+  parent {
+    external_id = okta_app_oauth.money_movement.id
+    type        = "APPLICATION"
+  }
 
   # Values in alphabetical order by external_value
   values {
-    value          = "CASH MANAGEMENT II"
+    name           = "CASH MANAGEMENT II"
     external_value = "26DEMO14"
   }
   values {
-    value          = "CASH MANAGEMENT III"
+    name           = "CASH MANAGEMENT III"
     external_value = "26DEMO26"
   }
   values {
-    value          = "ANCHOR CHECKING II"
+    name           = "ANCHOR CHECKING II"
     external_value = "DEMO38"
   }
   values {
-    value          = "INTEREST CHECKING"
+    name           = "INTEREST CHECKING"
     external_value = "DEMO42"
   }
 }
 
 # For yes/no entitlements, "no" comes before "yes" alphabetically
 resource "okta_entitlement" "app_permission" {
-  app_id         = okta_app_oauth.money_movement.id
-  key            = "canApprove"
-  type           = "string"
-  display_name   = "Can Approve"
+  name           = "Can Approve"
+  external_value = "canApprove"
+  multi_value    = false
+  data_type      = "string"
+
+  parent {
+    external_id = okta_app_oauth.money_movement.id
+    type        = "APPLICATION"
+  }
 
   values {
-    value          = "No"
+    name           = "No"
     external_value = "no"
   }
   values {
-    value          = "Yes"
+    name           = "Yes"
     external_value = "yes"
   }
 }
 ```
 
 ### Entitlement Bundle (Basic)
+
+The `target` block is required (the app the bundle belongs to):
+
 ```hcl
 resource "okta_entitlement_bundle" "marketing_tools" {
   name        = "Marketing Tools Bundle"
   description = "Access to all marketing applications and resources"
   status      = "ACTIVE"
+
+  target {
+    external_id = okta_app_oauth.salesforce.id
+    type        = "APPLICATION"
+  }
 }
 ```
 
@@ -340,22 +358,71 @@ resource "okta_entitlement_bundle" "standard_access" {
 - The `for` expression filters values by `external_value` and returns the Okta-generated `id`
 - This creates proper resource dependencies so bundles can be created in the same apply as entitlements
 
-### Access Review Campaign
+### Access Certification Campaign
 ```hcl
-resource "okta_reviews" "quarterly_access_review" {
-  name        = "Quarterly Access Review - Q1 2025"
-  description = "Review user access to all applications"
+resource "okta_campaign" "quarterly_access_review" {
+  name          = "Quarterly Access Review - Q1 2027"
+  description   = "Review user access to the money movement app"
+  campaign_type = "RESOURCE"
 
-  # Review schedule
-  start_date  = "2025-01-01T00:00:00Z"
-  end_date    = "2025-01-31T23:59:59Z"
+  schedule_settings {
+    type             = "ONE_OFF"
+    start_date       = "2027-01-01T08:00:00.000Z"
+    duration_in_days = 30
+    time_zone        = "America/Los_Angeles"
+  }
 
-  # Review type
-  review_type = "USER_ACCESS_REVIEW"
+  resource_settings {
+    type                 = "APPLICATION"
+    include_entitlements = true
+    target_resources {
+      resource_id                          = okta_app_oauth.money_movement.id
+      resource_type                        = "APPLICATION"
+      include_all_entitlements_and_bundles = true
+    }
+  }
 
-  # Reviewers
-  reviewer_type = "MANAGER"
+  principal_scope_settings {
+    type = "USERS"
+  }
+
+  reviewer_settings {
+    type                 = "RESOURCE_OWNER"
+    fallback_reviewer_id = okta_user.john_doe.id
+  }
+
+  remediation_settings {
+    access_approved = "NO_ACTION"
+    access_revoked  = "DENY"
+    no_response     = "DENY"
+  }
+
+  notification_settings {
+    notify_reviewer_when_review_assigned      = true
+    notify_reviewer_during_midpoint_of_review = true
+    notify_reviewer_when_overdue              = true
+    notify_review_period_end                  = true
+    notify_reviewer_at_campaign_end           = true
+  }
 }
+```
+
+### Resource Owners and Labels (provider v6.13.0+)
+```hcl
+data "okta_org_metadata" "current" {}
+
+resource "okta_resource_owner" "money_movement" {
+  resource_orns  = ["orn:okta:idp:${data.okta_org_metadata.current.id}:apps:${okta_app_oauth.money_movement.name}:${okta_app_oauth.money_movement.id}"]
+  principal_orns = ["orn:okta:directory:${data.okta_org_metadata.current.id}:users:${okta_user.john_doe.id}"]
+}
+
+resource "okta_label" "data_classification" {
+  name = "Data Classification"
+  values {
+    name = "Confidential"
+  }
+}
+# Attaching label values to resources is still API-only (scripts/apply_admin_labels.py)
 ```
 
 ## Authorization Server Examples

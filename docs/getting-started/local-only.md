@@ -70,7 +70,7 @@ terraform {
   required_providers {
     okta = {
       source  = "okta/okta"
-      version = "~> 6.4.0"
+      version = ">= 7.0.0, < 8.0.0"
     }
   }
 }
@@ -126,7 +126,7 @@ terraform init
 ```
 Initializing the backend...
 Initializing provider plugins...
-- Installing okta/okta v6.4.0...
+- Installing okta/okta v7.0.0...
 
 Terraform has been successfully initialized!
 ```
@@ -367,7 +367,7 @@ terraform {
   required_providers {
     okta = {
       source  = "okta/okta"
-      version = "~> 6.4.0"
+      version = ">= 7.0.0, < 8.0.0"
     }
   }
 }

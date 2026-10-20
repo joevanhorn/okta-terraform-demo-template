@@ -48,16 +48,16 @@ Example:
 - Contractor Access Review: Monthly review of contractor permissions
 
 OUTPUT REQUIREMENTS:
-1. Generate okta_entitlement_bundle resources in oig_entitlements.tf
-2. Generate okta_reviews resources in oig_reviews.tf
+1. Generate okta_entitlement_bundle resources in oig_entitlements.tf (every bundle needs a target { external_id, type = "APPLICATION" } block)
+2. Generate okta_campaign resources in oig_reviews.tf (schedule_settings, resource_settings, principal_scope_settings, reviewer_settings, remediation_settings and notification_settings are all required)
 3. Use descriptive names and comments
 4. Follow repository patterns exactly
 5. Include realistic dates for review campaigns
 
 IMPORTANT NOTES:
 - Bundle definitions only (principal assignments managed in Okta UI)
-- Resource owners managed separately via Python scripts
-- Governance labels managed separately via Python scripts
+- Resource owners can be Terraform (okta_resource_owner) or Python scripts
+- Label definitions can be Terraform (okta_label); assigning labels to resources is Python scripts only
 
 Please generate the OIG Terraform configuration.
 ```

@@ -245,32 +245,77 @@ For Identity Governance demos (entitlement bundles, access reviews):
 ### Create Entitlement Bundles
 
 ```hcl
-# Create bundle definition
+# Create bundle definitions (target app is required)
 resource "okta_entitlement_bundle" "patient_access" {
   name        = "Patient Data Access"
   description = "Access to view and edit patient records"
   status      = "ACTIVE"
+
+  target {
+    external_id = okta_app_oauth.ehr_system.id
+    type        = "APPLICATION"
+  }
 }
 
 resource "okta_entitlement_bundle" "admin_access" {
   name        = "Administrative Access"
   description = "Full administrative capabilities"
   status      = "ACTIVE"
+
+  target {
+    external_id = okta_app_oauth.ehr_system.id
+    type        = "APPLICATION"
+  }
 }
 ```
 
 **Important:** Bundles are DEFINITIONS only. Assigning bundles to users/groups is done in Okta Admin UI, not Terraform.
 
-### Create Access Reviews
+### Create Access Certification Campaigns
 
 ```hcl
-resource "okta_reviews" "quarterly_review" {
-  name        = "Q1 2025 Access Review"
-  description = "Quarterly review of all user access"
+resource "okta_campaign" "quarterly_review" {
+  name          = "Q1 2027 Access Review"
+  description   = "Quarterly review of all user access"
+  campaign_type = "RESOURCE"
 
-  # Note: Schedule and scope configured in Okta Admin UI
-  lifecycle {
-    ignore_changes = [schedule, scope]
+  schedule_settings {
+    type             = "ONE_OFF"
+    start_date       = "2027-01-01T08:00:00.000Z"
+    duration_in_days = 30
+    time_zone        = "America/Los_Angeles"
+  }
+
+  resource_settings {
+    type = "APPLICATION"
+    target_resources {
+      resource_id   = okta_app_oauth.ehr_system.id
+      resource_type = "APPLICATION"
+    }
+  }
+
+  principal_scope_settings {
+    type      = "GROUPS"
+    group_ids = [okta_group.clinical_staff.id]
+  }
+
+  reviewer_settings {
+    type        = "USER"
+    reviewer_id = okta_user.dr_smith.id
+  }
+
+  remediation_settings {
+    access_approved = "NO_ACTION"
+    access_revoked  = "DENY"
+    no_response     = "DENY"
+  }
+
+  notification_settings {
+    notify_reviewer_when_review_assigned      = true
+    notify_reviewer_during_midpoint_of_review = true
+    notify_reviewer_when_overdue              = true
+    notify_review_period_end                  = true
+    notify_reviewer_at_campaign_end           = true
   }
 }
 ```

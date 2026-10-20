@@ -102,7 +102,7 @@ module "azure_ad_federation" {
 | Name | Version |
 |------|---------|
 | terraform | >= 1.9.0 |
-| okta | >= 6.4.0, < 7.0.0 |
+| okta | >= 7.0.0, < 8.0.0 |
 
 ## Inputs
 

@@ -93,12 +93,13 @@ variable "user_types" {
 # -----------------------------------------------------------------------------
 
 variable "departments" {
-  description = "Departments for group rule auto-assignment"
+  description = "Departments for group rule auto-assignment. entitlement_bundle_app_id overrides oig_target_app_id for that department's bundle."
   type = list(object({
-    name               = string
-    group_name         = optional(string)
-    group_description  = optional(string)
-    entitlement_bundle = optional(string)
+    name                      = string
+    group_name                = optional(string)
+    group_description         = optional(string)
+    entitlement_bundle        = optional(string)
+    entitlement_bundle_app_id = optional(string, "")
   }))
   default = []
 }
@@ -121,8 +122,14 @@ variable "joiner_config" {
     # Default entitlement bundle for new employees
     default_employee_bundle = optional(string, "")
 
+    # App ID the employee bundle targets (falls back to oig_target_app_id)
+    default_employee_bundle_app_id = optional(string, "")
+
     # Default entitlement bundle for new contractors
     default_contractor_bundle = optional(string, "")
+
+    # App ID the contractor bundle targets (falls back to oig_target_app_id)
+    default_contractor_bundle_app_id = optional(string, "")
 
     # Enable staged user support (users created in STAGED status)
     enable_staged_users = optional(bool, true)
@@ -228,12 +235,24 @@ variable "contractor_config" {
 # OIG Entitlement Bundles Configuration
 # -----------------------------------------------------------------------------
 
+variable "oig_target_app_id" {
+  description = <<-EOT
+    Okta application ID that module-created entitlement bundles target.
+    The provider requires every okta_entitlement_bundle to declare a target
+    application, so bundles are only created when this (or a per-bundle
+    target_app_id) is set. The app must have Entitlement Management enabled.
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "entitlement_bundles" {
-  description = "Entitlement bundles to create for lifecycle management"
+  description = "Entitlement bundles to create for lifecycle management. target_app_id overrides oig_target_app_id for that bundle."
   type = list(object({
-    name        = string
-    description = string
-    status      = optional(string, "ACTIVE")
+    name          = string
+    description   = string
+    status        = optional(string, "ACTIVE")
+    target_app_id = optional(string, "")
   }))
   default = []
 }

@@ -5,20 +5,29 @@
 # This file creates an Okta application configured to provision users to a
 # custom SCIM 2.0 server deployed via the infrastructure/scim-server module.
 #
-# IMPORTANT: Terraform Provider Limitations
-# -----------------------------------------
-# The Okta Terraform provider does NOT yet support:
-#   - SCIM connection configuration (base URL, authentication)
-#   - Testing SCIM connections
-#   - Enabling specific provisioning features
-#   - Configuring attribute mappings
+# Provisioning configuration options
+# ----------------------------------
+# Provider v7 has okta_app_connection (provisioning connection: base URL +
+# auth, activate/deactivate) and okta_app_features (enable provisioning
+# capabilities). okta_app_features is only supported for OIN apps that expose
+# the Application Features API, and neither resource tests the connection or
+# manages attribute mappings, so this custom SWA-based SCIM app keeps the
+# proven two-step flow:
 #
-# These must be configured using the Okta Admin API via Python script.
-#
-# Two-Step Process:
-# -----------------
 # 1. Terraform: Creates the Okta app (this file)
 # 2. Python: Configures SCIM connection (modules/scim-server/scripts/configure_scim_app.py)
+#
+# For an OIN SCIM app, the Terraform-only alternative looks like:
+#
+# resource "okta_app_connection" "scim_demo" {
+#   id       = okta_app_auto_login.scim_demo.id
+#   base_url = data.terraform_remote_state.scim_server.outputs.scim_base_url
+#   action   = "activate"
+#   profile {
+#     auth_scheme = "TOKEN"
+#     token       = var.scim_bearer_token
+#   }
+# }
 #
 # ==============================================================================
 

@@ -898,42 +898,100 @@ Once the SCIM server is provisioned and configured in Okta:
 In `environments/myorg/terraform/oig_entitlements.tf`:
 
 ```hcl
+# Entitlements discovered from the SCIM server are imported by Okta; look the
+# "role" entitlement up and bundle the admin value.
+data "okta_entitlement" "scim_role" {
+  id = "<entitlement-id>" # from the Admin Console or scripts/import_app_entitlements.py
+}
+
 resource "okta_entitlement_bundle" "admin_bundle" {
   name        = "SCIM Demo - Administrator Access"
   description = "Full admin access to SCIM demo application"
   status      = "ACTIVE"
-}
 
-# Link bundle to SCIM app entitlements
-resource "okta_entitlement" "scim_admin_role" {
-  app_id          = okta_app_oauth.scim_demo.id
-  entitlement_id  = "role_admin"  # Matches SCIM server role ID
-  bundle_id       = okta_entitlement_bundle.admin_bundle.id
+  target {
+    external_id = okta_app_auto_login.scim_demo.id
+    type        = "APPLICATION"
+  }
+
+  entitlements {
+    id = data.okta_entitlement.scim_role.id
+    dynamic "values" {
+      for_each = [for v in data.okta_entitlement.scim_role.values : v.id if v.external_value == "role_admin"]
+      content {
+        id = values.value
+      }
+    }
+  }
 }
 ```
 
-### 2. Create Access Review Campaigns
+### 2. Create Access Certification Campaigns
 
 ```hcl
-resource "okta_access_review_campaign" "scim_quarterly_review" {
-  name        = "SCIM Demo - Quarterly Access Review"
-  description = "Review administrator access to SCIM demo app"
-  status      = "ACTIVE"
+resource "okta_campaign" "scim_quarterly_review" {
+  name          = "SCIM Demo - Quarterly Access Review"
+  description   = "Review administrator access to SCIM demo app"
+  campaign_type = "RESOURCE"
 
-  resources {
-    bundle_id = okta_entitlement_bundle.admin_bundle.id
+  schedule_settings {
+    type             = "RECURRING"
+    start_date       = "2027-01-01T08:00:00.000Z"
+    duration_in_days = 14
+    time_zone        = "America/Los_Angeles"
+    recurrence {
+      interval       = "P3M"
+      repeat_on_type = "SAME_DAY_AS_START_DATE"
+    }
   }
 
-  schedule {
-    frequency = "QUARTERLY"
-    # ... configuration
+  resource_settings {
+    type                 = "APPLICATION"
+    include_entitlements = true
+    target_resources {
+      resource_id   = okta_app_auto_login.scim_demo.id
+      resource_type = "APPLICATION"
+      entitlement_bundles {
+        id = okta_entitlement_bundle.admin_bundle.id
+      }
+    }
+  }
+
+  principal_scope_settings {
+    type = "USERS"
+  }
+
+  reviewer_settings {
+    type                 = "RESOURCE_OWNER"
+    fallback_reviewer_id = okta_user.security_lead.id
+  }
+
+  remediation_settings {
+    access_approved = "NO_ACTION"
+    access_revoked  = "DENY"
+    no_response     = "DENY"
+  }
+
+  notification_settings {
+    notify_reviewer_when_review_assigned      = true
+    notify_reviewer_during_midpoint_of_review = true
+    notify_reviewer_when_overdue              = true
+    notify_review_period_end                  = true
+    notify_reviewer_at_campaign_end           = true
   }
 }
 ```
 
 ### 3. Assign Resource Owners
 
-Use Python scripts in `scripts/apply_resource_owners.py`
+```hcl
+resource "okta_resource_owner" "scim_demo" {
+  resource_orns  = ["orn:okta:idp:${data.okta_org_metadata.current.id}:apps:${okta_app_auto_login.scim_demo.name}:${okta_app_auto_login.scim_demo.id}"]
+  principal_orns = ["orn:okta:directory:${data.okta_org_metadata.current.id}:users:${okta_user.security_lead.id}"]
+}
+```
+
+(`scripts/apply_resource_owners.py` remains available for config-file driven ownership.)
 
 ## Development and Testing
 

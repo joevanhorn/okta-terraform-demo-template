@@ -70,12 +70,14 @@ locals {
 
   # Merge default joiner config with provided config
   joiner = {
-    auto_assign_rules         = try(var.joiner_config.auto_assign_rules, [])
-    default_employee_bundle   = try(var.joiner_config.default_employee_bundle, "")
-    default_contractor_bundle = try(var.joiner_config.default_contractor_bundle, "")
-    enable_staged_users       = try(var.joiner_config.enable_staged_users, true)
-    create_new_hires_group    = try(var.joiner_config.create_new_hires_group, true)
-    manager_link_name         = try(var.joiner_config.manager_link_name, "manager")
+    auto_assign_rules                = try(var.joiner_config.auto_assign_rules, [])
+    default_employee_bundle          = try(var.joiner_config.default_employee_bundle, "")
+    default_employee_bundle_app_id   = try(var.joiner_config.default_employee_bundle_app_id, "") != "" ? var.joiner_config.default_employee_bundle_app_id : var.oig_target_app_id
+    default_contractor_bundle        = try(var.joiner_config.default_contractor_bundle, "")
+    default_contractor_bundle_app_id = try(var.joiner_config.default_contractor_bundle_app_id, "") != "" ? var.joiner_config.default_contractor_bundle_app_id : var.oig_target_app_id
+    enable_staged_users              = try(var.joiner_config.enable_staged_users, true)
+    create_new_hires_group           = try(var.joiner_config.create_new_hires_group, true)
+    manager_link_name                = try(var.joiner_config.manager_link_name, "manager")
   }
 
   # ---------------------------------------------------------------------------
@@ -112,15 +114,15 @@ locals {
   # ---------------------------------------------------------------------------
 
   contractor = {
-    end_date_attribute         = try(var.contractor_config.end_date_attribute, "contractEndDate")
-    create_end_date_attribute  = try(var.contractor_config.create_end_date_attribute, true)
-    warning_days               = try(var.contractor_config.warning_days, 30)
-    final_notice_days          = try(var.contractor_config.final_notice_days, 7)
-    user_type_name             = try(var.contractor_config.user_type_name, "contractor")
-    create_expiration_groups   = try(var.contractor_config.create_expiration_groups, true)
-    create_access_tier_groups  = try(var.contractor_config.create_access_tier_groups, true)
-    require_manager            = try(var.contractor_config.require_manager, true)
-    create_no_manager_group    = try(var.contractor_config.create_no_manager_group, true)
+    end_date_attribute        = try(var.contractor_config.end_date_attribute, "contractEndDate")
+    create_end_date_attribute = try(var.contractor_config.create_end_date_attribute, true)
+    warning_days              = try(var.contractor_config.warning_days, 30)
+    final_notice_days         = try(var.contractor_config.final_notice_days, 7)
+    user_type_name            = try(var.contractor_config.user_type_name, "contractor")
+    create_expiration_groups  = try(var.contractor_config.create_expiration_groups, true)
+    create_access_tier_groups = try(var.contractor_config.create_access_tier_groups, true)
+    require_manager           = try(var.contractor_config.require_manager, true)
+    create_no_manager_group   = try(var.contractor_config.create_no_manager_group, true)
   }
 
   # ---------------------------------------------------------------------------
@@ -167,14 +169,47 @@ locals {
   create_leaver_event_hook      = local.create_leaver_resources && local.leaver.webhook_url != ""
 
   # Contractor conditions
-  create_contractor_resources   = var.enable_contractor_lifecycle
-  create_expiration_groups      = local.create_contractor_resources && local.contractor.create_expiration_groups
-  create_access_tier_groups     = local.create_contractor_resources && local.contractor.create_access_tier_groups
-  create_no_manager_group       = local.create_contractor_resources && local.contractor.require_manager && local.contractor.create_no_manager_group
-  create_end_date_attribute     = local.create_contractor_resources && local.contractor.create_end_date_attribute
+  create_contractor_resources = var.enable_contractor_lifecycle
+  create_expiration_groups    = local.create_contractor_resources && local.contractor.create_expiration_groups
+  create_access_tier_groups   = local.create_contractor_resources && local.contractor.create_access_tier_groups
+  create_no_manager_group     = local.create_contractor_resources && local.contractor.require_manager && local.contractor.create_no_manager_group
+  create_end_date_attribute   = local.create_contractor_resources && local.contractor.create_end_date_attribute
 
   # OIG conditions
   create_oig_resources = var.enable_oig_integration
+
+  # okta_entitlement_bundle requires a target application. Resolve each
+  # bundle's target (per-bundle override, else var.oig_target_app_id) and only
+  # create bundles that have one.
+  create_employee_bundle = (
+    local.create_oig_resources &&
+    local.joiner.default_employee_bundle != "" &&
+    local.joiner.default_employee_bundle_app_id != ""
+  )
+  create_contractor_bundle = (
+    local.create_oig_resources &&
+    var.enable_contractor_lifecycle &&
+    local.joiner.default_contractor_bundle != "" &&
+    local.joiner.default_contractor_bundle_app_id != ""
+  )
+
+  custom_bundles = local.create_oig_resources ? {
+    for bundle in var.entitlement_bundles : bundle.name => {
+      name          = bundle.name
+      description   = bundle.description
+      status        = bundle.status
+      target_app_id = bundle.target_app_id != "" ? bundle.target_app_id : var.oig_target_app_id
+    } if(bundle.target_app_id != "" ? bundle.target_app_id : var.oig_target_app_id) != ""
+  } : {}
+
+  department_bundles = local.create_oig_resources ? {
+    for dept in var.departments : dept.name => {
+      name          = dept.entitlement_bundle
+      target_app_id = dept.entitlement_bundle_app_id != "" ? dept.entitlement_bundle_app_id : var.oig_target_app_id
+    }
+    if dept.entitlement_bundle != null && dept.entitlement_bundle != "" &&
+    (dept.entitlement_bundle_app_id != "" ? dept.entitlement_bundle_app_id : var.oig_target_app_id) != ""
+  } : {}
 
   # ---------------------------------------------------------------------------
   # Common Tags

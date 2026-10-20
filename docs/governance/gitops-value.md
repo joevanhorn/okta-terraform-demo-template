@@ -254,13 +254,26 @@ terraform destroy -target=module.acquired_users
 
 **With GitOps**:
 ```hcl
-# Quarterly access review - reusable template
-resource "okta_reviews" "q1_2025_review" {
-  name        = "Q1 2025 Access Review"
-  description = "Quarterly review of all application access"
+# Recurring access certification campaign - reusable template
+resource "okta_campaign" "quarterly_review" {
+  name          = "Quarterly Access Review"
+  description   = "Quarterly review of all application access"
+  campaign_type = "RESOURCE"
 
-  # Same configuration used each quarter
-  # Changes tracked in Git history
+  schedule_settings {
+    type             = "RECURRING"
+    start_date       = "2027-01-01T08:00:00.000Z"
+    duration_in_days = 30
+    time_zone        = "America/Los_Angeles"
+    recurrence {
+      interval       = "P3M"
+      repeat_on_type = "SAME_DAY_AS_START_DATE"
+    }
+  }
+  # resource_settings, principal_scope_settings, reviewer_settings,
+  # remediation_settings and notification_settings are required too;
+  # see RESOURCE_EXAMPLES.tf for the full shape.
+  # Same configuration used each quarter; changes tracked in Git history
 }
 
 # Entitlement bundles as code
@@ -268,6 +281,11 @@ resource "okta_entitlement_bundle" "admin_access" {
   name        = "Administrative Access"
   description = "Full admin capabilities - high risk"
   status      = "ACTIVE"
+
+  target {
+    external_id = okta_app_oauth.admin_console.id
+    type        = "APPLICATION"
+  }
 }
 ```
 

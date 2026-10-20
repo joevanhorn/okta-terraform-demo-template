@@ -28,7 +28,8 @@ resource "okta_event_hook" "mover" {
   status = "ACTIVE"
   events = local.mover.webhook_events
 
-  channel {
+  # channel is a map attribute on okta_event_hook, not a nested block
+  channel = {
     type    = "HTTP"
     version = "1.0.0"
     uri     = local.mover.webhook_url

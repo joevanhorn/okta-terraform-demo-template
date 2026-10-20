@@ -166,10 +166,12 @@ class OIGImporter:
                 response = self._make_request("GET", url, params=params)
                 sequences = response.json().get("data", [])
 
-                # Add to dict to deduplicate
+                # Add to dict to deduplicate. Remember which resource the
+                # sequence was found on: okta_request_sequence needs resource_id.
                 for seq in sequences:
                     seq_id = seq.get("id")
                     if seq_id and seq_id not in all_sequences:
+                        seq["_resource_id"] = bundle_id
                         all_sequences[seq_id] = seq
 
             except Exception as e:
@@ -358,41 +360,81 @@ class OIGImporter:
                 safe_name = f"review_{id_suffix}"
                 name = f"Review {id_suffix}"  # Placeholder display name
 
-            tf_config.append(f'resource "okta_reviews" "{safe_name}" {{')
+            # okta_campaign requires all five settings blocks. Pre-fill them from
+            # the campaign JSON where the API returned it, otherwise use safe
+            # defaults and leave a TODO so the file is valid HCL out of the box.
+            sched = review.get("scheduleSettings") or {}
+            res = review.get("resourceSettings") or {}
+            scope = review.get("principalScopeSettings") or {}
+            rev = review.get("reviewerSettings") or {}
+            rem = review.get("remediationSettings") or {}
+            notif = review.get("notificationSettings") or {}
+
+            def tf_bool(value, default):
+                return str(value if isinstance(value, bool) else default).lower()
+
+            tf_config.append(f'resource "okta_campaign" "{safe_name}" {{')
             tf_config.append(f'  # ID: {review_id}')
-            tf_config.append(f'  name        = "{name}"')
+            tf_config.append(f'  name          = "{name}"')
             if description:
-                tf_config.append(f'  description = "{description}"')
-            tf_config.append(f'')
-            tf_config.append(f'  # REQUIRED: Add schedule, scope, and reviewer configuration')
-            tf_config.append(f'  # This access review campaign will not run until you configure these required fields.')
-            tf_config.append(f'  #')
-            tf_config.append(f'  # Example schedule configuration:')
-            tf_config.append(f'  # schedule {{')
-            tf_config.append(f'  #   frequency   = "QUARTERLY"    # Options: WEEKLY, MONTHLY, QUARTERLY')
-            tf_config.append(f'  #   day_of_week = "MONDAY"       # For WEEKLY: MONDAY-SUNDAY')
-            tf_config.append(f'  #   day_of_month = 1             # For MONTHLY: 1-31')
-            tf_config.append(f'  #   hour        = 9              # 24-hour format: 0-23')
-            tf_config.append(f'  #   timezone    = "America/Los_Angeles"')
-            tf_config.append(f'  # }}')
-            tf_config.append(f'  #')
-            tf_config.append(f'  # Example scope configuration (what to review):')
-            tf_config.append(f'  # scope {{')
-            tf_config.append(f'  #   resource_type = "ENTITLEMENT_BUNDLE"  # or "APPLICATION", "GROUP"')
-            tf_config.append(f'  #   resource_ids  = [okta_entitlement_bundle.example.id]')
-            tf_config.append(f'  # }}')
-            tf_config.append(f'  #')
-            tf_config.append(f'  # Example reviewer configuration:')
-            tf_config.append(f'  # reviewer {{')
-            tf_config.append(f'  #   type = "MANAGER"      # or "RESOURCE_OWNER", "SPECIFIC_USER"')
-            tf_config.append(f'  #   fallback_user_id = okta_user.reviewer.id  # If manager not found')
-            tf_config.append(f'  # }}')
-            tf_config.append(f'  #')
-            tf_config.append(f'  # See: https://registry.terraform.io/providers/okta/okta/latest/docs/resources/reviews')
-            tf_config.append(f'}}')
+                tf_config.append(f'  description   = "{description}"')
+            tf_config.append(f'  campaign_type = "{review.get("campaignType", "RESOURCE")}"')
+            tf_config.append('')
+            tf_config.append('  # REVIEW: values below come from the exported campaign JSON (reviews.json)')
+            tf_config.append('  # where available; everything marked TODO is a placeholder.')
+            tf_config.append('  schedule_settings {')
+            tf_config.append(f'    type             = "{sched.get("type", "ONE_OFF")}"')
+            tf_config.append(f'    start_date       = "{sched.get("startDate", "2027-01-01T08:00:00.000Z")}"')
+            tf_config.append(f'    duration_in_days = {sched.get("durationInDays", 30)}')
+            tf_config.append(f'    time_zone        = "{sched.get("timeZone", "America/Los_Angeles")}"')
+            tf_config.append('  }')
+            tf_config.append('')
+            tf_config.append('  resource_settings {')
+            tf_config.append(f'    type = "{res.get("type", "APPLICATION")}"')
+            for target in res.get("targetResources") or []:
+                tf_config.append('    target_resources {')
+                tf_config.append(f'      resource_id   = "{target.get("resourceId", "")}"')
+                tf_config.append(f'      resource_type = "{target.get("resourceType", "APPLICATION")}"')
+                tf_config.append('    }')
+            if not res.get("targetResources"):
+                tf_config.append('    # TODO: add target_resources { resource_id = ... resource_type = "APPLICATION" | "GROUP" }')
+            tf_config.append('  }')
+            tf_config.append('')
+            tf_config.append('  principal_scope_settings {')
+            tf_config.append(f'    type = "{scope.get("type", "USERS")}"')
+            tf_config.append('  }')
+            tf_config.append('')
+            tf_config.append('  reviewer_settings {')
+            tf_config.append(f'    type = "{rev.get("type", "RESOURCE_OWNER")}"')
+            if rev.get("reviewerId"):
+                tf_config.append(f'    reviewer_id = "{rev["reviewerId"]}"')
+            if rev.get("reviewerGroupId"):
+                tf_config.append(f'    reviewer_group_id = "{rev["reviewerGroupId"]}"')
+            if rev.get("fallbackReviewerId"):
+                tf_config.append(f'    fallback_reviewer_id = "{rev["fallbackReviewerId"]}"')
+            if not (rev.get("reviewerId") or rev.get("reviewerGroupId") or rev.get("fallbackReviewerId")):
+                tf_config.append('    # TODO: reviewer_id (USER), reviewer_group_id (GROUP) or fallback_reviewer_id (RESOURCE_OWNER / REVIEWER_EXPRESSION)')
+            tf_config.append('  }')
+            tf_config.append('')
+            tf_config.append('  remediation_settings {')
+            tf_config.append(f'    access_approved = "{rem.get("accessApproved", "NO_ACTION")}"')
+            tf_config.append(f'    access_revoked  = "{rem.get("accessRevoked", "DENY")}"')
+            tf_config.append(f'    no_response     = "{rem.get("noResponse", "DENY")}"')
+            tf_config.append('  }')
+            tf_config.append('')
+            tf_config.append('  notification_settings {')
+            tf_config.append(f'    notify_reviewer_when_review_assigned      = {tf_bool(notif.get("notifyReviewerWhenReviewAssigned"), True)}')
+            tf_config.append(f'    notify_reviewer_during_midpoint_of_review = {tf_bool(notif.get("notifyReviewerDuringMidpointOfReview"), True)}')
+            tf_config.append(f'    notify_reviewer_when_overdue              = {tf_bool(notif.get("notifyReviewerWhenOverdue"), True)}')
+            tf_config.append(f'    notify_review_period_end                  = {tf_bool(notif.get("notifyReviewPeriodEnd"), True)}')
+            tf_config.append(f'    notify_reviewer_at_campaign_end           = {tf_bool(notif.get("notifyReviewerAtCampaignEnd"), True)}')
+            tf_config.append('  }')
+            tf_config.append('')
+            tf_config.append('  # See: https://registry.terraform.io/providers/okta/okta/latest/docs/resources/campaign')
+            tf_config.append('}')
             tf_config.append('')
 
-            import_commands.append(f'terraform import okta_reviews.{safe_name} {review_id}')
+            import_commands.append(f'terraform import okta_campaign.{safe_name} {review_id}')
 
         return "\n".join(tf_config), import_commands
 
@@ -412,42 +454,25 @@ class OIGImporter:
             description = seq.get("description", "")
             safe_name = self._sanitize_name(name)
 
-            tf_config.append(f'resource "okta_request_sequences" "{safe_name}" {{')
-            tf_config.append(f'  # ID: {seq_id}')
-            tf_config.append(f'  name        = "{name}"')
+            # okta_request_sequence binds an EXISTING approval sequence (authored
+            # in the Access Requests admin UI) to a resource. The sequence's
+            # stages are not managed in Terraform; name/description are read back.
+            resource_id = seq.get("_resource_id", "<resource-id>")
+
+            tf_config.append(f'resource "okta_request_sequence" "{safe_name}" {{')
+            tf_config.append(f'  # Sequence: {name}')
             if description:
-                tf_config.append(f'  description = "{description}"')
-            tf_config.append(f'')
-            tf_config.append(f'  # REQUIRED: Add approval stages configuration')
-            tf_config.append(f'  # Approval workflows require at least one approval stage to function.')
-            tf_config.append(f'  #')
-            tf_config.append(f'  # Example single-stage approval:')
-            tf_config.append(f'  # stage {{')
-            tf_config.append(f'  #   name          = "Manager Approval"')
-            tf_config.append(f'  #   type          = "MANAGER"         # or "SPECIFIC_USER", "RESOURCE_OWNER"')
-            tf_config.append(f'  #   approvers     = []                # Leave empty for MANAGER type')
-            tf_config.append(f'  #   timeout_hours = 48                # Hours before escalation')
-            tf_config.append(f'  # }}')
-            tf_config.append(f'  #')
-            tf_config.append(f'  # Example two-stage approval (manager → security team):')
-            tf_config.append(f'  # stage {{')
-            tf_config.append(f'  #   name          = "Manager Approval"')
-            tf_config.append(f'  #   type          = "MANAGER"')
-            tf_config.append(f'  #   approvers     = []')
-            tf_config.append(f'  #   timeout_hours = 48')
-            tf_config.append(f'  # }}')
-            tf_config.append(f'  # stage {{')
-            tf_config.append(f'  #   name          = "Security Team Approval"')
-            tf_config.append(f'  #   type          = "SPECIFIC_USER"')
-            tf_config.append(f'  #   approvers     = [okta_user.security_lead.id, okta_user.security_admin.id]')
-            tf_config.append(f'  #   timeout_hours = 72')
-            tf_config.append(f'  # }}')
-            tf_config.append(f'  #')
-            tf_config.append(f'  # See: https://registry.terraform.io/providers/okta/okta/latest/docs/resources/request_sequences')
-            tf_config.append(f'}}')
+                tf_config.append(f'  # {description}')
+            tf_config.append(f'  id          = "{seq_id}"')
+            tf_config.append(f'  resource_id = "{resource_id}"')
+            tf_config.append('')
+            tf_config.append('  # Approval stages are configured in Okta Admin Console > Access Requests.')
+            tf_config.append('  # Make the resource requestable with okta_request_condition (see RESOURCE_EXAMPLES.tf).')
+            tf_config.append('  # See: https://registry.terraform.io/providers/okta/okta/latest/docs/resources/request_sequence')
+            tf_config.append('}')
             tf_config.append('')
 
-            import_commands.append(f'terraform import okta_request_sequences.{safe_name} {seq_id}')
+            import_commands.append(f'terraform import okta_request_sequence.{safe_name} {resource_id}/{seq_id}')
 
         return "\n".join(tf_config), import_commands
 
@@ -467,30 +492,16 @@ class OIGImporter:
             name = entry.get("name", "unnamed")
             safe_name = self._sanitize_name(name)
 
-            tf_config.append(f'resource "okta_catalog_entry_default" "{safe_name}" {{')
-            tf_config.append(f'  # ID: {entry_id}')
-            tf_config.append(f'  app_id = "{app_id}"')
-            tf_config.append(f'')
-            tf_config.append(f'  # OPTIONAL: Review and add catalog configuration')
-            tf_config.append(f'  # Catalog entries control how resources appear in the access request catalog.')
-            tf_config.append(f'  # Default configuration is usually sufficient, but you can customize:')
-            tf_config.append(f'  #')
-            tf_config.append(f'  # Example customization:')
-            tf_config.append(f'  # visibility           = "EVERYONE"       # or "SPECIFIC_GROUPS"')
-            tf_config.append(f'  # visible_to_groups    = [okta_group.marketing.id]')
-            tf_config.append(f'  # auto_grant           = false            # Require approval (default)')
-            tf_config.append(f'  # approval_workflow_id = okta_request_sequences.manager_approval.id')
-            tf_config.append(f'  # request_form_fields {{')
-            tf_config.append(f'  #   name     = "Business Justification"')
-            tf_config.append(f'  #   required = true')
-            tf_config.append(f'  #   type     = "TEXT"')
-            tf_config.append(f'  # }}')
-            tf_config.append(f'  #')
-            tf_config.append(f'  # See: https://registry.terraform.io/providers/okta/okta/latest/docs/resources/catalog_entry_default')
-            tf_config.append(f'}}')
+            # Catalog entries are READ-ONLY in the provider (data source). What
+            # makes an app requestable is an okta_request_condition on the app.
+            tf_config.append(f'data "okta_catalog_entry_default" "{safe_name}" {{')
+            tf_config.append(f'  # App: {app_id}')
+            tf_config.append(f'  entry_id = "{entry_id}"')
+            tf_config.append('}')
             tf_config.append('')
-
-            import_commands.append(f'terraform import okta_catalog_entry_default.{safe_name} {entry_id}')
+            tf_config.append('# To manage who can request this entry, create an okta_request_condition')
+            tf_config.append('# (see RESOURCE_EXAMPLES.tf). Catalog entries themselves cannot be imported.')
+            tf_config.append('')
 
         return "\n".join(tf_config), import_commands
 
@@ -502,30 +513,21 @@ class OIGImporter:
         tf_config = []
         import_commands = []
 
+        acknowledged = str(bool(settings.get("subprocessorsAcknowledged", False))).lower()
+
         tf_config.append("# Global Request Settings\n")
-        tf_config.append('resource "okta_request_settings" "settings" {')
-        tf_config.append('  # Global settings for access requests')
+        tf_config.append('resource "okta_request_setting_organization" "org" {')
+        tf_config.append('  # Org-wide access request settings (the only writable field today)')
+        tf_config.append('  id                         = "default"')
+        tf_config.append(f'  subprocessors_acknowledged = {acknowledged}')
         tf_config.append('')
-        tf_config.append('  # OPTIONAL: Add request settings configuration')
-        tf_config.append('  # Global settings that apply to all access requests in your org.')
-        tf_config.append('  # If not specified, Okta defaults will be used.')
-        tf_config.append('  #')
-        tf_config.append('  # Example configuration:')
-        tf_config.append('  # default_approval_workflow_id = okta_request_sequences.default.id')
-        tf_config.append('  # require_justification        = true')
-        tf_config.append('  # notification_settings {{')
-        tf_config.append('  #   notify_requester  = true  # Email requester on status changes')
-        tf_config.append('  #   notify_approver   = true  # Email approver when action needed')
-        tf_config.append('  #   notify_on_grant   = true  # Email when access granted')
-        tf_config.append('  #   notify_on_revoke  = true  # Email when access revoked')
-        tf_config.append('  # }}')
-        tf_config.append('  # request_expiry_days         = 90   # Auto-expire requests after 90 days')
-        tf_config.append('  #')
-        tf_config.append('  # See: https://registry.terraform.io/providers/okta/okta/latest/docs/resources/request_settings')
+        tf_config.append('  # Per-resource settings (request on behalf of, risk settings) live in')
+        tf_config.append('  # okta_request_setting_resource; see RESOURCE_EXAMPLES.tf.')
+        tf_config.append('  # See: https://registry.terraform.io/providers/okta/okta/latest/docs/resources/request_setting_organization')
         tf_config.append('}')
         tf_config.append('')
 
-        import_commands.append('terraform import okta_request_settings.settings default')
+        import_commands.append('terraform import okta_request_setting_organization.org default')
 
         return "\n".join(tf_config), import_commands
 

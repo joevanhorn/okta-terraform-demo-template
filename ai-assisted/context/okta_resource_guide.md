@@ -1,8 +1,8 @@
 # Okta Resource Quick Reference
 
-Comprehensive reference for Okta Terraform resources. This guide covers 80+ resources commonly used in demo environments and production deployments.
+Comprehensive reference for Okta Terraform resources. This guide covers the resources commonly used in demo environments and production deployments (the provider itself has 162 resources and 109 data sources).
 
-**Provider Version:** Okta Terraform Provider 6.4.0+ (OIG support requires 6.4.0+)
+**Provider Version:** Okta Terraform Provider `>= 7.0.0, < 8.0.0`. Validated examples for every resource below live in `environments/myorg/terraform/RESOURCE_EXAMPLES.tf`.
 
 ## Table of Contents
 
@@ -136,18 +136,48 @@ Manages application-level entitlements (access rights)
 Manages entitlement bundles (packages of access)
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/entitlement_bundle
 - **Use for:** Creating access bundles (e.g., "Marketing Tools", "Engineering Access")
+- **Required:** `target { external_id = <app id>  type = "APPLICATION" }`
 - **Note:** Manage bundle definitions only; assign principals via Okta UI
 - **Critical:** Use dynamic blocks to reference Okta-generated value IDs by external_value string
 
-### okta_reviews
-Manages access review campaigns
-- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/reviews
-- **Use for:** Setting up periodic access reviews for compliance
+### okta_campaign
+Manages access certification campaigns (there is no `okta_reviews` resource)
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/campaign
+- **Use for:** Setting up one-off or recurring access reviews for compliance
+- **Required blocks:** `schedule_settings`, `resource_settings`, `reviewer_settings`, `remediation_settings`, `notification_settings`
+
+### okta_review
+Reassigns review items in a running campaign to another reviewer
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/review
+
+### okta_request_condition
+Makes a resource requestable: who may request it, which approval sequence runs, access duration
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/request_condition
+- **Note:** Name is singular; `okta_request_sequence` binds an existing approval sequence to the resource
+
+### okta_request_setting_organization / okta_request_setting_resource
+Org-wide and per-resource access request settings (request on behalf of, risk settings)
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/request_setting_resource
+
+### okta_resource_owner
+Assigns owners (users/groups, by ORN) to apps, groups, entitlements or bundles
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/resource_owner
+- **Added:** provider v6.13.0 (replaces the Python-only path for owners)
+
+### okta_label
+Governance label definition with its allowed values
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/label
+- **Added:** provider v6.13.0
+- **Note:** Assigning label values TO resources is still API-only (`scripts/apply_admin_labels.py`)
+
+### okta_group_owners
+Authoritative set of owners for a group
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/group_owners
 
 ### okta_resource_set
-Manages resource sets for OIG
+Manages admin resource sets (custom admin role scoping)
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/resource_set
-- **Use for:** Grouping resources for governance workflows
+- **Use for:** Scoping custom admin roles to groups/apps/users (not an OIG resource)
 
 ## Authorization & Security
 
@@ -176,14 +206,14 @@ Password policies
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_password
 - **Use for:** Setting password complexity, expiration, history rules
 
-### okta_policy_password_rule
+### okta_policy_rule_password
 Password policy rules
-- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_password_rule
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_rule_password
 - **Use for:** Defining password policy rule conditions
 
-### okta_policy_mfa_rule
+### okta_policy_rule_mfa
 MFA policy rules
-- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_mfa_rule
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_rule_mfa
 - **Use for:** Defining MFA enrollment conditions and requirements
 
 ### okta_auth_server_policy
@@ -205,9 +235,9 @@ Global session policies (formerly sign-on policies)
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_signon
 - **Use for:** Controlling session behavior, device trust, location-based access
 
-### okta_policy_signon_rule
+### okta_policy_rule_signon
 Sign-on policy rules
-- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_signon_rule
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_rule_signon
 - **Use for:** Defining conditions for session creation
 
 ### okta_policy_rule_idp_discovery
@@ -225,10 +255,15 @@ Apps assigned to profile enrollment policies
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_profile_enrollment_apps
 - **Use for:** Assigning apps to enrollment policies
 
-### okta_policy_access
-Access policies for resource access
-- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/policy_access
-- **Use for:** Defining access policies for protected resources
+### okta_entity_risk_policy_rule (ITP)
+Automated response to Identity Threat Protection risk signals
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/entity_risk_policy_rule
+- **Use for:** Terminate sessions / run a Workflow when a user's risk level changes; policy ID from `data.okta_entity_risk_policy`
+- **Related:** `okta_session_violation_policy_rule`, `okta_post_auth_session_policy_rule`, `okta_security_events_provider` (SSF receiver), `okta_user_risk` (set a user's risk level for demos)
+
+### okta_realm / okta_realm_assignment
+Partition users into realms (partner / segmented populations) and route them with Expression Language conditions
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/realm
 
 ---
 
@@ -245,12 +280,18 @@ Network zones for location-based policies
 Trusted origins for CORS and redirect
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/trusted_origin
 - **Use for:** Allowing cross-origin requests from your applications
-- **Scopes:** CORS, REDIRECT, or both
+- **Scopes (v7):** repeated `scopes { type = "CORS" }` blocks (CORS, REDIRECT, IFRAME_EMBED); `status` instead of `active`
 
 ### okta_threat_insight_settings
 ThreatInsight configuration
 - **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/threat_insight_settings
 - **Use for:** Enabling and configuring Okta ThreatInsight
+- **v7:** `network_excludes` was renamed to `exclude_zones` (network zone IDs)
+
+### okta_app_connection / okta_app_features
+Provisioning connection (SCIM base URL + auth, activate/deactivate) and provisioning capabilities
+- **Docs:** https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_connection
+- **Note:** `okta_app_features` only works for OIN apps that expose the Application Features API and cannot be destroyed
 
 ### okta_security_notification_emails
 Security notification settings
@@ -574,10 +615,11 @@ okta_entitlement_bundle (manage via Terraform)
 
 ### Identity Governance Demo
 1. Create users and groups (basic setup)
-2. Create entitlement bundles (`okta_entitlement_bundle`)
-3. Assign apps to bundles (via Okta UI)
-4. Create access reviews (`okta_reviews`)
-5. Demonstrate access certification workflow
+2. Define app entitlements (`okta_entitlement`) and bundles (`okta_entitlement_bundle`, targeting the app)
+3. Assign bundles to principals (via Okta UI)
+4. Assign owners (`okta_resource_owner`) and make resources requestable (`okta_request_condition`)
+5. Create access certification campaigns (`okta_campaign`)
+6. Demonstrate access certification workflow
 
 ## Important Notes
 
@@ -595,10 +637,11 @@ Most resources support `status` attribute:
 
 ### OIG License Required
 These resources require Okta Identity Governance license:
-- `okta_entitlement_bundle`
-- `okta_reviews`
-- `okta_resource_set`
-- Related OIG resources
+- `okta_entitlement`, `okta_entitlement_bundle`
+- `okta_campaign`, `okta_review`
+- `okta_request_condition`, `okta_request_sequence`, `okta_request_setting_*`, `okta_request_v2`
+- `okta_resource_owner`, `okta_label`
+- Related OIG data sources (`okta_catalog_entry_*`, `okta_principal_entitlements`, ...)
 
 ### Risk Rules (Separation of Duties Policies)
 
@@ -626,11 +669,11 @@ Risk rules detect and prevent conflicting access patterns (Separation of Duties 
 **Docs:** See `docs/API_MANAGEMENT.md` (Risk Rules section) for complete guide
 
 ### API-Only Features
-Some OIG features are API-only (not in Terraform):
-- Resource owners (use Python scripts: `scripts/apply_resource_owners.py`)
-- Governance labels (use Python scripts: `scripts/apply_admin_labels.py`, `scripts/sync_label_mappings.py`)
+Some OIG features are still API-only (not in Terraform as of provider v7.0.0):
+- Assigning governance labels to resources (use Python scripts: `scripts/apply_admin_labels.py`, `scripts/sync_label_mappings.py`); label *definitions* are `okta_label`
 - Risk rules / SOD policies (use Python scripts: `scripts/import_risk_rules.py`, `scripts/apply_risk_rules.py`)
 - Principal assignments to bundles (manage via Okta Admin Console)
+- Resource owners are now `okta_resource_owner`; `scripts/apply_resource_owners.py` remains for config-driven forks
 
 ## Infrastructure Resources (AWS)
 
